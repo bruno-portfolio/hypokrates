@@ -18,7 +18,7 @@ def _mock_fetch_total(totals: dict[str, int]) -> AsyncMock:
     async def _side_effect(search: str, *, use_cache: bool = True) -> int:
         if search == "":
             return totals.get("n_total", 10000)
-        if "+AND+" in search:
+        if " AND " in search:
             return totals.get("drug_event", 100)
         if "generic_name" in search:
             return totals.get("drug_total", 1000)

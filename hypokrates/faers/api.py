@@ -134,7 +134,7 @@ async def compare(
     for drug in drugs:
         if outcome:
             search = _build_search(drug)
-            search += f'+AND+{SEARCH_FIELDS["reaction"]}:"{outcome}"'
+            search += f' AND {SEARCH_FIELDS["reaction"]}:"{outcome}"'
 
             client = FAERSClient()
             try:
@@ -173,11 +173,11 @@ def _build_search(
     parts: list[str] = [f'{SEARCH_FIELDS["drug"]}:"{drug.upper()}"']
 
     if age_min is not None and age_max is not None:
-        parts.append(f"patient.patientonsetage:[{age_min}+TO+{age_max}]")
+        parts.append(f"patient.patientonsetage:[{age_min} TO {age_max}]")
     elif age_min is not None:
-        parts.append(f"patient.patientonsetage:[{age_min}+TO+999]")
+        parts.append(f"patient.patientonsetage:[{age_min} TO 999]")
     elif age_max is not None:
-        parts.append(f"patient.patientonsetage:[0+TO+{age_max}]")
+        parts.append(f"patient.patientonsetage:[0 TO {age_max}]")
 
     if sex is not None:
         sex_code = SEX_MAP.get(sex.upper(), "0")
@@ -186,7 +186,7 @@ def _build_search(
     if serious is not None:
         parts.append(f"serious:{'1' if serious else '2'}")
 
-    return "+AND+".join(parts)
+    return " AND ".join(parts)
 
 
 def _extract_total(data: dict[str, Any]) -> int:

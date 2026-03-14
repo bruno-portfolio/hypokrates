@@ -46,7 +46,7 @@ async def signal(
     drug_upper = drug.upper()
     event_upper = event.upper()
 
-    search_drug_event = f'{drug_field}:"{drug_upper}"+AND+{reaction_field}:"{event_upper}"'
+    search_drug_event = f'{drug_field}:"{drug_upper}" AND {reaction_field}:"{event_upper}"'
     search_drug = f'{drug_field}:"{drug_upper}"'
     search_event = f'{reaction_field}:"{event_upper}"'
 

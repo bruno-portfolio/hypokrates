@@ -26,15 +26,15 @@ class TestBuildSearch:
 
     def test_with_age_min(self) -> None:
         s = _build_search("propofol", age_min=65)
-        assert "patient.patientonsetage:[65+TO+999]" in s
+        assert "patient.patientonsetage:[65 TO 999]" in s
 
     def test_with_age_max(self) -> None:
         s = _build_search("propofol", age_max=80)
-        assert "patient.patientonsetage:[0+TO+80]" in s
+        assert "patient.patientonsetage:[0 TO 80]" in s
 
     def test_with_age_range(self) -> None:
         s = _build_search("propofol", age_min=18, age_max=65)
-        assert "patient.patientonsetage:[18+TO+65]" in s
+        assert "patient.patientonsetage:[18 TO 65]" in s
 
     def test_with_sex_male(self) -> None:
         s = _build_search("propofol", sex="M")
@@ -55,14 +55,14 @@ class TestBuildSearch:
     def test_combined_filters(self) -> None:
         s = _build_search("propofol", age_min=18, age_max=65, sex="M", serious=True)
         assert "PROPOFOL" in s
-        assert "patient.patientonsetage:[18+TO+65]" in s
+        assert "patient.patientonsetage:[18 TO 65]" in s
         assert "patient.patientsex:1" in s
         assert "serious:1" in s
-        assert "+AND+" in s
+        assert " AND " in s
 
     def test_no_filters_no_and(self) -> None:
         s = _build_search("propofol")
-        assert "+AND+" not in s
+        assert " AND " not in s
 
 
 class TestAdverseEvents:
