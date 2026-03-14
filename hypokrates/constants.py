@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import ClassVar
 
-__version__ = "0.1.0"
+__version__ = "0.6.0"
 
 USER_AGENT = f"hypokrates/{__version__}"
 
