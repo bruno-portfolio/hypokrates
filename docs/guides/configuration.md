@@ -11,6 +11,7 @@ configure(
     openfda_api_key="your-openfda-key",
     ncbi_api_key="your-ncbi-key",
     ncbi_email="you@example.com",
+    drugbank_path="/path/to/drugbank.xml",
     cache_enabled=True,
     cache_dir="/path/to/cache",
     http_timeout=30.0,
@@ -28,12 +29,18 @@ All parameters are optional — only set what you need. Unset fields keep their 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `openfda_api_key` | `str \| None` | `None` | OpenFDA API key — raises rate limit from 40 to 240 req/min |
-| `ncbi_api_key` | `str \| None` | `None` | NCBI API key — raises rate limit from 3 to 10 req/sec |
+| `ncbi_api_key` | `str \| None` | `None` | NCBI API key — raises rate limit from 180 to 600 req/min |
 | `ncbi_email` | `str \| None` | `None` | Email for NCBI requests (recommended by NCBI) |
 
 !!! tip "Where to get API keys"
     - **OpenFDA:** Register at [open.fda.gov/apis/authentication/](https://open.fda.gov/apis/authentication/) — free, instant
     - **NCBI:** Register at [ncbiinsights.ncbi.nlm.nih.gov](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/) — free, instant
+
+### Data Sources
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `drugbank_path` | `str \| Path \| None` | `None` | Path to DrugBank XML file (~175MB). Required for `drug_info()` and `drug_interactions()`. Free academic license at [go.drugbank.com](https://go.drugbank.com/releases/latest). |
 
 ### Cache
 
@@ -42,7 +49,17 @@ All parameters are optional — only set what you need. Unset fields keep their 
 | `cache_enabled` | `bool` | `True` | Enable/disable DuckDB cache globally |
 | `cache_dir` | `Path` | `~/.cache/hypokrates` | Directory for the DuckDB cache file |
 
-The cache stores HTTP responses locally with source-specific TTLs (24h by default). This reduces API calls and speeds up repeated queries.
+The cache stores HTTP responses locally with source-specific TTLs. This reduces API calls and speeds up repeated queries.
+
+| Source | Default TTL |
+|--------|-------------|
+| FAERS | 24 hours |
+| PubMed | 24 hours |
+| RxNorm / MeSH | 90 days |
+| DailyMed | 30 days |
+| ClinicalTrials.gov | 24 hours |
+| OpenTargets | 7 days |
+| ChEMBL | 7 days |
 
 To disable cache for a single call, use `use_cache=False`:
 
@@ -66,6 +83,21 @@ Retries use exponential backoff. Status codes 429 (rate limit), 500, 502, 503, a
 | `debug` | `bool` | `False` | Enable verbose logging |
 
 When `True`, logs detailed HTTP request/response information to the `hypokrates` logger.
+
+## Optional Dependencies
+
+Some features require additional packages:
+
+```bash
+# ClinicalTrials.gov (Cloudflare TLS bypass)
+pip install hypokrates[trials]
+
+# MCP server
+pip install hypokrates[mcp]
+
+# All extras
+pip install hypokrates[trials,mcp]
+```
 
 ## Reading Configuration
 
@@ -98,5 +130,6 @@ configure(
     openfda_api_key=os.getenv("OPENFDA_API_KEY"),
     ncbi_api_key=os.getenv("NCBI_API_KEY"),
     ncbi_email=os.getenv("NCBI_EMAIL"),
+    drugbank_path=os.getenv("DRUGBANK_PATH"),
 )
 ```

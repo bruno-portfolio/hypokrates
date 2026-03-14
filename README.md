@@ -2,30 +2,49 @@
 
 > Normalize and cross-reference global public health data for medical hypothesis generation.
 
-Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DrugBank, WHO, GBD) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
+Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
 
 ## Install
 
 ```bash
 pip install hypokrates
+
+# Optional: ClinicalTrials.gov support (Cloudflare bypass)
+pip install hypokrates[trials]
+
+# Optional: MCP server
+pip install hypokrates[mcp]
 ```
 
 ## Quick start
 
 ```python
-import hypokrates as hp
+from hypokrates.config import configure
 
-# Adverse events for a drug (OpenFDA/FAERS)
-events = hp.faers.adverse_events("propofol")
+# Optional: API keys raise rate limits
+configure(
+    openfda_api_key="your-key",     # 40 -> 240 req/min
+    ncbi_api_key="your-key",        # 180 -> 600 req/min
+    ncbi_email="you@example.com",
+    drugbank_path="/path/to/drugbank.xml",  # Optional: offline drug data
+)
+```
 
-# With filters
-events = hp.faers.adverse_events("propofol", age_min=65, sex="M")
+## Adverse events (FAERS)
 
-# Compare drugs
-comparison = hp.faers.compare(["propofol", "etomidato"], outcome="hypotension")
+```python
+from hypokrates.sync import faers
 
 # Top reported events
-top = hp.faers.top_events("dexmedetomidine", limit=10)
+top = faers.top_events("sugammadex", limit=10)
+for e in top.events:
+    print(f"{e.term}: {e.count}")
+
+# Individual reports with filters
+events = faers.adverse_events("propofol", age_min=65, sex="M", serious=True)
+
+# Compare drugs
+comparison = faers.compare(["propofol", "etomidate"], outcome="hypotension")
 ```
 
 ## Signal detection
@@ -33,140 +52,200 @@ top = hp.faers.top_events("dexmedetomidine", limit=10)
 Disproportionality analysis (PRR, ROR, IC) for drug-event pairs:
 
 ```python
-# Async
-result = await hp.stats.signal("propofol", "PRIS")
-print(result.prr.value)        # PRR point estimate
-print(result.signal_detected)  # Heuristic: >=2/3 measures significant
-
-# Sync
 from hypokrates.sync import stats
-result = stats.signal("propofol", "PRIS")
+
+result = stats.signal("sugammadex", "bradycardia")
+print(f"PRR: {result.prr.value:.2f}")
+print(f"Signal: {result.signal_detected}")  # >= 2/3 measures significant
 ```
 
-## PubMed literature search
-
-Search NCBI/PubMed for drug-event literature:
+## Literature search (PubMed)
 
 ```python
-# Count papers
-result = await hp.pubmed.count_papers("propofol", "hepatotoxicity")
-print(result.total_count)  # 23
-
-# Search with article metadata
-result = await hp.pubmed.search_papers("propofol", "hepatotoxicity", limit=5)
-for article in result.articles:
-    print(f"{article.pmid}: {article.title}")
-
-# Sync
 from hypokrates.sync import pubmed
-result = pubmed.search_papers("propofol", "hepatotoxicity")
+
+result = pubmed.search_papers("sugammadex", "cardiac arrest", limit=5)
+print(f"Total: {result.total_count} papers")
+for a in result.articles:
+    print(f"  [{a.pmid}] {a.title}")
 ```
 
 ## Hypothesis generation
 
-Cross-reference FAERS signal + PubMed literature to classify hypotheses:
+Cross-reference FAERS signal + PubMed + optional sources:
 
 ```python
-# Async
-result = await hp.cross.hypothesis("propofol", "PRIS")
-print(result.classification)    # novel_hypothesis | emerging_signal | known_association | no_signal
-print(result.summary)           # Human-readable summary
-print(result.literature_count)  # Papers found
-print(result.signal.prr.value)  # Underlying signal data
-
-# Sync
 from hypokrates.sync import cross
-result = cross.hypothesis("propofol", "PRIS")
 
-# Custom thresholds
-result = await hp.cross.hypothesis(
-    "propofol", "PRIS",
-    novel_max=2,       # <= 2 papers = novel (default: 0)
-    emerging_max=10,   # <= 10 papers = emerging (default: 5)
-    use_mesh=True,     # Use MeSH qualifiers for precision
+result = cross.hypothesis(
+    "sugammadex", "bradycardia",
+    check_label=True,        # DailyMed FDA label
+    check_trials=True,       # ClinicalTrials.gov
+    check_chembl=True,       # ChEMBL mechanism
+    check_opentargets=True,  # OpenTargets LRT
 )
+print(result.classification)    # novel_hypothesis | emerging_signal | known_association | no_signal
+print(result.summary)
+print(result.literature_count)
 ```
 
 ## Drug scanning
 
-Automated scan of top adverse events with hypothesis classification:
+Automated scan of top adverse events with classification:
 
 ```python
-# Scan top 20 events for propofol (async)
-result = await hp.scan.scan_drug("propofol", top_n=20)
+from hypokrates.sync import scan
 
+result = scan.scan_drug(
+    "sugammadex",
+    top_n=15,
+    check_labels=True,
+    check_trials=True,
+    check_chembl=True,
+    check_opentargets=True,
+    group_events=True,  # MedDRA synonym grouping (default)
+)
 for item in result.items:
     print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f})")
-
 print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
-
-# Sync
-from hypokrates.sync import scan
-result = scan.scan_drug("propofol", top_n=10)
 ```
 
-## Drug normalization
-
-Normalize drug names (brand → generic) and map to MeSH:
+## FDA drug labels (DailyMed)
 
 ```python
-# RxNorm: brand → generic
-norm = await hp.vocab.normalize_drug("advil")
-print(norm.generic_name)  # "ibuprofen"
-print(norm.brand_names)   # ["Advil", "Motrin"]
+from hypokrates.sync import dailymed
+
+# All adverse events in the label
+events = dailymed.label_events("sugammadex")
+print(events.events)  # ["bradycardia", "anaphylaxis", ...]
+
+# Check if specific event is in label
+check = dailymed.check_label("sugammadex", "bradycardia")
+print(check.in_label)  # True/False
+```
+
+## Clinical trials
+
+```python
+from hypokrates.sync import trials
+
+result = trials.search_trials("sugammadex", "bradycardia")
+print(f"Total: {result.total_count}, Active: {result.active_count}")
+for t in result.trials:
+    print(f"  {t.nct_id}: {t.title} [{t.status}]")
+```
+
+> Requires `curl_cffi`: `pip install hypokrates[trials]`
+
+## Drug info (DrugBank)
+
+```python
+from hypokrates.sync import drugbank
+
+# Mechanism, targets, enzymes, interactions
+info = drugbank.drug_info("sugammadex")
+print(info.mechanism)
+print(info.interactions[:5])
+
+# Drug-drug interactions
+interactions = drugbank.drug_interactions("sugammadex")
+```
+
+> Requires DrugBank XML (free academic license).
+
+## Mechanism of action (ChEMBL)
+
+```python
+from hypokrates.sync import chembl
+
+mech = chembl.drug_mechanism("sugammadex")
+print(mech.mechanisms)  # action type, targets, gene names
+```
+
+## Adverse events (OpenTargets)
+
+```python
+from hypokrates.sync import opentargets
+
+# All adverse events with LRT scores
+events = opentargets.drug_adverse_events("sugammadex")
+for e in events.events[:10]:
+    print(f"{e.event}: logLR={e.llr:.1f}, count={e.count}")
+
+# Specific drug-event LRT score
+score = opentargets.drug_safety_score("sugammadex", "bradycardia")
+print(f"logLR: {score.llr}")
+```
+
+## Drug normalization (RxNorm/MeSH)
+
+```python
+from hypokrates.sync import vocab
+
+# Brand -> generic
+norm = vocab.normalize_drug("advil")
+print(f"{norm.original} -> {norm.generic_name}")  # advil -> ibuprofen
 
 # MeSH mapping
-mesh = await hp.vocab.map_to_mesh("aspirin")
-print(mesh.mesh_term)     # "Aspirin"
-print(mesh.mesh_id)       # "D001241"
-
-# Sync
-from hypokrates.sync import vocab
-norm = vocab.normalize_drug("advil")
 mesh = vocab.map_to_mesh("aspirin")
+print(f"{mesh.mesh_term} ({mesh.mesh_id})")  # Aspirin (D001241)
 ```
 
-## Evidence blocks
+## Async API
 
-Structured provenance for any result:
+All functions are async-first. The sync wrapper is for convenience:
 
 ```python
-from hypokrates.evidence import build_faers_evidence
+import asyncio
+from hypokrates.cross import api as cross
+from hypokrates.scan import api as scan
 
-block = build_faers_evidence(result.meta, result.model_dump())
-print(block.limitations)  # [voluntary_reporting, no_denominator, ...]
-print(block.disclaimer)
+async def main():
+    hyp = await cross.hypothesis("sugammadex", "bradycardia", check_label=True)
+    result = await scan.scan_drug("sugammadex", top_n=10)
+
+asyncio.run(main())
 ```
 
-## Async
+## MCP Server
 
-```python
-import hypokrates
+hypokrates exposes all functions as MCP tools for LLM integration:
 
-events = await hypokrates.faers.adverse_events("propofol")
-signal = await hypokrates.stats.signal("propofol", "DEATH")
-papers = await hypokrates.pubmed.search_papers("propofol", "DEATH")
-hyp = await hypokrates.cross.hypothesis("propofol", "DEATH")
-scan_result = await hypokrates.scan.scan_drug("propofol")
-norm = await hypokrates.vocab.normalize_drug("advil")
+```bash
+# Run standalone
+python -m hypokrates.mcp
+
+# Or configure in .mcp.json
+{
+  "mcpServers": {
+    "hypokrates": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "hypokrates.mcp"]
+    }
+  }
+}
 ```
 
-## Sync wrapper
+19 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`.
 
-```python
-from hypokrates.sync import faers, stats, pubmed, cross, scan, vocab
+## Data Sources
 
-events = faers.adverse_events("propofol")
-signal = stats.signal("propofol", "DEATH")
-papers = pubmed.search_papers("propofol", "DEATH")
-hyp = cross.hypothesis("propofol", "DEATH")
-scan_result = scan.scan_drug("propofol")
-norm = vocab.normalize_drug("advil")
-```
+| Source | Module | Auth | Rate Limit |
+|--------|--------|------|------------|
+| OpenFDA/FAERS | `faers` | Optional key | 40-240/min |
+| PubMed | `pubmed` | Optional key | 180-600/min |
+| RxNorm | `vocab` | None | 120/min |
+| MeSH | `vocab` | Shared w/ PubMed | Shared |
+| DailyMed | `dailymed` | None | 60/min |
+| ClinicalTrials.gov | `trials` | None (needs curl_cffi) | 50/min |
+| DrugBank | `drugbank` | Local XML | Offline |
+| OpenTargets | `opentargets` | None | 30/min |
+| ChEMBL | `chembl` | None | 30/min |
 
 ## Status
 
-**Alpha** — Sprint 4 (FAERS + signal detection + PubMed + hypothesis + scan + vocab). Not for clinical use.
+**Alpha** — 704 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 
