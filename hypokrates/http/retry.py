@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_PASSTHROUGH_STATUS = {404}
 
 
 async def retry_request(
@@ -65,6 +66,9 @@ async def retry_request(
                 )
                 await asyncio.sleep(wait)
                 continue
+
+            if response.status_code in _PASSTHROUGH_STATUS:
+                return response
 
             if response.status_code >= 400:
                 response.raise_for_status()

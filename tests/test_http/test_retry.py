@@ -239,7 +239,7 @@ class TestRetryExceptions:
                     source_name="test",
                 )
 
-    @pytest.mark.parametrize("status_code", [400, 401, 403, 404])
+    @pytest.mark.parametrize("status_code", [400, 401, 403])
     @respx.mock
     async def test_4xx_raises_immediately_no_retry(self, status_code: int) -> None:
         """4xx não retryable → NetworkError imediato."""
@@ -253,6 +253,20 @@ class TestRetryExceptions:
                     max_retries=3,
                     source_name="test",
                 )
+
+    @respx.mock
+    async def test_404_passthrough_returns_response(self) -> None:
+        """404 é passthrough — retorna response pro caller tratar."""
+        respx.get("https://example.com/api").mock(return_value=httpx.Response(404))
+        async with create_client() as client:
+            response = await retry_request(
+                client,
+                "GET",
+                "https://example.com/api",
+                max_retries=3,
+                source_name="test",
+            )
+            assert response.status_code == 404
 
     @respx.mock
     async def test_500_final_attempt_source_unavailable(self) -> None:
