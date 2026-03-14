@@ -1,30 +1,30 @@
 # Contributing
 
-Obrigado pelo interesse em contribuir com o hypokrates! Este guia cobre tudo que você precisa saber.
+Thanks for your interest in contributing to hypokrates! This guide covers everything you need to know.
 
-## Como contribuir
+## How to contribute
 
-### Reportar bugs
+### Report bugs
 
-Abra uma [issue](https://github.com/brunoescalhao/hypokrates/issues) com:
-- Versão do hypokrates e Python
-- Código mínimo que reproduz o problema
-- Output/traceback completo
-- Comportamento esperado vs obtido
+Open an [issue](https://github.com/brunoescalhao/hypokrates/issues) with:
+- hypokrates and Python version
+- Minimal code that reproduces the problem
+- Full output/traceback
+- Expected vs actual behavior
 
-### Sugerir funcionalidades
+### Suggest features
 
-Abra uma issue com a label `enhancement`. Descreva o caso de uso, não apenas a solução.
+Open an issue with the `enhancement` label. Describe the use case, not just the solution.
 
 ### Pull Requests
 
-1. Fork o repositório
-2. Crie uma branch: `git checkout -b feat/minha-feature`
-3. Implemente com testes
-4. Verifique que tudo passa (veja abaixo)
-5. Abra o PR descrevendo o que mudou e por quê
+1. Fork the repository
+2. Create a branch: `git checkout -b feat/my-feature`
+3. Implement with tests
+4. Verify everything passes (see below)
+5. Open a PR describing what changed and why
 
-## Setup de desenvolvimento
+## Development setup
 
 ```bash
 # Clone
@@ -36,7 +36,7 @@ python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
-# Instalar em modo dev
+# Install in dev mode
 pip install -e ".[dev]"
 
 # Pre-commit hooks
@@ -44,12 +44,12 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-## Verificação
+## Verification
 
-Todos os checks devem passar antes de abrir PR:
+All checks must pass before opening a PR:
 
 ```bash
-# Testes
+# Tests
 pytest tests/ -v --timeout=30
 
 # Linting
@@ -63,35 +63,35 @@ mypy hypokrates/
 pytest tests/ --cov=hypokrates --cov-fail-under=85
 ```
 
-## Padrões de código
+## Code standards
 
 ### Type hints
 
 - mypy strict — zero `any`
-- `unknown` + type guards quando o tipo é desconhecido
+- `unknown` + type guards when the type is unknown
 - Type-only imports: `from __future__ import annotations` + `TYPE_CHECKING`
 
-### Nomenclatura
+### Naming conventions
 
-- Variáveis/funções: `snake_case`
+- Variables/functions: `snake_case`
 - Classes/Types: `PascalCase`
-- Constantes: `UPPER_SNAKE_CASE`
-- API pública em inglês
-- Domínio médico pode usar português nos comentários
+- Constants: `UPPER_SNAKE_CASE`
+- Public API in English
+- Medical domain may use Portuguese in comments
 
 ### Docstrings
 
-Google convention. Toda função pública precisa de docstring.
+Google convention. Every public function needs a docstring.
 
 ```python
 def compute_prr(table: ContingencyTable) -> DisproportionalityResult:
     """PRR = (a/(a+b)) / (c/(c+d)), CI via Rothman-Greenland.
 
     Args:
-        table: Tabela de contingência 2x2.
+        table: 2x2 contingency table.
 
     Returns:
-        DisproportionalityResult com PRR, CI 95% e flag de significância.
+        DisproportionalityResult with PRR, 95% CI and significance flag.
     """
 ```
 
@@ -114,73 +114,77 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 ```
 
-### Tratamento de erros
+### Error handling
 
-- Nunca catch vazio ou com apenas `console.log`
-- Logar com contexto: operação, IDs relevantes, mensagem do erro
-- Mensagens para o usuário: genéricas. Mensagens no log: específicas
+- Never use empty catch or catch with just `console.log`
+- Log with context: operation, relevant IDs, error message
+- User-facing messages: generic. Log messages: specific
 
-### Testes
+### Tests
 
-- Todo módulo novo precisa de testes
-- Golden data para respostas de API (fixtures JSON em `tests/golden_data/`)
-- Mock HTTP via `respx` — nunca chamar APIs reais em testes unitários
-- Testes de integração marcados com `@pytest.mark.integration`
+- Every new module needs tests
+- Golden data for API responses (JSON fixtures in `tests/golden_data/`)
+- Mock HTTP via `respx` — never call real APIs in unit tests
+- Integration tests marked with `@pytest.mark.integration`
 
-## Estrutura do projeto
+## Project structure
 
 ```
 hypokrates/
 ├── config.py          # HypokratesConfig singleton
 ├── constants.py       # Source enum, URLs, settings
-├── exceptions.py      # Hierarquia HypokratesError
+├── exceptions.py      # HypokratesError hierarchy
 ├── models.py          # Drug, AdverseEvent, MetaInfo
-├── sync.py            # Wrappers síncronos
-├── cache/             # DuckDB cache thread-safe
+├── sync.py            # Synchronous wrappers
+├── cache/             # DuckDB thread-safe cache
 ├── http/              # Retry, rate limiter, client factory
 ├── faers/             # OpenFDA/FAERS (client, parser, models)
-├── stats/             # PRR, ROR, IC — detecção de sinais
-├── evidence/          # EvidenceBlock com proveniência
+├── stats/             # PRR, ROR, IC — signal detection
+├── evidence/          # EvidenceBlock with provenance
 ├── contracts/         # Protocol classes (interfaces)
+├── pubmed/            # NCBI/PubMed (client, parser, models)
+├── cross/             # Hypothesis cross-referencing (FAERS + PubMed)
 └── utils/             # Helpers (validation, time, result)
 
 tests/
-├── golden_data/       # Fixtures JSON por fonte
-├── test_faers/        # Testes FAERS
-├── test_stats/        # Testes stats
-├── test_evidence/     # Testes evidence
-├── test_contracts/    # Testes contracts
+├── golden_data/       # JSON fixtures per source
+├── test_faers/        # FAERS tests
+├── test_stats/        # Stats tests
+├── test_evidence/     # Evidence tests
+├── test_contracts/    # Contracts tests
+├── test_pubmed/       # PubMed tests
+├── test_cross/        # Cross-reference tests
 └── ...
 ```
 
-## Adicionando uma nova fonte de dados
+## Adding a new data source
 
-1. Crie `hypokrates/{fonte}/` com `__init__.py`, `api.py`, `client.py`, `models.py`, `constants.py`, `parser.py`
-2. Adicione a fonte ao `Source` enum em `constants.py`
-3. Configure TTL em `cache/policies.py` e rate limit em `constants.py`
-4. Adicione sync wrapper em `sync.py`
-5. Exporte em `__init__.py`
-6. Crie golden data em `tests/golden_data/{fonte}/`
-7. Escreva testes espelhando a estrutura de `test_faers/`
+1. Create `hypokrates/{source}/` with `__init__.py`, `api.py`, `client.py`, `models.py`, `constants.py`, `parser.py`
+2. Add the source to the `Source` enum in `constants.py`
+3. Configure TTL in `cache/policies.py` and rate limit in `constants.py`
+4. Add sync wrapper in `sync.py`
+5. Export in `__init__.py`
+6. Create golden data in `tests/golden_data/{source}/`
+7. Write tests mirroring the `test_faers/` structure
 
 ## Commits
 
-Formato em português:
+Format in Portuguese:
 
 ```
-tipo: descrição curta
+type: short description
 
-Tipos: feat, fix, refactor, docs, style, test, chore, perf, security
+Types: feat, fix, refactor, docs, style, test, chore, perf, security
 ```
 
-Um concern por commit. Nunca misturar feature + refatoração.
+One concern per commit. Never mix feature + refactoring.
 
-## Segurança
+## Security
 
-- Nunca commitar `.env`, chaves de API ou segredos
-- Rate limiting obrigatório para toda fonte
-- Cache obrigatório — toda chamada HTTP passa pelo DuckDB
+- Never commit `.env`, API keys or secrets
+- Rate limiting is mandatory for every source
+- Cache is mandatory — every HTTP call goes through DuckDB
 
-## Licença
+## License
 
-Ao contribuir, você concorda que sua contribuição será licenciada sob a [MIT License](LICENSE).
+By contributing, you agree that your contribution will be licensed under the [MIT License](LICENSE).

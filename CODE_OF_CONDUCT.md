@@ -1,59 +1,59 @@
-# Código de Conduta — Contributor Covenant
+# Contributor Covenant Code of Conduct
 
-## Nosso compromisso
+## Our Pledge
 
-Nós, como membros, contribuidores e líderes, nos comprometemos a tornar a participação em nossa comunidade uma experiência livre de assédio para todos, independentemente de idade, tamanho corporal, deficiência visível ou invisível, etnia, características sexuais, identidade e expressão de gênero, nível de experiência, educação, status socioeconômico, nacionalidade, aparência pessoal, raça, religião ou identidade e orientação sexual.
+We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
-## Nossos padrões
+## Our Standards
 
-Exemplos de comportamento que contribuem para um ambiente positivo:
+Examples of behavior that contributes to a positive environment:
 
-- Usar linguagem acolhedora e inclusiva
-- Respeitar pontos de vista e experiências diferentes
-- Aceitar críticas construtivas com elegância
-- Focar no que é melhor para a comunidade
-- Demonstrar empatia com outros membros da comunidade
+- Using welcoming and inclusive language
+- Being respectful of differing viewpoints and experiences
+- Gracefully accepting constructive criticism
+- Focusing on what is best for the community
+- Showing empathy towards other community members
 
-Exemplos de comportamento inaceitável:
+Examples of unacceptable behavior:
 
-- Uso de linguagem ou imagens sexualizadas e atenção sexual indesejada
-- Trolling, comentários insultuosos/depreciativos e ataques pessoais ou políticos
-- Assédio público ou privado
-- Publicar informações privadas de terceiros sem permissão explícita
-- Outra conduta que poderia razoavelmente ser considerada inadequada em um ambiente profissional
+- The use of sexualized language or imagery and unwelcome sexual attention or advances
+- Trolling, insulting/derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information without explicit permission
+- Other conduct which could reasonably be considered inappropriate in a professional setting
 
-## Aplicação
+## Enforcement
 
-Casos de comportamento abusivo, de assédio ou inaceitável podem ser reportados via [GitHub Issues](https://github.com/brunoescalhao/hypokrates/issues).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported via [GitHub Issues](https://github.com/brunoescalhao/hypokrates/issues).
 
-Todos os líderes da comunidade são obrigados a respeitar a privacidade e a segurança de quem reportar qualquer incidente.
+All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
-## Diretrizes de aplicação
+## Enforcement Guidelines
 
-### 1. Ação corretiva
+### 1. Correction
 
-**Impacto**: Uso de linguagem inadequada ou outro comportamento considerado não profissional.
+**Impact**: Use of inappropriate language or other behavior deemed unprofessional.
 
-**Consequência**: Aviso privado, esclarecendo a natureza da violação. Um pedido público de desculpas pode ser solicitado.
+**Consequence**: A private warning, clarifying the nature of the violation. A public apology may be requested.
 
-### 2. Aviso
+### 2. Warning
 
-**Impacto**: Violação por meio de um único incidente ou série de ações.
+**Impact**: A violation through a single incident or series of actions.
 
-**Consequência**: Aviso com consequências para comportamento continuado. Sem interação com as pessoas envolvidas por um período determinado.
+**Consequence**: A warning with consequences for continued behavior. No interaction with the people involved for a specified period.
 
-### 3. Banimento temporário
+### 3. Temporary Ban
 
-**Impacto**: Violação grave dos padrões da comunidade.
+**Impact**: A serious violation of community standards.
 
-**Consequência**: Banimento temporário de qualquer tipo de interação ou comunicação pública com a comunidade.
+**Consequence**: A temporary ban from any sort of interaction or public communication with the community.
 
-### 4. Banimento permanente
+### 4. Permanent Ban
 
-**Impacto**: Demonstrar um padrão de violação dos padrões da comunidade.
+**Impact**: Demonstrating a pattern of violation of community standards.
 
-**Consequência**: Banimento permanente de qualquer tipo de interação pública dentro da comunidade.
+**Consequence**: A permanent ban from any sort of public interaction within the community.
 
-## Atribuição
+## Attribution
 
-Este Código de Conduta é adaptado do [Contributor Covenant](https://www.contributor-covenant.org), versão 2.1.
+This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org), version 2.1.
