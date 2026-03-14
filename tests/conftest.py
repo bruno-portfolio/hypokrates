@@ -10,6 +10,7 @@ import pytest
 
 from hypokrates.cache.duckdb_store import CacheStore
 from hypokrates.config import reset_config
+from hypokrates.drugbank.store import DrugBankStore
 from hypokrates.http.rate_limiter import RateLimiter
 
 GOLDEN_DATA = Path(__file__).parent / "golden_data"
@@ -21,6 +22,7 @@ def _reset_singletons() -> None:  # type: ignore[misc]
     reset_config()
     CacheStore.reset()
     RateLimiter.reset_all()
+    DrugBankStore.reset()
 
 
 # ---------------------------------------------------------------------------

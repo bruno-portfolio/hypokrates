@@ -507,3 +507,124 @@ class TestScore:
         score = _score(hyp)
         # 10.0 * 1.5 = 15.0
         assert score == pytest.approx(15.0)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6: group_events, check_drugbank, check_opentargets
+# ---------------------------------------------------------------------------
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_group_events_merges_synonyms(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """group_events=True consolida sinônimos MedDRA."""
+    mock_top_events.return_value = _make_events(
+        ["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION", "DEATH"]
+    )
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result(
+            "ANAPHYLACTIC SHOCK", HypothesisClassification.NOVEL_HYPOTHESIS, prr_lci=3.0
+        ),
+        _make_hypothesis_result(
+            "ANAPHYLACTIC REACTION", HypothesisClassification.EMERGING_SIGNAL, lit_count=2
+        ),
+        _make_hypothesis_result("DEATH", HypothesisClassification.KNOWN_ASSOCIATION, lit_count=10),
+    ]
+
+    result = await scan_drug("propofol", top_n=3, group_events=True)
+
+    assert result.groups_applied is True
+    assert len(result.items) == 2  # ANAPHYLAXIS (merged) + DEATH
+    events = [item.event for item in result.items]
+    assert "ANAPHYLAXIS" in events
+    assert "DEATH" in events
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_group_events_disabled(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """group_events=False mantém todos separados."""
+    mock_top_events.return_value = _make_events(["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION"])
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result("ANAPHYLACTIC SHOCK", HypothesisClassification.NOVEL_HYPOTHESIS),
+        _make_hypothesis_result(
+            "ANAPHYLACTIC REACTION", HypothesisClassification.EMERGING_SIGNAL, lit_count=2
+        ),
+    ]
+
+    result = await scan_drug("propofol", top_n=2, group_events=False)
+
+    assert result.groups_applied is False
+    assert len(result.items) == 2
+
+
+@patch("hypokrates.drugbank.api.drug_info", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_check_drugbank(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+    mock_drug_info: AsyncMock,
+) -> None:
+    """check_drugbank → ScanResult tem mechanism, interactions_count, cyp_enzymes."""
+    from hypokrates.drugbank.models import DrugBankInfo, DrugEnzyme, DrugInteraction
+
+    mock_top_events.return_value = _make_events(["A"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "A", HypothesisClassification.NOVEL_HYPOTHESIS
+    )
+    mock_drug_info.return_value = DrugBankInfo(
+        drugbank_id="DB00818",
+        name="Propofol",
+        mechanism_of_action="GABA-A potentiator",
+        enzymes=[DrugEnzyme(name="CYP2B6", gene_name="CYP2B6")],
+        interactions=[
+            DrugInteraction(partner_id="DB00813", partner_name="Fentanyl"),
+        ],
+    )
+
+    result = await scan_drug("propofol", top_n=1, check_drugbank=True, group_events=False)
+
+    assert result.mechanism == "GABA-A potentiator"
+    assert result.interactions_count == 1
+    assert "CYP2B6" in result.cyp_enzymes
+    # Verifica que _drugbank_cache foi passado para hypothesis
+    call_kwargs = mock_hypothesis.call_args.kwargs
+    assert call_kwargs["_drugbank_cache"] is not None
+
+
+@patch("hypokrates.opentargets.api.drug_adverse_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_check_opentargets(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+    mock_ot_events: AsyncMock,
+) -> None:
+    """check_opentargets → _ot_safety_cache passado para hypothesis."""
+    from hypokrates.opentargets.models import OTDrugSafety
+
+    mock_top_events.return_value = _make_events(["A"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "A", HypothesisClassification.NOVEL_HYPOTHESIS
+    )
+    mock_ot_events.return_value = OTDrugSafety(
+        drug_name="propofol",
+        chembl_id="CHEMBL526",
+        meta=_make_meta(),
+    )
+
+    result = await scan_drug("propofol", top_n=1, check_opentargets=True, group_events=False)
+
+    call_kwargs = mock_hypothesis.call_args.kwargs
+    assert call_kwargs["check_opentargets"] is True
+    assert call_kwargs["_ot_safety_cache"] is not None
+    assert result.total_scanned == 1

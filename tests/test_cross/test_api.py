@@ -308,3 +308,155 @@ class TestHypothesisWithTrials:
         assert result.active_trials == 2
         assert result.trials_detail is not None
         assert "3 trials found" in result.trials_detail
+
+
+class TestHypothesisWithDrugBank:
+    """hypothesis() com check_drugbank=True."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.drugbank.api.drug_info", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_drugbank_fields_populated(
+        self, mock_signal: Any, mock_pubmed: Any, mock_drug_info: AsyncMock
+    ) -> None:
+        """check_drugbank → mechanism, interactions, enzymes populados."""
+        from hypokrates.drugbank.models import (
+            DrugBankInfo,
+            DrugEnzyme,
+            DrugInteraction,
+            DrugTarget,
+        )
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_drug_info.return_value = DrugBankInfo(
+            drugbank_id="DB00818",
+            name="Propofol",
+            mechanism_of_action="GABA-A receptor potentiator",
+            targets=[DrugTarget(name="GABRA1", gene_name="GABRA1", actions=["potentiator"])],
+            enzymes=[
+                DrugEnzyme(name="CYP2B6", gene_name="CYP2B6"),
+                DrugEnzyme(name="UGT1A9", gene_name="UGT1A9"),
+            ],
+            interactions=[
+                DrugInteraction(partner_id="DB00813", partner_name="Fentanyl"),
+                DrugInteraction(partner_id="DB01236", partner_name="Sevoflurane"),
+            ],
+        )
+
+        result = await hypothesis("propofol", "PRIS", check_drugbank=True, use_cache=False)
+
+        assert result.mechanism == "GABA-A receptor potentiator"
+        assert "Fentanyl" in result.interactions
+        assert "CYP2B6" in result.enzymes
+        assert "UGT1A9" in result.enzymes
+
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_drugbank_with_cache(self, mock_signal: Any, mock_pubmed: Any) -> None:
+        """_drugbank_cache é usado em vez de chamar API."""
+        from hypokrates.drugbank.models import DrugBankInfo
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+
+        cache = DrugBankInfo(
+            drugbank_id="DB00818",
+            name="Propofol",
+            mechanism_of_action="Cached mechanism",
+        )
+
+        result = await hypothesis(
+            "propofol", "PRIS", check_drugbank=True, _drugbank_cache=cache, use_cache=False
+        )
+
+        assert result.mechanism == "Cached mechanism"
+
+    @patch("hypokrates.drugbank.api.drug_info", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_drugbank_not_found(
+        self, mock_signal: Any, mock_pubmed: Any, mock_drug_info: AsyncMock
+    ) -> None:
+        """DrugBank não encontrou a droga → campos None/empty."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_drug_info.return_value = None
+
+        result = await hypothesis("unknown_drug", "PRIS", check_drugbank=True, use_cache=False)
+
+        assert result.mechanism is None
+        assert result.interactions == []
+        assert result.enzymes == []
+
+
+class TestHypothesisWithOpenTargets:
+    """hypothesis() com check_opentargets=True."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.opentargets.api.drug_safety_score", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_ot_llr_populated(
+        self, mock_signal: Any, mock_pubmed: Any, mock_ot_score: AsyncMock
+    ) -> None:
+        """check_opentargets → ot_llr populado."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_ot_score.return_value = 18.72
+
+        result = await hypothesis(
+            "propofol", "bradycardia", check_opentargets=True, use_cache=False
+        )
+
+        assert result.ot_llr == 18.72
+
+    @patch("hypokrates.opentargets.api.drug_safety_score", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_ot_not_found(
+        self, mock_signal: Any, mock_pubmed: Any, mock_ot_score: AsyncMock
+    ) -> None:
+        """OpenTargets não encontrou o par → ot_llr=None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_ot_score.return_value = None
+
+        result = await hypothesis("unknown", "unknown", check_opentargets=True, use_cache=False)
+
+        assert result.ot_llr is None
+
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_ot_with_cache(self, mock_signal: Any, mock_pubmed: Any) -> None:
+        """_ot_safety_cache é usado em vez de chamar API."""
+        from hypokrates.opentargets.models import OTAdverseEvent, OTDrugSafety
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+
+        cache = OTDrugSafety(
+            drug_name="propofol",
+            chembl_id="CHEMBL526",
+            adverse_events=[
+                OTAdverseEvent(name="BRADYCARDIA", count=980, log_lr=18.72),
+            ],
+            meta=MetaInfo(source="OpenTargets", retrieved_at=datetime.now(UTC)),
+        )
+
+        result = await hypothesis(
+            "propofol",
+            "bradycardia",
+            check_opentargets=True,
+            _ot_safety_cache=cache,
+            use_cache=False,
+        )
+
+        assert result.ot_llr == 18.72

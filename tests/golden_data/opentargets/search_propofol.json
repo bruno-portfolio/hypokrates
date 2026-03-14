@@ -1,0 +1,13 @@
+{
+  "data": {
+    "search": {
+      "hits": [
+        {
+          "id": "CHEMBL526",
+          "name": "PROPOFOL",
+          "entity": "drug"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<drugbank xmlns="http://www.drugbank.ca" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.drugbank.ca http://www.drugbank.ca/docs/drugbank.xsd" version="5.1" exported-on="2024-01-01">
+  <drug type="small molecule" created="2005-06-13" updated="2024-01-01">
+    <drugbank-id primary="true">DB00818</drugbank-id>
+    <drugbank-id>APRD00382</drugbank-id>
+    <name>Propofol</name>
+    <description>Propofol is an intravenous anesthetic agent used for induction and maintenance of general anesthesia.</description>
+    <mechanism-of-action>Propofol acts on GABA-A receptors to potentiate the inhibitory effect of GABA, leading to sedation and anesthesia.</mechanism-of-action>
+    <pharmacodynamics>Propofol produces rapid onset of anesthesia with smooth recovery.</pharmacodynamics>
+    <categories>
+      <category>
+        <name>Anesthetics, Intravenous</name>
+      </category>
+      <category>
+        <name>Hypnotics and Sedatives</name>
+      </category>
+    </categories>
+    <synonyms>
+      <synonym language="english" coder="INN">Propofol</synonym>
+      <synonym language="english" coder="BAN">Diprivan</synonym>
+    </synonyms>
+    <drug-interactions>
+      <drug-interaction>
+        <drugbank-id>DB00813</drugbank-id>
+        <name>Fentanyl</name>
+        <description>Fentanyl may enhance the CNS depressant effect of propofol.</description>
+      </drug-interaction>
+      <drug-interaction>
+        <drugbank-id>DB01236</drugbank-id>
+        <name>Sevoflurane</name>
+        <description>Additive CNS depression when combined.</description>
+      </drug-interaction>
+    </drug-interactions>
+    <targets>
+      <target>
+        <name>Gamma-aminobutyric acid receptor subunit alpha-1</name>
+        <actions>
+          <action>potentiator</action>
+        </actions>
+        <polypeptide id="P14867" source="Swiss-Prot">
+          <gene-name>GABRA1</gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </target>
+    </targets>
+    <enzymes>
+      <enzyme>
+        <name>Cytochrome P450 2B6</name>
+        <polypeptide id="P20813" source="Swiss-Prot">
+          <gene-name>CYP2B6</gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </enzyme>
+      <enzyme>
+        <name>UDP-glucuronosyltransferase 1-9</name>
+        <polypeptide id="O60656" source="Swiss-Prot">
+          <gene-name>UGT1A9</gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </enzyme>
+    </enzymes>
+  </drug>
+  <drug type="biotech" created="2007-07-11" updated="2024-01-01">
+    <drugbank-id primary="true">DB06372</drugbank-id>
+    <name>Sugammadex</name>
+    <description>Sugammadex is a modified gamma-cyclodextrin used to reverse neuromuscular blockade induced by rocuronium or vecuronium.</description>
+    <mechanism-of-action>Sugammadex encapsulates rocuronium and vecuronium molecules, forming a complex that prevents binding to nicotinic receptors.</mechanism-of-action>
+    <pharmacodynamics>Sugammadex provides rapid reversal of neuromuscular blockade.</pharmacodynamics>
+    <categories>
+      <category>
+        <name>Antidotes</name>
+      </category>
+    </categories>
+    <synonyms>
+      <synonym language="english" coder="INN">Sugammadex</synonym>
+      <synonym language="english" coder="BAN">Bridion</synonym>
+    </synonyms>
+    <drug-interactions>
+      <drug-interaction>
+        <drugbank-id>DB00728</drugbank-id>
+        <name>Rocuronium</name>
+        <description>Sugammadex encapsulates rocuronium, reversing its neuromuscular blockade.</description>
+      </drug-interaction>
+    </drug-interactions>
+    <targets>
+      <target>
+        <name>Rocuronium</name>
+        <actions>
+          <action>binder</action>
+        </actions>
+        <polypeptide id="NA" source="DrugBank">
+          <gene-name></gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </target>
+    </targets>
+    <enzymes/>
+  </drug>
+  <drug type="small molecule" created="2005-06-13" updated="2024-01-01">
+    <drugbank-id primary="true">DB01236</drugbank-id>
+    <name>Sevoflurane</name>
+    <description>Sevoflurane is a halogenated inhalational anesthetic used for induction and maintenance of general anesthesia.</description>
+    <mechanism-of-action>Sevoflurane enhances inhibitory neurotransmission via GABA-A and glycine receptors while inhibiting excitatory NMDA receptors.</mechanism-of-action>
+    <pharmacodynamics>Sevoflurane provides smooth induction with minimal airway irritation.</pharmacodynamics>
+    <categories>
+      <category>
+        <name>Anesthetics, Inhalation</name>
+      </category>
+    </categories>
+    <synonyms>
+      <synonym language="english" coder="INN">Sevoflurane</synonym>
+    </synonyms>
+    <drug-interactions>
+      <drug-interaction>
+        <drugbank-id>DB00818</drugbank-id>
+        <name>Propofol</name>
+        <description>Additive CNS depression when combined.</description>
+      </drug-interaction>
+    </drug-interactions>
+    <targets>
+      <target>
+        <name>Gamma-aminobutyric acid receptor subunit alpha-1</name>
+        <actions>
+          <action>potentiator</action>
+        </actions>
+        <polypeptide id="P14867" source="Swiss-Prot">
+          <gene-name>GABRA1</gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </target>
+    </targets>
+    <enzymes>
+      <enzyme>
+        <name>Cytochrome P450 2E1</name>
+        <polypeptide id="P05181" source="Swiss-Prot">
+          <gene-name>CYP2E1</gene-name>
+          <organism>Humans</organism>
+        </polypeptide>
+      </enzyme>
+    </enzymes>
+  </drug>
+</drugbank>

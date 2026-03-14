@@ -1,0 +1,43 @@
+{
+  "data": {
+    "drug": {
+      "name": "PROPOFOL",
+      "adverseEvents": {
+        "count": 150,
+        "criticalValue": 3.84,
+        "rows": [
+          {
+            "name": "Cardiac arrest",
+            "count": 1250,
+            "logLR": 25.43,
+            "meddraCode": "10007515"
+          },
+          {
+            "name": "Bradycardia",
+            "count": 980,
+            "logLR": 18.72,
+            "meddraCode": "10006093"
+          },
+          {
+            "name": "Hypotension",
+            "count": 2100,
+            "logLR": 15.31,
+            "meddraCode": "10021097"
+          },
+          {
+            "name": "Propofol infusion syndrome",
+            "count": 320,
+            "logLR": 45.67,
+            "meddraCode": "10073874"
+          },
+          {
+            "name": "Death",
+            "count": 3500,
+            "logLR": 8.92,
+            "meddraCode": "10011906"
+          }
+        ]
+      }
+    }
+  }
+}
