@@ -9,8 +9,10 @@ import pytest
 import respx
 
 from hypokrates.config import configure
+from hypokrates.cross.models import HypothesisResult
 from hypokrates.exceptions import NetworkError
 from hypokrates.faers.models import FAERSResult
+from hypokrates.pubmed.models import PubMedSearchResult
 from hypokrates.sync import faers
 
 
@@ -64,3 +66,109 @@ class TestSyncWrapper:
         )
         with pytest.raises((httpx.ConnectError, NetworkError)):
             faers.adverse_events("propofol", use_cache=False)
+
+
+class TestSyncPubMed:
+    """Sync wrapper para PubMed."""
+
+    @respx.mock
+    def test_sync_count_papers(self) -> None:
+        configure(cache_enabled=False)
+        respx.get(
+            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "esearchresult": {
+                        "count": "42",
+                        "idlist": [],
+                        "querytranslation": "test",
+                    }
+                },
+            )
+        )
+        from hypokrates.sync import pubmed
+
+        result = pubmed.count_papers("propofol", "bradycardia", use_cache=False)
+        assert isinstance(result, PubMedSearchResult)
+        assert result.total_count == 42
+
+    @respx.mock
+    def test_sync_search_papers(self) -> None:
+        configure(cache_enabled=False)
+        respx.get(
+            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "esearchresult": {
+                        "count": "1",
+                        "idlist": ["111"],
+                        "querytranslation": "test",
+                    }
+                },
+            )
+        )
+        respx.get(
+            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "uids": ["111"],
+                        "111": {
+                            "uid": "111",
+                            "title": "Test",
+                            "pubdate": "2024",
+                            "source": "J",
+                            "authors": [],
+                            "articleids": [],
+                        },
+                    }
+                },
+            )
+        )
+        from hypokrates.sync import pubmed
+
+        result = pubmed.search_papers("propofol", "bradycardia", limit=1, use_cache=False)
+        assert isinstance(result, PubMedSearchResult)
+        assert len(result.articles) == 1
+
+
+class TestSyncCross:
+    """Sync wrapper para Cross."""
+
+    @respx.mock
+    def test_sync_hypothesis(self) -> None:
+        configure(cache_enabled=False)
+        # Mock FAERS (4 fetch_total calls)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "meta": {"results": {"total": 100}},
+                    "results": [],
+                },
+            )
+        )
+        # Mock PubMed esearch
+        respx.get(
+            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "esearchresult": {
+                        "count": "0",
+                        "idlist": [],
+                    }
+                },
+            )
+        )
+        from hypokrates.sync import cross
+
+        result = cross.hypothesis("propofol", "PRIS", use_cache=False)
+        assert isinstance(result, HypothesisResult)

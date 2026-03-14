@@ -1,0 +1,20 @@
+{
+  "header": {
+    "type": "esearch",
+    "version": "0.3"
+  },
+  "esearchresult": {
+    "count": "23",
+    "retmax": "5",
+    "retstart": "0",
+    "idlist": [
+      "38901234",
+      "37654321",
+      "36543210",
+      "35432109",
+      "34321098"
+    ],
+    "translationset": [],
+    "querytranslation": "(\"propofol\"[All Fields]) AND (\"hepatotoxicity\"[All Fields])"
+  }
+}

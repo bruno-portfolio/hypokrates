@@ -13,9 +13,10 @@ Usage:
 
 from __future__ import annotations
 
-from hypokrates import faers, stats
+from hypokrates import cross, faers, pubmed, stats
 from hypokrates.config import configure
 from hypokrates.constants import __version__
+from hypokrates.cross import HypothesisClassification, HypothesisResult
 from hypokrates.evidence import EvidenceBlock, Limitation
 from hypokrates.exceptions import (
     CacheError,
@@ -27,20 +28,27 @@ from hypokrates.exceptions import (
     SourceUnavailableError,
     ValidationError,
 )
+from hypokrates.pubmed import PubMedArticle, PubMedSearchResult
 
 __all__ = [
     "CacheError",
     "ConfigurationError",
     "EvidenceBlock",
     "HypokratesError",
+    "HypothesisClassification",
+    "HypothesisResult",
     "Limitation",
     "NetworkError",
     "ParseError",
+    "PubMedArticle",
+    "PubMedSearchResult",
     "RateLimitError",
     "SourceUnavailableError",
     "ValidationError",
     "__version__",
     "configure",
+    "cross",
     "faers",
+    "pubmed",
     "stats",
 ]

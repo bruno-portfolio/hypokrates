@@ -1,0 +1,12 @@
+{
+  "header": {
+    "type": "esearch",
+    "version": "0.3"
+  },
+  "esearchresult": {
+    "count": "142",
+    "retmax": "0",
+    "retstart": "0",
+    "querytranslation": "(\"propofol\"[All Fields]) AND (\"bradycardia\"[All Fields])"
+  }
+}

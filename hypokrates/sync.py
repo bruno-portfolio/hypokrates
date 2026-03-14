@@ -11,7 +11,9 @@ import asyncio
 import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from hypokrates.cross import api as cross_api
 from hypokrates.faers import api as faers_api
+from hypokrates.pubmed import api as pubmed_api
 from hypokrates.stats import api as stats_api
 
 if TYPE_CHECKING:
@@ -61,5 +63,20 @@ class _SyncStats:
     signal = staticmethod(_make_sync(stats_api.signal))
 
 
+class _SyncPubMed:
+    """Wrapper síncrono para hypokrates.pubmed."""
+
+    count_papers = staticmethod(_make_sync(pubmed_api.count_papers))
+    search_papers = staticmethod(_make_sync(pubmed_api.search_papers))
+
+
+class _SyncCross:
+    """Wrapper síncrono para hypokrates.cross."""
+
+    hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
+
+
 faers = _SyncFAERS()
 stats = _SyncStats()
+pubmed = _SyncPubMed()
+cross = _SyncCross()

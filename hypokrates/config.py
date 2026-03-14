@@ -25,6 +25,10 @@ class HypokratesConfig:
     # OpenFDA
     openfda_api_key: str | None = None
 
+    # NCBI / PubMed
+    ncbi_api_key: str | None = None
+    ncbi_email: str | None = None
+
     # Verbosity
     debug: bool = False
 

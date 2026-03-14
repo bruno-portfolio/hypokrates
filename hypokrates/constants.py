@@ -28,6 +28,8 @@ class Source(StrEnum):
 OPENFDA_BASE_URL = "https://api.fda.gov"
 OPENFDA_DRUG_EVENT = f"{OPENFDA_BASE_URL}/drug/event.json"
 
+NCBI_EUTILS_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
 
 # --- Cache settings ---
 
@@ -56,4 +58,5 @@ class HTTPSettings:
     # Rate limits por fonte (requests por minuto)
     RATE_LIMITS: ClassVar[dict[Source, int]] = {
         Source.FAERS: 40,  # sem API key; com key = 240
+        Source.PUBMED: 180,  # 3/s sem key; com key = 600 (10/s)
     }

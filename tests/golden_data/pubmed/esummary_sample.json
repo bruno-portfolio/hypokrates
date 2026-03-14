@@ -1,0 +1,53 @@
+{
+  "header": {
+    "type": "esummary",
+    "version": "0.3"
+  },
+  "result": {
+    "uids": [
+      "38901234",
+      "37654321",
+      "36543210"
+    ],
+    "38901234": {
+      "uid": "38901234",
+      "pubdate": "2024 Jan",
+      "source": "Anesthesiology",
+      "title": "Propofol-induced hepatotoxicity: a systematic review.",
+      "fulljournalname": "Anesthesiology",
+      "authors": [
+        {"name": "Silva AB", "authtype": "Author"},
+        {"name": "Santos CD", "authtype": "Author"}
+      ],
+      "articleids": [
+        {"idtype": "pubmed", "value": "38901234"},
+        {"idtype": "doi", "value": "10.1234/anes.2024.001"}
+      ]
+    },
+    "37654321": {
+      "uid": "37654321",
+      "pubdate": "2023 Mar",
+      "source": "Br J Anaesth",
+      "title": "Hepatic effects of prolonged propofol infusion in ICU patients.",
+      "fulljournalname": "British Journal of Anaesthesia",
+      "authors": [
+        {"name": "Johnson EF", "authtype": "Author"}
+      ],
+      "articleids": [
+        {"idtype": "pubmed", "value": "37654321"},
+        {"idtype": "doi", "value": "10.1093/bja/2023.456"}
+      ]
+    },
+    "36543210": {
+      "uid": "36543210",
+      "pubdate": "2022 Jul",
+      "source": "J Clin Pharmacol",
+      "title": "Case report: propofol and acute liver failure.",
+      "fulljournalname": "Journal of Clinical Pharmacology",
+      "authors": [],
+      "articleids": [
+        {"idtype": "pubmed", "value": "36543210"}
+      ]
+    }
+  }
+}
