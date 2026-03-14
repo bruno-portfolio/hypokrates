@@ -55,6 +55,10 @@ dev = [
     "mypy>=1.10,<2",
     "pre-commit>=3,<4",
 ]
+docs = [
+    "mkdocs-material>=9.5,<10",
+    "mkdocstrings[python]>=0.24,<1",
+]
 
 [project.urls]
 Homepage = "https://github.com/brunoescalhao/hypokrates"
