@@ -56,7 +56,7 @@ class RxNormClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.RXNORM, RXNORM_DRUGS_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -76,7 +76,7 @@ class RxNormClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.RXNORM, RXNORM_DRUGS_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.RXNORM)
+            await store.aset(key, data, Source.RXNORM)
 
         return data
 

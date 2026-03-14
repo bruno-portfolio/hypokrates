@@ -68,7 +68,7 @@ class MeSHClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.MESH, ESEARCH_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -88,7 +88,7 @@ class MeSHClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.MESH, ESEARCH_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.MESH)
+            await store.aset(key, data, Source.MESH)
 
         return data
 
@@ -112,7 +112,7 @@ class MeSHClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.MESH, ESUMMARY_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -132,7 +132,7 @@ class MeSHClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.MESH, ESUMMARY_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.MESH)
+            await store.aset(key, data, Source.MESH)
 
         return data
 

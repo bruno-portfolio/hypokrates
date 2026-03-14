@@ -66,7 +66,7 @@ class OpenTargetsClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -81,7 +81,7 @@ class OpenTargetsClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            store.set(key, data, Source.OPENTARGETS)
+            await store.aset(key, data, Source.OPENTARGETS)
 
         return data
 

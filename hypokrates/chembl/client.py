@@ -61,7 +61,7 @@ class ChEMBLClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -80,7 +80,7 @@ class ChEMBLClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            store.set(key, data, _CHEMBL_SOURCE)
+            await store.aset(key, data, _CHEMBL_SOURCE)
 
         return data
 

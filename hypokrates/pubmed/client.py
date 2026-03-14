@@ -67,7 +67,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, f"{ESEARCH_ENDPOINT}/count", params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -87,7 +87,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, f"{ESEARCH_ENDPOINT}/count", params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.PUBMED)
+            await store.aset(key, data, Source.PUBMED)
 
         return data
 
@@ -113,7 +113,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, ESEARCH_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -133,7 +133,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, ESEARCH_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.PUBMED)
+            await store.aset(key, data, Source.PUBMED)
 
         return data
 
@@ -161,7 +161,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, ESUMMARY_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -181,7 +181,7 @@ class PubMedClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.PUBMED, ESUMMARY_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.PUBMED)
+            await store.aset(key, data, Source.PUBMED)
 
         return data
 

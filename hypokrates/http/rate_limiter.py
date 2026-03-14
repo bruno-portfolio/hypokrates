@@ -36,10 +36,20 @@ class RateLimiter:
         cls._instances.clear()
 
     async def acquire(self) -> None:
-        """Aguarda até que seja seguro fazer um request."""
+        """Aguarda até que seja seguro fazer um request.
+
+        Reserva o slot dentro do semáforo (rápido), mas dorme fora dele.
+        Isso permite que requests concorrentes agendem seus slots sem
+        bloquear uns aos outros no semáforo.
+        """
+        wait = 0.0
         async with self._semaphore:
             now = time.monotonic()
             elapsed = now - self._last_request
-            if elapsed < self._min_interval:
-                await asyncio.sleep(self._min_interval - elapsed)
-            self._last_request = time.monotonic()
+            wait = max(0.0, self._min_interval - elapsed)
+            # Reserva o slot imediatamente (antes de dormir)
+            self._last_request = now + wait
+
+        # Dorme FORA do semáforo — outras tasks podem reservar seus slots
+        if wait > 0:
+            await asyncio.sleep(wait)

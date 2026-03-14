@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import logging
@@ -40,6 +41,7 @@ class CacheStore:
 
         self._db_path = db_path
         self._conn = duckdb.connect(str(db_path))
+        self._async_lock = asyncio.Lock()
         run_migrations(self._conn)
 
     @classmethod
@@ -87,6 +89,11 @@ class CacheStore:
             logger.warning("Cache read error for key=%s: %s", key, exc)
             return None
 
+    async def aget(self, key: str) -> dict[str, object] | None:
+        """Busca valor no cache (async-safe via lock)."""
+        async with self._async_lock:
+            return self.get(key)
+
     def set(self, key: str, data: dict[str, object], source: str) -> None:
         """Armazena valor no cache com TTL baseado na fonte."""
         ttl = get_ttl(source)
@@ -103,6 +110,11 @@ class CacheStore:
             )
         except duckdb.Error as exc:
             raise CacheError(f"Cache write error for key={key}: {exc}") from exc
+
+    async def aset(self, key: str, data: dict[str, object], source: str) -> None:
+        """Armazena valor no cache (async-safe via lock)."""
+        async with self._async_lock:
+            self.set(key, data, source)
 
     def invalidate(self, key: str) -> None:
         """Remove entrada específica do cache."""

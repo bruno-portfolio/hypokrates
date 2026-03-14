@@ -62,7 +62,7 @@ class DailyMedClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -81,7 +81,7 @@ class DailyMedClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            store.set(key, data, Source.DAILYMED)
+            await store.aset(key, data, Source.DAILYMED)
 
         return data
 
@@ -108,7 +108,7 @@ class DailyMedClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return str(cached.get("xml", ""))
@@ -126,7 +126,7 @@ class DailyMedClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            store.set(key, {"xml": xml_text}, Source.DAILYMED)
+            await store.aset(key, {"xml": xml_text}, Source.DAILYMED)
 
         return xml_text
 

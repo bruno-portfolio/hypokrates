@@ -82,7 +82,7 @@ class TrialsClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -92,7 +92,7 @@ class TrialsClient:
 
         if should_cache:
             store = CacheStore.get_instance()
-            store.set(key, data, Source.TRIALS)
+            await store.aset(key, data, Source.TRIALS)
 
         return data
 

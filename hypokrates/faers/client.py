@@ -65,7 +65,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, DRUG_EVENT_ENDPOINT, params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
                 return cached
@@ -96,7 +96,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, DRUG_EVENT_ENDPOINT, params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.FAERS)
+            await store.aset(key, data, Source.FAERS)
 
         return data
 
@@ -124,7 +124,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/count", params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 return cached
         await self._rate_limiter.acquire()
@@ -152,7 +152,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/count", params)
             store = CacheStore.get_instance()
-            store.set(key, data, Source.FAERS)
+            await store.aset(key, data, Source.FAERS)
 
         return data
 
@@ -181,7 +181,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
             store = CacheStore.get_instance()
-            cached = store.get(key)
+            cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit (total): %s", key)
                 raw_total: Any = cached.get("total", 0)
@@ -219,7 +219,7 @@ class FAERSClient:
         if use_cache and get_config().cache_enabled:
             key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
             store = CacheStore.get_instance()
-            store.set(key, {"total": total}, Source.FAERS)
+            await store.aset(key, {"total": total}, Source.FAERS)
 
         return total
 
