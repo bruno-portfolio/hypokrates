@@ -183,10 +183,10 @@ async def drug_metabolism(
 
         met_data = await client.get(
             METABOLISM_ENDPOINT,
-            {"molecule_chembl_id": chembl_id},
+            {"drug_chembl_id": chembl_id},
             use_cache=use_cache,
         )
-        pathways = parse_metabolism(met_data)
+        pathways = parse_metabolism(met_data, chembl_id=chembl_id)
 
         return ChEMBLMetabolism(
             chembl_id=chembl_id,

@@ -78,8 +78,17 @@ def parse_target(data: dict[str, Any]) -> ChEMBLTarget:
     )
 
 
-def parse_metabolism(data: dict[str, Any]) -> list[MetabolismPathway]:
+def parse_metabolism(
+    data: dict[str, Any],
+    *,
+    chembl_id: str = "",
+) -> list[MetabolismPathway]:
     """Extrai vias metabólicas da resposta.
+
+    Args:
+        data: JSON response do ChEMBL.
+        chembl_id: ChEMBL ID para filtrar (safety net — a API pode
+            ignorar o filtro e retornar dados de outras drogas).
 
     Returns:
         Lista de MetabolismPathway.
@@ -87,6 +96,12 @@ def parse_metabolism(data: dict[str, Any]) -> list[MetabolismPathway]:
     metabolisms = data.get("metabolisms", [])
     pathways: list[MetabolismPathway] = []
     for met in metabolisms:
+        # Filtrar client-side: só aceitar registros da droga correta
+        if chembl_id:
+            drug_id = met.get("drug_chembl_id", "")
+            substrate_id = met.get("substrate_chembl_id", "")
+            if drug_id != chembl_id and substrate_id != chembl_id:
+                continue
         pathways.append(
             MetabolismPathway(
                 enzyme_name=met.get("enzyme_name", "") or "",

@@ -112,3 +112,52 @@ class TestParseMetabolism:
         data = json.loads((GOLDEN / "metabolism_propofol.json").read_text())
         pathways = parse_metabolism(data)
         assert pathways[0].enzyme_name == ""
+
+    def test_filters_by_chembl_id(self) -> None:
+        """Filtra registros de outras drogas (bug: API ignora molecule_chembl_id)."""
+        data = {
+            "metabolisms": [
+                {
+                    "drug_chembl_id": "CHEMBL526",
+                    "substrate_chembl_id": "CHEMBL526",
+                    "substrate_name": "Propofol",
+                    "metabolite_name": "Propofol glucuronide",
+                    "met_conversion": "Glucuronidation",
+                    "enzyme_name": None,
+                    "organism": "Homo sapiens",
+                },
+                {
+                    "drug_chembl_id": "CHEMBL417",
+                    "substrate_chembl_id": "CHEMBL417",
+                    "substrate_name": "Epirubicin",
+                    "metabolite_name": "Epidoxorubicinol",
+                    "met_conversion": "",
+                    "enzyme_name": None,
+                    "organism": "Homo sapiens",
+                },
+            ],
+        }
+        pathways = parse_metabolism(data, chembl_id="CHEMBL526")
+        assert len(pathways) == 1
+        assert pathways[0].substrate_name == "Propofol"
+
+    def test_no_filter_without_chembl_id(self) -> None:
+        """Sem chembl_id, retorna todos os registros (backward compat)."""
+        data = {
+            "metabolisms": [
+                {
+                    "drug_chembl_id": "CHEMBL526",
+                    "substrate_name": "Propofol",
+                    "metabolite_name": "X",
+                    "met_conversion": "",
+                },
+                {
+                    "drug_chembl_id": "CHEMBL417",
+                    "substrate_name": "Epirubicin",
+                    "metabolite_name": "Y",
+                    "met_conversion": "",
+                },
+            ],
+        }
+        pathways = parse_metabolism(data)
+        assert len(pathways) == 2
