@@ -9,6 +9,8 @@ _TTL_MAP: dict[str, int] = {
     Source.PUBMED: CacheSettings.DEFAULT_TTL,
     Source.RXNORM: CacheSettings.VOCAB_TTL,
     Source.MESH: CacheSettings.VOCAB_TTL,
+    Source.DAILYMED: CacheSettings.DAILYMED_TTL,
+    Source.TRIALS: CacheSettings.TRIALS_TTL,
 }
 
 

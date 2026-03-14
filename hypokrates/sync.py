@@ -12,10 +12,12 @@ import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from hypokrates.cross import api as cross_api
+from hypokrates.dailymed import api as dailymed_api
 from hypokrates.faers import api as faers_api
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.scan import api as scan_api
 from hypokrates.stats import api as stats_api
+from hypokrates.trials import api as trials_api
 from hypokrates.vocab import api as vocab_api
 
 if TYPE_CHECKING:
@@ -91,9 +93,24 @@ class _SyncVocab:
     map_to_mesh = staticmethod(_make_sync(vocab_api.map_to_mesh))
 
 
+class _SyncDailyMed:
+    """Wrapper síncrono para hypokrates.dailymed."""
+
+    label_events = staticmethod(_make_sync(dailymed_api.label_events))
+    check_label = staticmethod(_make_sync(dailymed_api.check_label))
+
+
+class _SyncTrials:
+    """Wrapper síncrono para hypokrates.trials."""
+
+    search_trials = staticmethod(_make_sync(trials_api.search_trials))
+
+
 faers = _SyncFAERS()
 stats = _SyncStats()
 pubmed = _SyncPubMed()
 cross = _SyncCross()
 scan = _SyncScan()
 vocab = _SyncVocab()
+dailymed = _SyncDailyMed()
+trials = _SyncTrials()

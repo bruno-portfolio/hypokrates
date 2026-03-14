@@ -172,3 +172,35 @@ class TestSyncCross:
 
         result = cross.hypothesis("propofol", "PRIS", use_cache=False)
         assert isinstance(result, HypothesisResult)
+
+
+class TestSyncDailyMed:
+    """Sync wrapper para DailyMed."""
+
+    @respx.mock
+    def test_sync_label_events(self) -> None:
+        configure(cache_enabled=False)
+        respx.get(
+            url__startswith="https://dailymed.nlm.nih.gov/dailymed/services/v2/spls.json"
+        ).mock(return_value=httpx.Response(200, json={"data": [], "metadata": {}}))
+        from hypokrates.sync import dailymed
+
+        result = dailymed.label_events("propofol", use_cache=False)
+        assert result.drug == "propofol"
+        assert result.events == []
+
+
+class TestSyncTrials:
+    """Sync wrapper para Trials."""
+
+    @respx.mock
+    def test_sync_search_trials(self) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://clinicaltrials.gov/api/v2/studies").mock(
+            return_value=httpx.Response(200, json={"totalCount": 0, "studies": []})
+        )
+        from hypokrates.sync import trials
+
+        result = trials.search_trials("propofol", "hypotension", use_cache=False)
+        assert result.total_count == 0
+        assert result.trials == []

@@ -15,12 +15,16 @@ from hypokrates.scan.constants import (
     CLASSIFICATION_WEIGHTS,
     DEFAULT_CONCURRENCY,
     DEFAULT_TOP_N,
+    LABEL_IN_MULTIPLIER,
+    LABEL_NOT_IN_MULTIPLIER,
     SCAN_METHODOLOGY,
 )
 from hypokrates.scan.models import ScanItem, ScanResult
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from hypokrates.dailymed.models import LabelEventsResult
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +36,8 @@ async def scan_drug(
     concurrency: int = DEFAULT_CONCURRENCY,
     include_no_signal: bool = False,
     use_cache: bool = True,
+    check_labels: bool = False,
+    check_trials: bool = False,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
     """Escaneia os top eventos adversos de uma droga e gera hipóteses.
@@ -49,6 +55,8 @@ async def scan_drug(
         concurrency: Máximo de hipóteses simultâneas.
         include_no_signal: Se True, inclui eventos sem sinal no resultado.
         use_cache: Se deve usar cache.
+        check_labels: Se deve verificar bula FDA via DailyMed para cada evento.
+        check_trials: Se deve buscar trials em ClinicalTrials.gov para cada evento.
         on_progress: Callback opcional (completed, total, event_term).
 
     Returns:
@@ -71,7 +79,14 @@ async def scan_drug(
             ),
         )
 
-    # 2. Executar hypothesis() em paralelo com semáforo
+    # 2. Pre-fetch label para evitar N+1 (XML parsed 1x, não N)
+    label_cache: LabelEventsResult | None = None
+    if check_labels:
+        from hypokrates.dailymed import api as dailymed_api
+
+        label_cache = await dailymed_api.label_events(drug, use_cache=use_cache)
+
+    # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
     completed = 0
     total = len(events)
@@ -80,7 +95,14 @@ async def scan_drug(
         nonlocal completed
         async with semaphore:
             try:
-                result = await cross_api.hypothesis(drug, event_term, use_cache=use_cache)
+                result = await cross_api.hypothesis(
+                    drug,
+                    event_term,
+                    use_cache=use_cache,
+                    check_label=check_labels,
+                    check_trials=check_trials,
+                    _label_cache=label_cache,
+                )
             except Exception as exc:
                 completed += 1
                 logger.warning(
@@ -112,6 +134,7 @@ async def scan_drug(
     emerging_count = 0
     known_count = 0
     no_signal_count = 0
+    labeled_count = 0
 
     for i, res in enumerate(results):
         if isinstance(res, Exception):
@@ -130,6 +153,9 @@ async def scan_drug(
         else:
             no_signal_count += 1
 
+        if hyp.in_label is True:
+            labeled_count += 1
+
         # Filtrar NO_SIGNAL se não solicitado
         if not include_no_signal and hyp.classification == HypothesisClassification.NO_SIGNAL:
             continue
@@ -147,6 +173,8 @@ async def scan_drug(
                 summary=hyp.summary,
                 score=score,
                 rank=0,  # atribuído abaixo
+                in_label=hyp.in_label,
+                active_trials=hyp.active_trials,
             )
         )
 
@@ -162,6 +190,7 @@ async def scan_drug(
         emerging_count=emerging_count,
         known_count=known_count,
         no_signal_count=no_signal_count,
+        labeled_count=labeled_count,
         failed_count=failed_count,
         skipped_events=skipped_events,
         meta=MetaInfo(
@@ -184,4 +213,12 @@ def _score(result: HypothesisResult) -> float:
     prr_lci = max(result.signal.prr.ci_lower, 0.0)
     ror_lci = max(result.signal.ror.ci_lower, 0.0)
     strength = (prr_lci + ror_lci) / 2.0
-    return base * max(strength, 0.1)
+    score = base * max(strength, 0.1)
+
+    # Ajustar score por label
+    if result.in_label is False:
+        score *= LABEL_NOT_IN_MULTIPLIER
+    elif result.in_label is True:
+        score *= LABEL_IN_MULTIPLIER
+
+    return score

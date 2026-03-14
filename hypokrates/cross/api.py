@@ -5,8 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from hypokrates.cross.constants import DEFAULT_EMERGING_MAX, DEFAULT_NOVEL_MAX
+
+if TYPE_CHECKING:
+    from hypokrates.dailymed.models import LabelEventsResult
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.evidence.builder import build_evidence
 from hypokrates.evidence.models import Limitation
@@ -38,6 +42,9 @@ async def hypothesis(
     literature_limit: int = 5,
     use_mesh: bool = False,
     use_cache: bool = True,
+    check_label: bool = False,
+    check_trials: bool = False,
+    _label_cache: LabelEventsResult | None = None,
 ) -> HypothesisResult:
     """Cruza sinal FAERS + literatura PubMed → classificação.
 
@@ -49,6 +56,8 @@ async def hypothesis(
         literature_limit: Máximo de artigos retornados na busca PubMed.
         use_mesh: Usar qualificadores MeSH na busca PubMed (mais preciso).
         use_cache: Se deve usar cache.
+        check_label: Se deve verificar bula FDA via DailyMed.
+        check_trials: Se deve buscar trials em ClinicalTrials.gov.
 
     Thresholds são heurísticas — ajuste pro domínio clínico.
 
@@ -67,19 +76,53 @@ async def hypothesis(
         ),
     )
 
+    # 3. Opcionais: DailyMed e Trials (paralelo se ambos)
+    in_label: bool | None = None
+    label_detail: str | None = None
+    active_trials: int | None = None
+    trials_detail: str | None = None
+
+    if check_label and check_trials:
+        from hypokrates.dailymed import api as dailymed_api
+        from hypokrates.trials import api as trials_api
+
+        label_result, trials_result = await asyncio.gather(
+            dailymed_api.check_label(drug, event, use_cache=use_cache, _label_cache=_label_cache),
+            trials_api.search_trials(drug, event, use_cache=use_cache),
+        )
+        in_label = label_result.in_label
+        label_detail = _format_label_detail(label_result)
+        active_trials = trials_result.active_count
+        trials_detail = _format_trials_detail(trials_result)
+    elif check_label:
+        from hypokrates.dailymed import api as dailymed_api
+
+        label_result = await dailymed_api.check_label(
+            drug, event, use_cache=use_cache, _label_cache=_label_cache
+        )
+        in_label = label_result.in_label
+        label_detail = _format_label_detail(label_result)
+    elif check_trials:
+        from hypokrates.trials import api as trials_api
+
+        trials_result = await trials_api.search_trials(drug, event, use_cache=use_cache)
+        active_trials = trials_result.active_count
+        trials_detail = _format_trials_detail(trials_result)
+
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
-    # 3. Classificar com thresholds
+    # 3. Classificar com thresholds + label refinement
     classification = _classify(
         signal_detected=signal_result.signal_detected,
         literature_count=literature_count,
         novel_max=novel_max,
         emerging_max=emerging_max,
+        in_label=in_label,
     )
 
     # 4. Gerar summary
-    summary = _build_summary(drug, event, classification, literature_count)
+    summary = _build_summary(drug, event, classification, literature_count, in_label=in_label)
 
     # 5. Gerar EvidenceBlock
     thresholds_used = {"novel_max": novel_max, "emerging_max": emerging_max}
@@ -114,6 +157,10 @@ async def hypothesis(
         evidence=evidence,
         summary=summary,
         thresholds_used=thresholds_used,
+        in_label=in_label,
+        label_detail=label_detail,
+        active_trials=active_trials,
+        trials_detail=trials_detail,
     )
 
 
@@ -123,13 +170,18 @@ def _classify(
     literature_count: int,
     novel_max: int,
     emerging_max: int,
+    in_label: bool | None = None,
 ) -> HypothesisClassification:
-    """Classifica hipótese com base em sinal e literatura."""
+    """Classifica hipótese com base em sinal, literatura e label."""
     if not signal_detected:
         return HypothesisClassification.NO_SIGNAL
 
     if literature_count <= novel_max:
+        # Refinamento: signal + in_label + 0 papers → EMERGING (não é novel se está na bula)
+        if in_label is True:
+            return HypothesisClassification.EMERGING_SIGNAL
         return HypothesisClassification.NOVEL_HYPOTHESIS
+
     if literature_count <= emerging_max:
         return HypothesisClassification.EMERGING_SIGNAL
     return HypothesisClassification.KNOWN_ASSOCIATION
@@ -140,6 +192,8 @@ def _build_summary(
     event: str,
     classification: HypothesisClassification,
     literature_count: int,
+    *,
+    in_label: bool | None = None,
 ) -> str:
     """Gera resumo textual da classificação."""
     labels = {
@@ -172,6 +226,11 @@ def _build_summary(
             f"({literature_count} papers). Well-documented association."
         )
 
+    if in_label is True:
+        parts.append("Event is listed in the FDA label.")
+    elif in_label is False:
+        parts.append("Event is NOT listed in the FDA label.")
+
     return " ".join(parts)
 
 
@@ -184,3 +243,18 @@ def _confidence_label(classification: HypothesisClassification) -> str:
         HypothesisClassification.NO_SIGNAL: "n/a — no signal detected",
     }
     return labels[classification]
+
+
+def _format_label_detail(label_result: object) -> str:
+    """Formata detalhe do label check."""
+    matched = getattr(label_result, "matched_terms", [])
+    if matched:
+        return f"Matched: {', '.join(matched)}"
+    return "Not found in label"
+
+
+def _format_trials_detail(trials_result: object) -> str:
+    """Formata detalhe dos trials."""
+    total = getattr(trials_result, "total_count", 0)
+    active = getattr(trials_result, "active_count", 0)
+    return f"{total} trials found, {active} active"

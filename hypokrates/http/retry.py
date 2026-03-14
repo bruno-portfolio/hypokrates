@@ -25,6 +25,7 @@ async def retry_request(
     url: str,
     *,
     params: dict[str, str | int | float | bool | None] | None = None,
+    headers: dict[str, str] | None = None,
     max_retries: int | None = None,
     source_name: str = "unknown",
 ) -> httpx.Response:
@@ -37,7 +38,7 @@ async def retry_request(
 
     for attempt in range(retries + 1):
         try:
-            response = await client.request(method, url, params=params)
+            response = await client.request(method, url, params=params, headers=headers)
 
             if response.status_code == 429:
                 retry_after = _parse_retry_after(response)

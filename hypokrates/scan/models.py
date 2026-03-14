@@ -26,6 +26,8 @@ class ScanItem(BaseModel):
     summary: str
     score: float
     rank: int
+    in_label: bool | None = None
+    active_trials: int | None = None
 
 
 class ScanResult(BaseModel):
@@ -38,6 +40,7 @@ class ScanResult(BaseModel):
     emerging_count: int = 0
     known_count: int = 0
     no_signal_count: int = 0
+    labeled_count: int = 0
     failed_count: int = 0
     skipped_events: list[str] = Field(default_factory=list)
     meta: MetaInfo

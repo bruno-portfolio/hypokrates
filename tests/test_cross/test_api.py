@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -173,3 +173,138 @@ class TestHypothesisAPI:
         mock_pubmed.return_value = _make_pubmed_result(6)
         r2 = await hypothesis("propofol", "PRIS", emerging_max=5, use_cache=False)
         assert r2.classification == HypothesisClassification.KNOWN_ASSOCIATION
+
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_default_no_label_fields(self, mock_signal: Any, mock_pubmed: Any) -> None:
+        """Sem check_label/check_trials → campos são None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+
+        result = await hypothesis("propofol", "PRIS", use_cache=False)
+        assert result.in_label is None
+        assert result.label_detail is None
+        assert result.active_trials is None
+        assert result.trials_detail is None
+
+
+class TestHypothesisWithLabel:
+    """hypothesis() com check_label=True."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_in_label_upgrades_novel_to_emerging(
+        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+    ) -> None:
+        """Signal + in_label=True + 0 papers → EMERGING (não NOVEL)."""
+        from hypokrates.dailymed.models import LabelCheckResult
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_check_label.return_value = LabelCheckResult(
+            drug="propofol",
+            event="bradycardia",
+            in_label=True,
+            matched_terms=["Bradycardia"],
+            set_id="test-set-id",
+            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+        )
+
+        result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
+
+        assert result.in_label is True
+        assert result.classification == HypothesisClassification.EMERGING_SIGNAL
+
+    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_not_in_label_stays_novel(
+        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+    ) -> None:
+        """Signal + in_label=False + 0 papers → NOVEL (confirmado)."""
+        from hypokrates.dailymed.models import LabelCheckResult
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_check_label.return_value = LabelCheckResult(
+            drug="propofol",
+            event="serotonin syndrome",
+            in_label=False,
+            matched_terms=[],
+            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+        )
+
+        result = await hypothesis(
+            "propofol", "serotonin syndrome", check_label=True, use_cache=False
+        )
+
+        assert result.in_label is False
+        assert result.classification == HypothesisClassification.NOVEL_HYPOTHESIS
+
+    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_label_detail_populated(
+        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+    ) -> None:
+        """label_detail reflete resultado."""
+        from hypokrates.dailymed.models import LabelCheckResult
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_check_label.return_value = LabelCheckResult(
+            drug="propofol",
+            event="bradycardia",
+            in_label=True,
+            matched_terms=["Bradycardia"],
+            set_id="test-set-id",
+            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+        )
+
+        result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
+
+        assert result.label_detail is not None
+        assert "Matched:" in result.label_detail
+        assert "label" in result.summary.lower()
+
+
+class TestHypothesisWithTrials:
+    """hypothesis() com check_trials=True."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.trials.api.search_trials", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_trials_info_populated(
+        self, mock_signal: Any, mock_pubmed: Any, mock_search_trials: AsyncMock
+    ) -> None:
+        """check_trials → active_trials e trials_detail populados."""
+        from hypokrates.trials.models import ClinicalTrial, TrialsResult
+
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_search_trials.return_value = TrialsResult(
+            drug="propofol",
+            event="hypotension",
+            total_count=3,
+            active_count=2,
+            trials=[
+                ClinicalTrial(nct_id="NCT001", title="Test", status="RECRUITING"),
+                ClinicalTrial(nct_id="NCT002", title="Test2", status="ACTIVE_NOT_RECRUITING"),
+            ],
+            meta=MetaInfo(source="ClinicalTrials.gov", retrieved_at=datetime.now(UTC)),
+        )
+
+        result = await hypothesis("propofol", "hypotension", check_trials=True, use_cache=False)
+
+        assert result.active_trials == 2
+        assert result.trials_detail is not None
+        assert "3 trials found" in result.trials_detail

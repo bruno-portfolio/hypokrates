@@ -23,6 +23,7 @@ class Source(StrEnum):
     DATASUS = "datasus"
     RXNORM = "rxnorm"
     MESH = "mesh"
+    DAILYMED = "dailymed"
 
 
 # --- URLs base ---
@@ -34,6 +35,10 @@ NCBI_EUTILS_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 RXNORM_BASE_URL = "https://rxnav.nlm.nih.gov/REST"
 
+DAILYMED_BASE_URL = "https://dailymed.nlm.nih.gov/dailymed/services/v2"
+
+TRIALS_BASE_URL = "https://clinicaltrials.gov/api/v2"
+
 
 # --- Cache settings ---
 
@@ -43,6 +48,8 @@ class CacheSettings:
 
     FAERS_TTL: int = 86_400  # 24h
     VOCAB_TTL: int = 7_776_000  # 90 dias
+    DAILYMED_TTL: int = 2_592_000  # 30 dias
+    TRIALS_TTL: int = 86_400  # 24h
     DEFAULT_TTL: int = 86_400  # 24h
     SCHEMA_VERSION: int = 1
 
@@ -64,4 +71,6 @@ class HTTPSettings:
         Source.FAERS: 40,  # sem API key; com key = 240
         Source.PUBMED: 180,  # 3/s sem key; com key = 600 (10/s)
         Source.RXNORM: 120,
+        Source.DAILYMED: 60,  # conservador (nao documentado)
+        Source.TRIALS: 50,  # documentado
     }

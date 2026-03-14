@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="urn:hl7-org:v3">
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="34084-4" codeSystem="2.16.840.1.113883.6.1" displayName="ADVERSE REACTIONS"/>
+          <title>ADVERSE REACTIONS</title>
+          <text>
+            <paragraph>The following adverse reactions have been reported during use of propofol:</paragraph>
+            <paragraph>Cardiac disorders: Bradycardia, Cardiac arrest, Tachycardia</paragraph>
+            <paragraph>Vascular disorders: Hypotension, Hypertension</paragraph>
+            <paragraph>Respiratory disorders: Apnea, Respiratory depression, Bronchospasm</paragraph>
+            <paragraph>Nervous system disorders: Headache, Dizziness, Involuntary movements</paragraph>
+            <paragraph>Gastrointestinal disorders: Nausea, Vomiting</paragraph>
+            <paragraph>General disorders: Pain at injection site, Fever</paragraph>
+            <paragraph>Metabolic disorders: Hypertriglyceridemia, Metabolic acidosis</paragraph>
+            <paragraph>Immune system disorders: Anaphylaxis, Anaphylactoid reaction</paragraph>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="34068-7" codeSystem="2.16.840.1.113883.6.1" displayName="DOSAGE AND ADMINISTRATION"/>
+          <title>DOSAGE AND ADMINISTRATION</title>
+          <text>
+            <paragraph>Propofol is an intravenous anesthetic agent.</paragraph>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</document>

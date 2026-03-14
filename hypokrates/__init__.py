@@ -13,10 +13,11 @@ Usage:
 
 from __future__ import annotations
 
-from hypokrates import cross, faers, pubmed, scan, stats, vocab
+from hypokrates import cross, dailymed, faers, pubmed, scan, stats, trials, vocab
 from hypokrates.config import configure
 from hypokrates.constants import __version__
 from hypokrates.cross import HypothesisClassification, HypothesisResult
+from hypokrates.dailymed import LabelCheckResult, LabelEventsResult
 from hypokrates.evidence import EvidenceBlock, Limitation
 from hypokrates.exceptions import (
     CacheError,
@@ -30,16 +31,20 @@ from hypokrates.exceptions import (
 )
 from hypokrates.pubmed import PubMedArticle, PubMedSearchResult
 from hypokrates.scan import ScanItem, ScanResult
+from hypokrates.trials import ClinicalTrial, TrialsResult
 from hypokrates.vocab import DrugNormResult, MeSHResult
 
 __all__ = [
     "CacheError",
+    "ClinicalTrial",
     "ConfigurationError",
     "DrugNormResult",
     "EvidenceBlock",
     "HypokratesError",
     "HypothesisClassification",
     "HypothesisResult",
+    "LabelCheckResult",
+    "LabelEventsResult",
     "Limitation",
     "MeSHResult",
     "NetworkError",
@@ -50,13 +55,16 @@ __all__ = [
     "ScanItem",
     "ScanResult",
     "SourceUnavailableError",
+    "TrialsResult",
     "ValidationError",
     "__version__",
     "configure",
     "cross",
+    "dailymed",
     "faers",
     "pubmed",
     "scan",
     "stats",
+    "trials",
     "vocab",
 ]

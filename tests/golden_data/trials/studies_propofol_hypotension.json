@@ -1,0 +1,82 @@
+{
+  "totalCount": 3,
+  "studies": [
+    {
+      "protocolSection": {
+        "identificationModule": {
+          "nctId": "NCT05001234",
+          "briefTitle": "Propofol vs Ketamine: Hemodynamic Effects"
+        },
+        "statusModule": {
+          "overallStatus": "RECRUITING",
+          "startDateStruct": {
+            "date": "2024-03-01"
+          }
+        },
+        "designModule": {
+          "phases": ["PHASE3"]
+        },
+        "conditionsModule": {
+          "conditions": ["Hypotension", "Anesthesia Complication"]
+        },
+        "armsInterventionsModule": {
+          "interventions": [
+            {"name": "Propofol", "type": "DRUG"},
+            {"name": "Ketamine", "type": "DRUG"}
+          ]
+        }
+      }
+    },
+    {
+      "protocolSection": {
+        "identificationModule": {
+          "nctId": "NCT05005678",
+          "briefTitle": "Blood Pressure During Propofol Induction"
+        },
+        "statusModule": {
+          "overallStatus": "COMPLETED",
+          "startDateStruct": {
+            "date": "2022-06-15"
+          }
+        },
+        "designModule": {
+          "phases": ["PHASE4"]
+        },
+        "conditionsModule": {
+          "conditions": ["Hypotension"]
+        },
+        "armsInterventionsModule": {
+          "interventions": [
+            {"name": "Propofol", "type": "DRUG"}
+          ]
+        }
+      }
+    },
+    {
+      "protocolSection": {
+        "identificationModule": {
+          "nctId": "NCT05009999",
+          "briefTitle": "Fluid Resuscitation in Propofol-Induced Hypotension"
+        },
+        "statusModule": {
+          "overallStatus": "ACTIVE_NOT_RECRUITING",
+          "startDateStruct": {
+            "date": "2023-09-01"
+          }
+        },
+        "designModule": {
+          "phases": ["PHASE2"]
+        },
+        "conditionsModule": {
+          "conditions": ["Hypotension", "General Anesthesia"]
+        },
+        "armsInterventionsModule": {
+          "interventions": [
+            {"name": "Propofol", "type": "DRUG"},
+            {"name": "Normal Saline", "type": "DRUG"}
+          ]
+        }
+      }
+    }
+  ]
+}

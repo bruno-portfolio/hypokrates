@@ -32,3 +32,7 @@ class HypothesisResult(BaseModel):
     evidence: EvidenceBlock
     summary: str
     thresholds_used: dict[str, int] = Field(default_factory=dict)
+    in_label: bool | None = None
+    label_detail: str | None = None
+    active_trials: int | None = None
+    trials_detail: str | None = None

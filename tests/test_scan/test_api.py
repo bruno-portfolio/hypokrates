@@ -13,6 +13,7 @@ from hypokrates.faers.models import FAERSResult
 from hypokrates.models import AdverseEvent, MetaInfo
 from hypokrates.pubmed.models import PubMedArticle
 from hypokrates.scan.api import _score, scan_drug
+from hypokrates.scan.constants import LABEL_IN_MULTIPLIER, LABEL_NOT_IN_MULTIPLIER
 from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,8 @@ def _make_hypothesis_result(
     lit_count: int = 0,
     prr_lci: float = 1.5,
     ror_lci: float = 1.6,
+    in_label: bool | None = None,
+    active_trials: int | None = None,
 ) -> HypothesisResult:
     """Factory para HypothesisResult de teste."""
     return HypothesisResult(
@@ -72,6 +75,8 @@ def _make_hypothesis_result(
         evidence=_make_evidence(),
         summary=f"{classification.value}: propofol + {event}",
         thresholds_used={"novel_max": 0, "emerging_max": 5},
+        in_label=in_label,
+        active_trials=active_trials,
     )
 
 
@@ -355,6 +360,82 @@ async def test_scan_on_progress_callback(
     assert all(t == 2 for _, t, _ in progress_calls)
 
 
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_labeled_count(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """labeled_count conta eventos in_label=True."""
+    mock_top_events.return_value = _make_events(["A", "B", "C"])
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS, in_label=True),
+        _make_hypothesis_result(
+            "B", HypothesisClassification.EMERGING_SIGNAL, lit_count=3, in_label=False
+        ),
+        _make_hypothesis_result(
+            "C", HypothesisClassification.KNOWN_ASSOCIATION, lit_count=10, in_label=True
+        ),
+    ]
+
+    result = await scan_drug("propofol", top_n=3)
+
+    assert result.labeled_count == 2
+
+
+@patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_passes_check_labels_and_trials(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+    mock_label_events: AsyncMock,
+) -> None:
+    """check_labels/check_trials são passados para hypothesis()."""
+    from hypokrates.dailymed.models import LabelEventsResult
+    from hypokrates.models import MetaInfo as _Meta
+
+    mock_top_events.return_value = _make_events(["A"])
+    mock_label_events.return_value = LabelEventsResult(
+        drug="propofol", meta=_Meta(source="test", retrieved_at=datetime.now(UTC))
+    )
+
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "A", HypothesisClassification.NOVEL_HYPOTHESIS
+    )
+
+    await scan_drug("propofol", top_n=1, check_labels=True, check_trials=True)
+
+    mock_hypothesis.assert_called_once()
+    call_kwargs = mock_hypothesis.call_args.kwargs
+    assert call_kwargs["check_label"] is True
+    assert call_kwargs["check_trials"] is True
+    assert call_kwargs["_label_cache"] is not None
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_items_have_label_fields(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """ScanItem tem in_label e active_trials."""
+    mock_top_events.return_value = _make_events(["A"])
+
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "A",
+        HypothesisClassification.NOVEL_HYPOTHESIS,
+        in_label=False,
+        active_trials=3,
+    )
+
+    result = await scan_drug("propofol", top_n=1)
+
+    assert result.items[0].in_label is False
+    assert result.items[0].active_trials == 3
+
+
 class TestScore:
     """Testes para _score()."""
 
@@ -384,3 +465,45 @@ class TestScore:
         score = _score(hyp)
         # base * max(0.0, 0.1) = 10.0 * 0.1 = 1.0
         assert score == pytest.approx(1.0)
+
+    def test_not_in_label_multiplier(self) -> None:
+        """in_label=False -> score x LABEL_NOT_IN_MULTIPLIER."""
+        base_hyp = _make_hypothesis_result(
+            "A", HypothesisClassification.NOVEL_HYPOTHESIS, prr_lci=1.5, ror_lci=1.5
+        )
+        label_hyp = _make_hypothesis_result(
+            "A",
+            HypothesisClassification.NOVEL_HYPOTHESIS,
+            prr_lci=1.5,
+            ror_lci=1.5,
+            in_label=False,
+        )
+        base_score = _score(base_hyp)
+        label_score = _score(label_hyp)
+        assert label_score == pytest.approx(base_score * LABEL_NOT_IN_MULTIPLIER)
+
+    def test_in_label_multiplier(self) -> None:
+        """in_label=True -> score x LABEL_IN_MULTIPLIER."""
+        base_hyp = _make_hypothesis_result(
+            "A", HypothesisClassification.NOVEL_HYPOTHESIS, prr_lci=1.5, ror_lci=1.5
+        )
+        label_hyp = _make_hypothesis_result(
+            "A",
+            HypothesisClassification.NOVEL_HYPOTHESIS,
+            prr_lci=1.5,
+            ror_lci=1.5,
+            in_label=True,
+        )
+        base_score = _score(base_hyp)
+        label_score = _score(label_hyp)
+        assert label_score == pytest.approx(base_score * LABEL_IN_MULTIPLIER)
+
+    def test_label_none_no_multiplier(self) -> None:
+        """in_label=None → sem modificador."""
+        hyp = _make_hypothesis_result(
+            "A", HypothesisClassification.NOVEL_HYPOTHESIS, prr_lci=1.5, ror_lci=1.5
+        )
+        assert hyp.in_label is None
+        score = _score(hyp)
+        # 10.0 * 1.5 = 15.0
+        assert score == pytest.approx(15.0)
