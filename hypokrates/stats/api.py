@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
+from hypokrates.faers.api import resolve_drug_field
 from hypokrates.faers.client import FAERSClient
 from hypokrates.faers.constants import SEARCH_FIELDS
 from hypokrates.models import MetaInfo
@@ -40,18 +41,17 @@ async def signal(
     Returns:
         SignalResult com PRR, ROR, IC e heurística signal_detected.
     """
-    drug_field = SEARCH_FIELDS["drug"]
     reaction_field = SEARCH_FIELDS["reaction"]
-
-    drug_upper = drug.upper()
     event_upper = event.upper()
-
-    search_drug_event = f'{drug_field}:"{drug_upper}" AND {reaction_field}:"{event_upper}"'
-    search_drug = f'{drug_field}:"{drug_upper}"'
-    search_event = f'{reaction_field}:"{event_upper}"'
 
     client = FAERSClient()
     try:
+        drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
+
+        search_drug_event = f'{drug_search} AND {reaction_field}:"{event_upper}"'
+        search_drug = drug_search
+        search_event = f'{reaction_field}:"{event_upper}"'
+
         drug_event_count = await client.fetch_total(search_drug_event, use_cache=use_cache)
         drug_total = await client.fetch_total(search_drug, use_cache=use_cache)
         event_total = await client.fetch_total(search_event, use_cache=use_cache)

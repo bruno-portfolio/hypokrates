@@ -44,6 +44,13 @@ OUTCOME_MAP = {
     "6": "unknown",
 }
 
+# Ordem de fallback para resolução de nome de droga
+DRUG_FIELD_FALLBACK: list[str] = [
+    "patient.drug.openfda.generic_name.exact",
+    "patient.drug.openfda.brand_name.exact",
+    "patient.drug.medicinalproduct",
+]
+
 # Limites da API
 MAX_SKIP = 25_000  # OpenFDA max skip value
 MAX_LIMIT = 1_000  # max results per request
