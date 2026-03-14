@@ -36,3 +36,7 @@ class HypothesisResult(BaseModel):
     label_detail: str | None = None
     active_trials: int | None = None
     trials_detail: str | None = None
+    mechanism: str | None = None
+    interactions: list[str] = Field(default_factory=list)
+    enzymes: list[str] = Field(default_factory=list)
+    ot_llr: float | None = None

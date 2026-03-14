@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from hypokrates.mcp.tools import cross, faers, meta, pubmed, scan, stats, vocab
+from hypokrates.mcp.tools import (
+    cross,
+    dailymed,
+    drugbank,
+    faers,
+    meta,
+    opentargets,
+    pubmed,
+    scan,
+    stats,
+    trials,
+    vocab,
+)
 
 mcp = FastMCP("hypokrates")
 
@@ -18,4 +30,8 @@ def create_server() -> FastMCP:
     meta.register(mcp)
     scan.register(mcp)
     vocab.register(mcp)
+    dailymed.register(mcp)
+    trials.register(mcp)
+    drugbank.register(mcp)
+    opentargets.register(mcp)
     return mcp

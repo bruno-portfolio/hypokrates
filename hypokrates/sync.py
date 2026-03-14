@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from hypokrates.cross import api as cross_api
 from hypokrates.dailymed import api as dailymed_api
+from hypokrates.drugbank import api as drugbank_api
 from hypokrates.faers import api as faers_api
+from hypokrates.opentargets import api as opentargets_api
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.scan import api as scan_api
 from hypokrates.stats import api as stats_api
@@ -106,6 +108,21 @@ class _SyncTrials:
     search_trials = staticmethod(_make_sync(trials_api.search_trials))
 
 
+class _SyncDrugBank:
+    """Wrapper síncrono para hypokrates.drugbank."""
+
+    drug_info = staticmethod(_make_sync(drugbank_api.drug_info))
+    drug_interactions = staticmethod(_make_sync(drugbank_api.drug_interactions))
+    drug_mechanism = staticmethod(_make_sync(drugbank_api.drug_mechanism))
+
+
+class _SyncOpenTargets:
+    """Wrapper síncrono para hypokrates.opentargets."""
+
+    drug_adverse_events = staticmethod(_make_sync(opentargets_api.drug_adverse_events))
+    drug_safety_score = staticmethod(_make_sync(opentargets_api.drug_safety_score))
+
+
 faers = _SyncFAERS()
 stats = _SyncStats()
 pubmed = _SyncPubMed()
@@ -114,3 +131,5 @@ scan = _SyncScan()
 vocab = _SyncVocab()
 dailymed = _SyncDailyMed()
 trials = _SyncTrials()
+drugbank = _SyncDrugBank()
+opentargets = _SyncOpenTargets()

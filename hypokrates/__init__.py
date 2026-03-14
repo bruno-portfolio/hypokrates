@@ -13,11 +13,23 @@ Usage:
 
 from __future__ import annotations
 
-from hypokrates import cross, dailymed, faers, pubmed, scan, stats, trials, vocab
+from hypokrates import (
+    cross,
+    dailymed,
+    drugbank,
+    faers,
+    opentargets,
+    pubmed,
+    scan,
+    stats,
+    trials,
+    vocab,
+)
 from hypokrates.config import configure
 from hypokrates.constants import __version__
 from hypokrates.cross import HypothesisClassification, HypothesisResult
 from hypokrates.dailymed import LabelCheckResult, LabelEventsResult
+from hypokrates.drugbank import DrugBankInfo, DrugInteraction, DrugTarget
 from hypokrates.evidence import EvidenceBlock, Limitation
 from hypokrates.exceptions import (
     CacheError,
@@ -29,6 +41,7 @@ from hypokrates.exceptions import (
     SourceUnavailableError,
     ValidationError,
 )
+from hypokrates.opentargets import OTAdverseEvent, OTDrugSafety
 from hypokrates.pubmed import PubMedArticle, PubMedSearchResult
 from hypokrates.scan import ScanItem, ScanResult
 from hypokrates.trials import ClinicalTrial, TrialsResult
@@ -38,7 +51,10 @@ __all__ = [
     "CacheError",
     "ClinicalTrial",
     "ConfigurationError",
+    "DrugBankInfo",
+    "DrugInteraction",
     "DrugNormResult",
+    "DrugTarget",
     "EvidenceBlock",
     "HypokratesError",
     "HypothesisClassification",
@@ -48,6 +64,8 @@ __all__ = [
     "Limitation",
     "MeSHResult",
     "NetworkError",
+    "OTAdverseEvent",
+    "OTDrugSafety",
     "ParseError",
     "PubMedArticle",
     "PubMedSearchResult",
@@ -61,7 +79,9 @@ __all__ = [
     "configure",
     "cross",
     "dailymed",
+    "drugbank",
     "faers",
+    "opentargets",
     "pubmed",
     "scan",
     "stats",

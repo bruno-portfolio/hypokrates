@@ -11,6 +11,8 @@ from hypokrates.cross.constants import DEFAULT_EMERGING_MAX, DEFAULT_NOVEL_MAX
 
 if TYPE_CHECKING:
     from hypokrates.dailymed.models import LabelEventsResult
+    from hypokrates.drugbank.models import DrugBankInfo
+    from hypokrates.opentargets.models import OTDrugSafety
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.evidence.builder import build_evidence
 from hypokrates.evidence.models import Limitation
@@ -44,7 +46,11 @@ async def hypothesis(
     use_cache: bool = True,
     check_label: bool = False,
     check_trials: bool = False,
+    check_drugbank: bool = False,
+    check_opentargets: bool = False,
     _label_cache: LabelEventsResult | None = None,
+    _drugbank_cache: DrugBankInfo | None = None,
+    _ot_safety_cache: OTDrugSafety | None = None,
 ) -> HypothesisResult:
     """Cruza sinal FAERS + literatura PubMed → classificação.
 
@@ -58,6 +64,8 @@ async def hypothesis(
         use_cache: Se deve usar cache.
         check_label: Se deve verificar bula FDA via DailyMed.
         check_trials: Se deve buscar trials em ClinicalTrials.gov.
+        check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
+        check_opentargets: Se deve buscar LRT score no OpenTargets.
 
     Thresholds são heurísticas — ajuste pro domínio clínico.
 
@@ -109,10 +117,38 @@ async def hypothesis(
         active_trials = trials_result.active_count
         trials_detail = _format_trials_detail(trials_result)
 
+    # 3b. DrugBank (drug-level, cached externally)
+    mechanism: str | None = None
+    interactions_list: list[str] = []
+    enzymes_list: list[str] = []
+
+    if check_drugbank:
+        from hypokrates.drugbank import api as drugbank_api
+
+        db_info: DrugBankInfo | None
+        if _drugbank_cache is not None:
+            db_info = _drugbank_cache
+        else:
+            db_info = await drugbank_api.drug_info(drug, _store=None)
+
+        if db_info is not None:
+            mechanism = db_info.mechanism_of_action or None
+            interactions_list = [it.partner_name for it in db_info.interactions[:10]]
+            enzymes_list = [e.gene_name for e in db_info.enzymes if e.gene_name]
+
+    # 3c. OpenTargets (per-event LRT score)
+    ot_llr: float | None = None
+
+    if check_opentargets:
+        from hypokrates.opentargets import api as opentargets_api
+
+        ot_llr = await opentargets_api.drug_safety_score(
+            drug, event, use_cache=use_cache, _safety_cache=_ot_safety_cache
+        )
+
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
-    # 3. Classificar com thresholds + label refinement
     classification = _classify(
         signal_detected=signal_result.signal_detected,
         literature_count=literature_count,
@@ -121,10 +157,10 @@ async def hypothesis(
         in_label=in_label,
     )
 
-    # 4. Gerar summary
+    # 5. Gerar summary
     summary = _build_summary(drug, event, classification, literature_count, in_label=in_label)
 
-    # 5. Gerar EvidenceBlock
+    # 6. Gerar EvidenceBlock
     thresholds_used = {"novel_max": novel_max, "emerging_max": emerging_max}
     evidence = build_evidence(
         MetaInfo(
@@ -161,6 +197,10 @@ async def hypothesis(
         label_detail=label_detail,
         active_trials=active_trials,
         trials_detail=trials_detail,
+        mechanism=mechanism,
+        interactions=interactions_list,
+        enzymes=enzymes_list,
+        ot_llr=ot_llr,
     )
 
 

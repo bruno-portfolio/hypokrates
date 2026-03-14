@@ -24,6 +24,8 @@ class Source(StrEnum):
     RXNORM = "rxnorm"
     MESH = "mesh"
     DAILYMED = "dailymed"
+    OPENTARGETS = "opentargets"
+    CHEMBL = "chembl"
 
 
 # --- URLs base ---
@@ -39,6 +41,8 @@ DAILYMED_BASE_URL = "https://dailymed.nlm.nih.gov/dailymed/services/v2"
 
 TRIALS_BASE_URL = "https://clinicaltrials.gov/api/v2"
 
+OPENTARGETS_GRAPHQL_URL = "https://api.platform.opentargets.org/api/v4/graphql"
+
 
 # --- Cache settings ---
 
@@ -50,6 +54,7 @@ class CacheSettings:
     VOCAB_TTL: int = 7_776_000  # 90 dias
     DAILYMED_TTL: int = 2_592_000  # 30 dias
     TRIALS_TTL: int = 86_400  # 24h
+    OPENTARGETS_TTL: int = 604_800  # 7 dias
     DEFAULT_TTL: int = 86_400  # 24h
     SCHEMA_VERSION: int = 1
 
@@ -73,4 +78,5 @@ class HTTPSettings:
         Source.RXNORM: 120,
         Source.DAILYMED: 60,  # conservador (nao documentado)
         Source.TRIALS: 50,  # documentado
+        Source.OPENTARGETS: 30,  # conservador (nao documentado)
     }

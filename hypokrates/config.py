@@ -29,6 +29,9 @@ class HypokratesConfig:
     ncbi_api_key: str | None = None
     ncbi_email: str | None = None
 
+    # DrugBank
+    drugbank_path: Path | None = None
+
     # Verbosity
     debug: bool = False
 

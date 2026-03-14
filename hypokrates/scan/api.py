@@ -25,6 +25,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from hypokrates.dailymed.models import LabelEventsResult
+    from hypokrates.drugbank.models import DrugBankInfo
+    from hypokrates.opentargets.models import OTDrugSafety
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,9 @@ async def scan_drug(
     use_cache: bool = True,
     check_labels: bool = False,
     check_trials: bool = False,
+    check_drugbank: bool = False,
+    check_opentargets: bool = False,
+    group_events: bool = True,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
     """Escaneia os top eventos adversos de uma droga e gera hipóteses.
@@ -57,6 +62,9 @@ async def scan_drug(
         use_cache: Se deve usar cache.
         check_labels: Se deve verificar bula FDA via DailyMed para cada evento.
         check_trials: Se deve buscar trials em ClinicalTrials.gov para cada evento.
+        check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
+        check_opentargets: Se deve buscar LRT score no OpenTargets.
+        group_events: Se deve agrupar termos MedDRA sinônimos.
         on_progress: Callback opcional (completed, total, event_term).
 
     Returns:
@@ -79,12 +87,25 @@ async def scan_drug(
             ),
         )
 
-    # 2. Pre-fetch label para evitar N+1 (XML parsed 1x, não N)
+    # 2. Pre-fetch drug-level data (1x por droga, não por evento)
     label_cache: LabelEventsResult | None = None
+    drugbank_cache: DrugBankInfo | None = None
+    ot_safety_cache: OTDrugSafety | None = None
+
     if check_labels:
         from hypokrates.dailymed import api as dailymed_api
 
         label_cache = await dailymed_api.label_events(drug, use_cache=use_cache)
+
+    if check_drugbank:
+        from hypokrates.drugbank import api as drugbank_api
+
+        drugbank_cache = await drugbank_api.drug_info(drug)
+
+    if check_opentargets:
+        from hypokrates.opentargets import api as opentargets_api
+
+        ot_safety_cache = await opentargets_api.drug_adverse_events(drug, use_cache=use_cache)
 
     # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
@@ -101,7 +122,11 @@ async def scan_drug(
                     use_cache=use_cache,
                     check_label=check_labels,
                     check_trials=check_trials,
+                    check_drugbank=check_drugbank,
+                    check_opentargets=check_opentargets,
                     _label_cache=label_cache,
+                    _drugbank_cache=drugbank_cache,
+                    _ot_safety_cache=ot_safety_cache,
                 )
             except Exception as exc:
                 completed += 1
@@ -175,12 +200,33 @@ async def scan_drug(
                 rank=0,  # atribuído abaixo
                 in_label=hyp.in_label,
                 active_trials=hyp.active_trials,
+                mechanism=hyp.mechanism,
+                ot_llr=hyp.ot_llr,
             )
         )
 
     # 4. Ordenar por score e reconstruir com ranks corretos
     items.sort(key=lambda x: x.score, reverse=True)
     items = [item.model_copy(update={"rank": idx + 1}) for idx, item in enumerate(items)]
+
+    # 5. MedDRA grouping
+    groups_applied = False
+    if group_events and items:
+        from hypokrates.vocab.meddra import group_scan_items
+
+        grouped = group_scan_items(items)
+        if len(grouped) < len(items):
+            items = grouped
+            groups_applied = True
+
+    # 6. Enriquecer ScanResult com dados drug-level do DrugBank
+    scan_mechanism: str | None = None
+    scan_interactions_count: int | None = None
+    scan_cyp_enzymes: list[str] = []
+    if drugbank_cache is not None:
+        scan_mechanism = drugbank_cache.mechanism_of_action or None
+        scan_interactions_count = len(drugbank_cache.interactions)
+        scan_cyp_enzymes = [e.gene_name for e in drugbank_cache.enzymes if e.gene_name]
 
     return ScanResult(
         drug=drug,
@@ -192,7 +238,11 @@ async def scan_drug(
         no_signal_count=no_signal_count,
         labeled_count=labeled_count,
         failed_count=failed_count,
+        groups_applied=groups_applied,
         skipped_events=skipped_events,
+        mechanism=scan_mechanism,
+        interactions_count=scan_interactions_count,
+        cyp_enzymes=scan_cyp_enzymes,
         meta=MetaInfo(
             source="hypokrates/scan",
             query={"drug": drug, "top_n": top_n},

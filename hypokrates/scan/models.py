@@ -28,6 +28,9 @@ class ScanItem(BaseModel):
     rank: int
     in_label: bool | None = None
     active_trials: int | None = None
+    grouped_terms: list[str] = Field(default_factory=list)
+    mechanism: str | None = None
+    ot_llr: float | None = None
 
 
 class ScanResult(BaseModel):
@@ -42,5 +45,9 @@ class ScanResult(BaseModel):
     no_signal_count: int = 0
     labeled_count: int = 0
     failed_count: int = 0
+    groups_applied: bool = False
     skipped_events: list[str] = Field(default_factory=list)
+    mechanism: str | None = None
+    interactions_count: int | None = None
+    cyp_enzymes: list[str] = Field(default_factory=list)
     meta: MetaInfo
