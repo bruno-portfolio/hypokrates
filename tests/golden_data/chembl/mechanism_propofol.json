@@ -1,0 +1,20 @@
+{
+  "mechanisms": [
+    {
+      "action_type": "POSITIVE ALLOSTERIC MODULATOR",
+      "mechanism_of_action": "GABA-A receptor; anion channel positive allosteric modulator",
+      "molecule_chembl_id": "CHEMBL526",
+      "target_chembl_id": "CHEMBL2093872",
+      "max_phase": 4,
+      "direct_interaction": 1,
+      "disease_efficacy": 1,
+      "mechanism_comment": null,
+      "mec_id": 1616
+    }
+  ],
+  "page_meta": {
+    "limit": 20,
+    "offset": 0,
+    "total_count": 1
+  }
+}

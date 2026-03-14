@@ -25,6 +25,7 @@ def register(mcp: FastMCP) -> None:
         check_trials: bool = False,
         check_drugbank: bool = False,
         check_opentargets: bool = False,
+        check_chembl: bool = False,
         group_events: bool = True,
     ) -> str:
         """Scan a drug's adverse events and classify each as novel/emerging/known signal.
@@ -42,6 +43,7 @@ def register(mcp: FastMCP) -> None:
             check_trials: Search ClinicalTrials.gov for each event (opt-in).
             check_drugbank: Check DrugBank for mechanism/interactions (opt-in).
             check_opentargets: Check OpenTargets for LRT scores (opt-in).
+            check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
             group_events: Group synonymous MedDRA terms (default True).
         """
         clamped_top_n = min(top_n, 20)
@@ -57,6 +59,7 @@ def register(mcp: FastMCP) -> None:
             check_trials=check_trials,
             check_drugbank=check_drugbank,
             check_opentargets=check_opentargets,
+            check_chembl=check_chembl,
             group_events=group_events,
             on_progress=_on_progress,
         )

@@ -1,0 +1,43 @@
+{
+  "metabolisms": [
+    {
+      "drug_chembl_id": "CHEMBL526",
+      "enzyme_name": null,
+      "met_conversion": "Glucuronidation",
+      "met_id": 1001,
+      "metabolite_chembl_id": "CHEMBL1234",
+      "metabolite_name": "Propofol glucuronide",
+      "organism": "Homo sapiens",
+      "substrate_chembl_id": "CHEMBL526",
+      "substrate_name": "Propofol",
+      "target_chembl_id": null,
+      "pathway_id": 1,
+      "pathway_key": "Fig1",
+      "met_comment": null,
+      "tax_id": 9606,
+      "metabolism_refs": []
+    },
+    {
+      "drug_chembl_id": "CHEMBL526",
+      "enzyme_name": null,
+      "met_conversion": "Oxidation",
+      "met_id": 1002,
+      "metabolite_chembl_id": "CHEMBL5678",
+      "metabolite_name": "4-Hydroxypropofol",
+      "organism": "Homo sapiens",
+      "substrate_chembl_id": "CHEMBL526",
+      "substrate_name": "Propofol",
+      "target_chembl_id": null,
+      "pathway_id": 1,
+      "pathway_key": "Fig1",
+      "met_comment": null,
+      "tax_id": 9606,
+      "metabolism_refs": []
+    }
+  ],
+  "page_meta": {
+    "limit": 20,
+    "offset": 0,
+    "total_count": 2
+  }
+}

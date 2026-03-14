@@ -11,6 +11,7 @@ import asyncio
 import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from hypokrates.chembl import api as chembl_api
 from hypokrates.cross import api as cross_api
 from hypokrates.dailymed import api as dailymed_api
 from hypokrates.drugbank import api as drugbank_api
@@ -131,5 +132,16 @@ scan = _SyncScan()
 vocab = _SyncVocab()
 dailymed = _SyncDailyMed()
 trials = _SyncTrials()
+
+
+class _SyncChEMBL:
+    """Wrapper síncrono para hypokrates.chembl."""
+
+    drug_mechanism = staticmethod(_make_sync(chembl_api.drug_mechanism))
+    drug_targets = staticmethod(_make_sync(chembl_api.drug_targets))
+    drug_metabolism = staticmethod(_make_sync(chembl_api.drug_metabolism))
+
+
 drugbank = _SyncDrugBank()
 opentargets = _SyncOpenTargets()
+chembl = _SyncChEMBL()

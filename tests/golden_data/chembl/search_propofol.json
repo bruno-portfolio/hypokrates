@@ -1,0 +1,16 @@
+{
+  "molecules": [
+    {
+      "molecule_chembl_id": "CHEMBL526",
+      "pref_name": "PROPOFOL",
+      "molecule_type": "Small molecule",
+      "max_phase": "4.0",
+      "first_approval": 1989
+    }
+  ],
+  "page_meta": {
+    "limit": 1,
+    "offset": 0,
+    "total_count": 5
+  }
+}

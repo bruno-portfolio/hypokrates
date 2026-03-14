@@ -1,0 +1,33 @@
+{
+  "target_chembl_id": "CHEMBL2093872",
+  "pref_name": "GABA-A receptor; anion channel",
+  "organism": "Homo sapiens",
+  "target_type": "PROTEIN COMPLEX GROUP",
+  "target_components": [
+    {
+      "component_id": 1234,
+      "component_description": "Gamma-aminobutyric acid receptor subunit alpha-1",
+      "accession": "P14867",
+      "target_component_synonyms": [
+        {"component_synonym": "GABRA1", "syn_type": "GENE_SYMBOL"},
+        {"component_synonym": "GABA(A) receptor alpha-1", "syn_type": "UNIPROT"}
+      ]
+    },
+    {
+      "component_id": 1235,
+      "component_description": "Gamma-aminobutyric acid receptor subunit beta-2",
+      "accession": "P47870",
+      "target_component_synonyms": [
+        {"component_synonym": "GABRB2", "syn_type": "GENE_SYMBOL"}
+      ]
+    },
+    {
+      "component_id": 1236,
+      "component_description": "Gamma-aminobutyric acid receptor subunit gamma-2",
+      "accession": "P18507",
+      "target_component_synonyms": [
+        {"component_synonym": "GABRG2", "syn_type": "GENE_SYMBOL"}
+      ]
+    }
+  ]
+}

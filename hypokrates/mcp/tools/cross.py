@@ -21,6 +21,7 @@ def register(mcp: FastMCP) -> None:
         check_trials: bool = False,
         check_drugbank: bool = False,
         check_opentargets: bool = False,
+        check_chembl: bool = False,
     ) -> str:
         """Cross-reference FAERS signal with PubMed literature for a drug-event pair.
 
@@ -34,6 +35,7 @@ def register(mcp: FastMCP) -> None:
             check_trials: Search ClinicalTrials.gov (opt-in).
             check_drugbank: Check DrugBank for mechanism/interactions (opt-in).
             check_opentargets: Check OpenTargets for LRT score (opt-in).
+            check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
         """
         result = await cross_api.hypothesis(
             drug,
@@ -42,6 +44,7 @@ def register(mcp: FastMCP) -> None:
             check_trials=check_trials,
             check_drugbank=check_drugbank,
             check_opentargets=check_opentargets,
+            check_chembl=check_chembl,
         )
         lines = [
             f"# Hypothesis: {drug.upper()} + {event.upper()}",

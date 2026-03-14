@@ -5,6 +5,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from hypokrates.mcp.tools import (
+    chembl,
     cross,
     dailymed,
     drugbank,
@@ -34,4 +35,5 @@ def create_server() -> FastMCP:
     trials.register(mcp)
     drugbank.register(mcp)
     opentargets.register(mcp)
+    chembl.register(mcp)
     return mcp

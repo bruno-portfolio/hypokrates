@@ -12,6 +12,7 @@ _TTL_MAP: dict[str, int] = {
     Source.DAILYMED: CacheSettings.DAILYMED_TTL,
     Source.TRIALS: CacheSettings.TRIALS_TTL,
     Source.OPENTARGETS: CacheSettings.OPENTARGETS_TTL,
+    Source.CHEMBL: CacheSettings.CHEMBL_TTL,
 }
 
 

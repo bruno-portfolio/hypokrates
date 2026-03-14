@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from hypokrates.cross.constants import DEFAULT_EMERGING_MAX, DEFAULT_NOVEL_MAX
 
 if TYPE_CHECKING:
+    from hypokrates.chembl.models import ChEMBLMechanism
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.opentargets.models import OTDrugSafety
@@ -48,9 +49,11 @@ async def hypothesis(
     check_trials: bool = False,
     check_drugbank: bool = False,
     check_opentargets: bool = False,
+    check_chembl: bool = False,
     _label_cache: LabelEventsResult | None = None,
     _drugbank_cache: DrugBankInfo | None = None,
     _ot_safety_cache: OTDrugSafety | None = None,
+    _chembl_cache: ChEMBLMechanism | None = None,
 ) -> HypothesisResult:
     """Cruza sinal FAERS + literatura PubMed → classificação.
 
@@ -66,6 +69,7 @@ async def hypothesis(
         check_trials: Se deve buscar trials em ClinicalTrials.gov.
         check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
         check_opentargets: Se deve buscar LRT score no OpenTargets.
+        check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
 
     Thresholds são heurísticas — ajuste pro domínio clínico.
 
@@ -145,6 +149,21 @@ async def hypothesis(
         ot_llr = await opentargets_api.drug_safety_score(
             drug, event, use_cache=use_cache, _safety_cache=_ot_safety_cache
         )
+
+    # 3d. ChEMBL (mecanismo + targets, alternativa ao DrugBank sem download)
+    if check_chembl and mechanism is None:
+        from hypokrates.chembl import api as chembl_api
+
+        if _chembl_cache is not None:
+            chembl_mech = _chembl_cache
+        else:
+            chembl_mech = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
+
+        if chembl_mech.mechanism_of_action:
+            mechanism = chembl_mech.mechanism_of_action
+        if not enzymes_list and chembl_mech.targets:
+            for t in chembl_mech.targets:
+                enzymes_list.extend(g for g in t.gene_names if g not in enzymes_list)
 
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles

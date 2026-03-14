@@ -55,6 +55,7 @@ class CacheSettings:
     DAILYMED_TTL: int = 2_592_000  # 30 dias
     TRIALS_TTL: int = 86_400  # 24h
     OPENTARGETS_TTL: int = 604_800  # 7 dias
+    CHEMBL_TTL: int = 604_800  # 7 dias (releases trimestrais)
     DEFAULT_TTL: int = 86_400  # 24h
     SCHEMA_VERSION: int = 1
 

@@ -24,6 +24,7 @@ from hypokrates.scan.models import ScanItem, ScanResult
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from hypokrates.chembl.models import ChEMBLMechanism
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.opentargets.models import OTDrugSafety
@@ -42,6 +43,7 @@ async def scan_drug(
     check_trials: bool = False,
     check_drugbank: bool = False,
     check_opentargets: bool = False,
+    check_chembl: bool = False,
     group_events: bool = True,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
@@ -64,6 +66,7 @@ async def scan_drug(
         check_trials: Se deve buscar trials em ClinicalTrials.gov para cada evento.
         check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
         check_opentargets: Se deve buscar LRT score no OpenTargets.
+        check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
         group_events: Se deve agrupar termos MedDRA sinônimos.
         on_progress: Callback opcional (completed, total, event_term).
 
@@ -107,6 +110,12 @@ async def scan_drug(
 
         ot_safety_cache = await opentargets_api.drug_adverse_events(drug, use_cache=use_cache)
 
+    chembl_cache: ChEMBLMechanism | None = None
+    if check_chembl:
+        from hypokrates.chembl import api as chembl_api
+
+        chembl_cache = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
+
     # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
     completed = 0
@@ -124,9 +133,11 @@ async def scan_drug(
                     check_trials=check_trials,
                     check_drugbank=check_drugbank,
                     check_opentargets=check_opentargets,
+                    check_chembl=check_chembl,
                     _label_cache=label_cache,
                     _drugbank_cache=drugbank_cache,
                     _ot_safety_cache=ot_safety_cache,
+                    _chembl_cache=chembl_cache,
                 )
             except Exception as exc:
                 completed += 1
@@ -219,7 +230,7 @@ async def scan_drug(
             items = grouped
             groups_applied = True
 
-    # 6. Enriquecer ScanResult com dados drug-level do DrugBank
+    # 6. Enriquecer ScanResult com dados drug-level (DrugBank ou ChEMBL)
     scan_mechanism: str | None = None
     scan_interactions_count: int | None = None
     scan_cyp_enzymes: list[str] = []
@@ -227,6 +238,11 @@ async def scan_drug(
         scan_mechanism = drugbank_cache.mechanism_of_action or None
         scan_interactions_count = len(drugbank_cache.interactions)
         scan_cyp_enzymes = [e.gene_name for e in drugbank_cache.enzymes if e.gene_name]
+    if chembl_cache is not None and scan_mechanism is None:
+        scan_mechanism = chembl_cache.mechanism_of_action or None
+        if not scan_cyp_enzymes:
+            for t in chembl_cache.targets:
+                scan_cyp_enzymes.extend(g for g in t.gene_names if g not in scan_cyp_enzymes)
 
     return ScanResult(
         drug=drug,
