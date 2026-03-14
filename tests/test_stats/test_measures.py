@@ -24,6 +24,7 @@ def _load_golden(name: str) -> dict[str, object]:
 # a=100, b=900, c=200, d=8800 → N=10000
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def golden_table() -> ContingencyTable:
     data = _load_golden("signal_propofol_pris.json")

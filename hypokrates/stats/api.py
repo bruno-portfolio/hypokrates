@@ -46,17 +46,13 @@ async def signal(
     drug_upper = drug.upper()
     event_upper = event.upper()
 
-    search_drug_event = (
-        f'{drug_field}:"{drug_upper}"+AND+{reaction_field}:"{event_upper}"'
-    )
+    search_drug_event = f'{drug_field}:"{drug_upper}"+AND+{reaction_field}:"{event_upper}"'
     search_drug = f'{drug_field}:"{drug_upper}"'
     search_event = f'{reaction_field}:"{event_upper}"'
 
     client = FAERSClient()
     try:
-        drug_event_count = await client.fetch_total(
-            search_drug_event, use_cache=use_cache
-        )
+        drug_event_count = await client.fetch_total(search_drug_event, use_cache=use_cache)
         drug_total = await client.fetch_total(search_drug, use_cache=use_cache)
         event_total = await client.fetch_total(search_event, use_cache=use_cache)
         n_total = await client.fetch_total("", use_cache=use_cache)
@@ -71,8 +67,7 @@ async def signal(
 
     significant_count = sum([prr.significant, ror.significant, ic.significant])
     signal_detected = (
-        drug_event_count >= MIN_REPORT_COUNT
-        and significant_count >= MIN_MEASURES_FOR_SIGNAL
+        drug_event_count >= MIN_REPORT_COUNT and significant_count >= MIN_MEASURES_FOR_SIGNAL
     )
 
     disclaimer = (

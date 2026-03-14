@@ -43,9 +43,7 @@ class TestBuildEvidence:
 
     def test_methodology_preserved(self) -> None:
         meta = _make_meta()
-        block = build_evidence(
-            meta, {}, methodology="PRR via Rothman-Greenland CI"
-        )
+        block = build_evidence(meta, {}, methodology="PRR via Rothman-Greenland CI")
         assert block.methodology == "PRR via Rothman-Greenland CI"
 
     def test_confidence_preserved(self) -> None:
@@ -85,7 +83,5 @@ class TestBuildFAERSEvidence:
 
     def test_methodology_passed_through(self) -> None:
         meta = _make_meta()
-        block = build_faers_evidence(
-            meta, {}, methodology="ROR via Woolf"
-        )
+        block = build_faers_evidence(meta, {}, methodology="ROR via Woolf")
         assert block.methodology == "ROR via Woolf"

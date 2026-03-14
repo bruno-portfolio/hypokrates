@@ -35,9 +35,7 @@ class DisproportionalityResult(BaseModel):
     value: float = Field(description="Ponto estimado")
     ci_lower: float = Field(description="Intervalo de confiança 95% — limite inferior")
     ci_upper: float = Field(description="Intervalo de confiança 95% — limite superior")
-    significant: bool = Field(
-        description="ci_lower > 1.0 (PRR/ROR) ou ci_lower > 0 (IC)"
-    )
+    significant: bool = Field(description="ci_lower > 1.0 (PRR/ROR) ou ci_lower > 0 (IC)")
 
 
 class SignalResult(BaseModel):
@@ -55,10 +53,6 @@ class SignalResult(BaseModel):
     table: ContingencyTable
     prr: DisproportionalityResult
     ror: DisproportionalityResult
-    ic: DisproportionalityResult = Field(
-        description="IC simplified (não BCPNN completo)"
-    )
-    signal_detected: bool = Field(
-        description="Heurística: >= 2 medidas significantes"
-    )
+    ic: DisproportionalityResult = Field(description="IC simplified (não BCPNN completo)")
+    signal_detected: bool = Field(description="Heurística: >= 2 medidas significantes")
     meta: MetaInfo

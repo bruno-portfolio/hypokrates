@@ -40,12 +40,14 @@ class TestSignalAPI:
     async def test_signal_returns_result(self, mock_client_cls: Any) -> None:
         """Mock FAERS → SignalResult completo."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 100,
-            "drug_total": 1000,
-            "event_total": 300,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 100,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         result = await signal("propofol", "PRIS")
@@ -60,12 +62,14 @@ class TestSignalAPI:
     async def test_signal_below_min_count(self, mock_client_cls: Any) -> None:
         """a < 3 → signal_detected=False independente das medidas."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 2,
-            "drug_total": 1000,
-            "event_total": 300,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 2,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         result = await signal("raredrug", "RAREREACTION")
@@ -76,12 +80,14 @@ class TestSignalAPI:
     async def test_signal_zero_counts(self, mock_client_cls: Any) -> None:
         """drug_event=0 → tudo zero, sem crash."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 0,
-            "drug_total": 1000,
-            "event_total": 300,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 0,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         result = await signal("nodrug", "NOEVENT")
@@ -92,12 +98,14 @@ class TestSignalAPI:
     async def test_signal_meta_complete(self, mock_client_cls: Any) -> None:
         """MetaInfo tem todos os campos."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 100,
-            "drug_total": 1000,
-            "event_total": 300,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 100,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         result = await signal("propofol", "DEATH")
@@ -112,12 +120,14 @@ class TestSignalAPI:
     async def test_signal_not_significant(self, mock_client_cls: Any) -> None:
         """Tabela balanceada → nenhuma medida significante."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 100,
-            "drug_total": 1000,
-            "event_total": 1000,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 100,
+                "drug_total": 1000,
+                "event_total": 1000,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         result = await signal("aspirin", "HEADACHE")
@@ -127,12 +137,14 @@ class TestSignalAPI:
     async def test_signal_calls_close(self, mock_client_cls: Any) -> None:
         """Client é fechado após uso."""
         instance = mock_client_cls.return_value
-        instance.fetch_total = _mock_fetch_total({
-            "drug_event": 100,
-            "drug_total": 1000,
-            "event_total": 300,
-            "n_total": 10000,
-        })
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 100,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
         instance.close = AsyncMock()
 
         await signal("propofol", "PRIS")
