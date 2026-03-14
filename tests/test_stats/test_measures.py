@@ -1,0 +1,178 @@
+"""Testes para hypokrates.stats.measures — matemática pura."""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+
+import pytest
+
+from hypokrates.stats.measures import build_table, compute_ic, compute_prr, compute_ror
+from hypokrates.stats.models import ContingencyTable
+
+GOLDEN_DATA = Path(__file__).parents[1] / "golden_data" / "stats"
+
+
+def _load_golden(name: str) -> dict[str, object]:
+    path = GOLDEN_DATA / name
+    return json.loads(path.read_text())  # type: ignore[no-any-return]
+
+
+# ---------------------------------------------------------------------------
+# Tabela padrão para testes (golden data)
+# a=100, b=900, c=200, d=8800 → N=10000
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def golden_table() -> ContingencyTable:
+    data = _load_golden("signal_propofol_pris.json")
+    t = data["table"]
+    return ContingencyTable(a=t["a"], b=t["b"], c=t["c"], d=t["d"])  # type: ignore[arg-type]
+
+
+class TestComputePRR:
+    """Testes para compute_prr."""
+
+    def test_known_values(self, golden_table: ContingencyTable) -> None:
+        """a=100,b=900,c=200,d=8800 → PRR ≈ 4.5."""
+        result = compute_prr(golden_table)
+        assert result.measure == "PRR"
+        assert math.isclose(result.value, 4.5, rel_tol=1e-6)
+
+    def test_ci_contains_point_estimate(self, golden_table: ContingencyTable) -> None:
+        result = compute_prr(golden_table)
+        assert result.ci_lower < result.value < result.ci_upper
+
+    def test_significant_when_ci_above_1(self, golden_table: ContingencyTable) -> None:
+        result = compute_prr(golden_table)
+        assert result.ci_lower > 1.0
+        assert result.significant is True
+
+    def test_not_significant_ci_below_1(self) -> None:
+        """Tabela onde PRR ≈ 1.0 — não significante."""
+        table = ContingencyTable(a=100, b=900, c=100, d=900)
+        result = compute_prr(table)
+        assert result.significant is False
+
+    def test_zero_a_handled(self) -> None:
+        table = ContingencyTable(a=0, b=1000, c=500, d=8500)
+        result = compute_prr(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_zero_c_handled(self) -> None:
+        """c=0 → divisão por zero → retorna 0."""
+        table = ContingencyTable(a=50, b=950, c=0, d=9000)
+        result = compute_prr(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+
+class TestComputeROR:
+    """Testes para compute_ror."""
+
+    def test_known_values(self, golden_table: ContingencyTable) -> None:
+        """a=100,b=900,c=200,d=8800 → ROR = (100*8800)/(900*200) ≈ 4.889."""
+        result = compute_ror(golden_table)
+        assert result.measure == "ROR"
+        expected_ror = (100 * 8800) / (900 * 200)
+        assert math.isclose(result.value, expected_ror, rel_tol=1e-6)
+
+    def test_ci_contains_point_estimate(self, golden_table: ContingencyTable) -> None:
+        result = compute_ror(golden_table)
+        assert result.ci_lower < result.value < result.ci_upper
+
+    def test_significant(self, golden_table: ContingencyTable) -> None:
+        result = compute_ror(golden_table)
+        assert result.significant is True
+
+    def test_zero_b_handled(self) -> None:
+        table = ContingencyTable(a=100, b=0, c=200, d=9700)
+        result = compute_ror(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_zero_d_handled(self) -> None:
+        table = ContingencyTable(a=100, b=400, c=500, d=0)
+        result = compute_ror(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_not_significant(self) -> None:
+        """Tabela balanceada → ROR ≈ 1.0."""
+        table = ContingencyTable(a=100, b=900, c=100, d=900)
+        result = compute_ror(table)
+        assert result.significant is False
+
+
+class TestComputeIC:
+    """Testa IC simplified (NÃO BCPNN completo com priors)."""
+
+    def test_known_values(self, golden_table: ContingencyTable) -> None:
+        """IC = log2(a*N / ((a+b)*(a+c)))."""
+        result = compute_ic(golden_table)
+        assert result.measure == "IC"
+        expected_ic = math.log2(100 * 10000 / (1000 * 300))
+        assert math.isclose(result.value, expected_ic, rel_tol=1e-6)
+
+    def test_ic025_positive_is_signal(self, golden_table: ContingencyTable) -> None:
+        result = compute_ic(golden_table)
+        assert result.ci_lower > 0
+        assert result.significant is True
+
+    def test_ic025_negative_no_signal(self) -> None:
+        """Tabela balanceada → IC ≈ 0, IC025 < 0."""
+        table = ContingencyTable(a=10, b=990, c=10, d=990)
+        result = compute_ic(table)
+        assert result.significant is False
+
+    def test_zero_a_handled(self) -> None:
+        table = ContingencyTable(a=0, b=1000, c=500, d=8500)
+        result = compute_ic(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_docstring_mentions_simplified(self) -> None:
+        """Verifica que a docstring documenta ser versão simplificada."""
+        doc = compute_ic.__doc__ or ""
+        assert "simplificad" in doc.lower() or "simplified" in doc.lower()
+
+
+class TestBuildTable:
+    """Testes para build_table."""
+
+    def test_from_marginals(self) -> None:
+        table = build_table(drug_event=100, drug_total=1000, event_total=300, n_total=10000)
+        assert table.a == 100
+        assert table.b == 900
+        assert table.c == 200
+        assert table.d == 8800
+        assert table.n == 10000
+
+    def test_negative_d_clamped(self) -> None:
+        """Se dados inconsistentes levam a d < 0, clamp para 0."""
+        table = build_table(drug_event=100, drug_total=5000, event_total=6000, n_total=10000)
+        assert table.d >= 0
+
+    def test_negative_b_clamped(self) -> None:
+        """Se drug_event > drug_total, b seria negativo — clamp."""
+        table = build_table(drug_event=200, drug_total=100, event_total=300, n_total=10000)
+        assert table.b >= 0
+
+    def test_negative_c_clamped(self) -> None:
+        """Se drug_event > event_total, c seria negativo — clamp."""
+        table = build_table(drug_event=400, drug_total=1000, event_total=300, n_total=10000)
+        assert table.c >= 0
+
+
+class TestMeasuresDeterminism:
+    """Testa determinismo das medidas."""
+
+    def test_all_measures_deterministic_100x(self, golden_table: ContingencyTable) -> None:
+        results_prr = [compute_prr(golden_table).value for _ in range(100)]
+        results_ror = [compute_ror(golden_table).value for _ in range(100)]
+        results_ic = [compute_ic(golden_table).value for _ in range(100)]
+        assert len(set(results_prr)) == 1
+        assert len(set(results_ror)) == 1
+        assert len(set(results_ic)) == 1

@@ -156,6 +156,73 @@ class FAERSClient:
 
         return data
 
+    async def fetch_total(
+        self,
+        search: str,
+        *,
+        use_cache: bool = True,
+    ) -> int:
+        """Retorna total de reports que matcham uma query.
+
+        Nota: o total é um snapshot — o FAERS atualiza trimestralmente.
+        Com cache TTL=24h, o valor pode ficar levemente desatualizado
+        entre updates, mas a diferença é marginal para cálculos de
+        desproporcionalidade.
+
+        Args:
+            search: Query string OpenFDA.
+            use_cache: Se deve usar cache.
+
+        Returns:
+            Total de reports (int). 0 se nenhum match.
+        """
+        params = self._build_params(search, limit=1)
+
+        if use_cache and get_config().cache_enabled:
+            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
+            store = CacheStore.get_instance()
+            cached = store.get(key)
+            if cached is not None:
+                logger.debug("Cache hit (total): %s", key)
+                raw_total: Any = cached.get("total", 0)
+                return int(raw_total)
+
+        await self._rate_limiter.acquire()
+        client = await self._get_client()
+        response = await retry_request(
+            client,
+            "GET",
+            DRUG_EVENT_ENDPOINT,
+            params=params,
+            source_name=Source.FAERS,
+        )
+
+        try:
+            data: dict[str, Any] = response.json()
+        except Exception as exc:
+            raise ParseError(Source.FAERS, f"Invalid JSON: {exc}") from exc
+
+        if "error" in data:
+            error_msg = data["error"].get("message", "Unknown error")
+            if "No matches found" in str(error_msg):
+                total = 0
+            else:
+                raise SourceUnavailableError(Source.FAERS, str(error_msg))
+        else:
+            try:
+                meta = data.get("meta", {})
+                results_meta = meta.get("results", {})
+                total = int(results_meta.get("total", 0))
+            except (ValueError, TypeError):
+                total = 0
+
+        if use_cache and get_config().cache_enabled:
+            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
+            store = CacheStore.get_instance()
+            store.set(key, {"total": total}, Source.FAERS)
+
+        return total
+
     async def close(self) -> None:
         """Fecha o client HTTP."""
         if self._client is not None:

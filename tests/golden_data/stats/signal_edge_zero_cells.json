@@ -1,0 +1,30 @@
+{
+    "description": "Edge case: cells com zero — deve retornar value=0 sem crash.",
+    "cases": [
+        {
+            "name": "a=0 (nenhum report droga+evento)",
+            "table": {"a": 0, "b": 1000, "c": 500, "d": 8500},
+            "expected_value": 0.0,
+            "expected_significant": false
+        },
+        {
+            "name": "c=0 (evento nunca aparece sem a droga)",
+            "table": {"a": 50, "b": 950, "c": 0, "d": 9000},
+            "expected_prr_value": 0.0,
+            "expected_ror_value": 0.0,
+            "note": "PRR e ROR com c=0 retornam 0 (divisão por zero)"
+        },
+        {
+            "name": "b=0 (droga sempre causa o evento)",
+            "table": {"a": 100, "b": 0, "c": 200, "d": 9700},
+            "expected_ror_value": 0.0,
+            "note": "ROR com b=0 retorna 0"
+        },
+        {
+            "name": "d=0 (todo mundo tem droga ou evento)",
+            "table": {"a": 100, "b": 400, "c": 500, "d": 0},
+            "expected_ror_value": 0.0,
+            "note": "ROR com d=0 retorna 0"
+        }
+    ]
+}

@@ -12,6 +12,7 @@ import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from hypokrates.faers import api as faers_api
+from hypokrates.stats import api as stats_api
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -54,4 +55,11 @@ class _SyncFAERS:
     compare = staticmethod(_make_sync(faers_api.compare))
 
 
+class _SyncStats:
+    """Wrapper síncrono para hypokrates.stats."""
+
+    signal = staticmethod(_make_sync(stats_api.signal))
+
+
 faers = _SyncFAERS()
+stats = _SyncStats()

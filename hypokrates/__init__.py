@@ -13,9 +13,10 @@ Usage:
 
 from __future__ import annotations
 
-from hypokrates import faers
+from hypokrates import faers, stats
 from hypokrates.config import configure
 from hypokrates.constants import __version__
+from hypokrates.evidence import EvidenceBlock, Limitation
 from hypokrates.exceptions import (
     CacheError,
     ConfigurationError,
@@ -28,10 +29,11 @@ from hypokrates.exceptions import (
 )
 
 __all__ = [
-    # Exceptions
     "CacheError",
     "ConfigurationError",
+    "EvidenceBlock",
     "HypokratesError",
+    "Limitation",
     "NetworkError",
     "ParseError",
     "RateLimitError",
@@ -40,4 +42,5 @@ __all__ = [
     "__version__",
     "configure",
     "faers",
+    "stats",
 ]

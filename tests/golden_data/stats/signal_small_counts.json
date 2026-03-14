@@ -1,0 +1,10 @@
+{
+    "description": "Small counts: a < MIN_REPORT_COUNT — sinal não detectado mesmo se medidas significantes.",
+    "table": {
+        "a": 2,
+        "b": 998,
+        "c": 50,
+        "d": 8950
+    },
+    "note": "a=2 < MIN_REPORT_COUNT=3, signal_detected deve ser False independente das medidas."
+}
