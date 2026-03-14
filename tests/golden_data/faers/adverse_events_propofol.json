@@ -1,0 +1,142 @@
+{
+  "meta": {
+    "disclaimer": "Do not rely on openFDA to make decisions regarding medical care.",
+    "terms": "https://open.fda.gov/terms/",
+    "license": "https://open.fda.gov/license/",
+    "last_updated": "2024-12-01",
+    "results": {
+      "skip": 0,
+      "limit": 3,
+      "total": 45230
+    }
+  },
+  "results": [
+    {
+      "safetyreportid": "10001234",
+      "receivedate": "20240101",
+      "receiptdate": "20240105",
+      "serious": "1",
+      "seriousnessdeath": "0",
+      "seriousnesshospitalization": "1",
+      "seriousnesslifethreatening": "0",
+      "seriousnessdisabling": "0",
+      "seriousnesscongenitalanomali": "0",
+      "seriousnessother": "0",
+      "occurcountry": "US",
+      "primarysource": {
+        "qualification": "1",
+        "reportercountry": "US"
+      },
+      "patient": {
+        "patientonsetage": "65",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "patientweight": "80.0",
+        "reaction": [
+          {
+            "reactionmeddrapt": "HYPOTENSION",
+            "reactionmeddraversionpt": "27.1",
+            "reactionoutcome": "1"
+          },
+          {
+            "reactionmeddrapt": "BRADYCARDIA",
+            "reactionmeddraversionpt": "27.1",
+            "reactionoutcome": "1"
+          }
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "drugadministrationroute": "065",
+            "drugdosagetext": "200 MG, IV",
+            "drugindication": "ANAESTHESIA",
+            "openfda": {
+              "generic_name": ["PROPOFOL"],
+              "brand_name": ["DIPRIVAN"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "10001235",
+      "receivedate": "20240115",
+      "serious": "1",
+      "seriousnessdeath": "0",
+      "seriousnesshospitalization": "0",
+      "seriousnesslifethreatening": "1",
+      "occurcountry": "BR",
+      "primarysource": {
+        "qualification": "1"
+      },
+      "patient": {
+        "patientonsetage": "45",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "reaction": [
+          {
+            "reactionmeddrapt": "PROPOFOL INFUSION SYNDROME",
+            "reactionmeddraversionpt": "27.1",
+            "reactionoutcome": "2"
+          }
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "drugdosagetext": "continuous infusion",
+            "drugindication": "SEDATION",
+            "openfda": {
+              "generic_name": ["PROPOFOL"],
+              "brand_name": ["DIPRIVAN", "PROPOVEN"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "10001236",
+      "receivedate": "20240201",
+      "serious": "2",
+      "occurcountry": "JP",
+      "primarysource": {
+        "qualification": "3"
+      },
+      "patient": {
+        "patientonsetage": "30",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "patientweight": "70.5",
+        "reaction": [
+          {
+            "reactionmeddrapt": "NAUSEA",
+            "reactionmeddraversionpt": "27.1",
+            "reactionoutcome": "1"
+          },
+          {
+            "reactionmeddrapt": "INJECTION SITE PAIN",
+            "reactionmeddraversionpt": "27.1",
+            "reactionoutcome": "1"
+          }
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "openfda": {
+              "generic_name": ["PROPOFOL"]
+            }
+          },
+          {
+            "drugcharacterization": "2",
+            "medicinalproduct": "FENTANYL",
+            "openfda": {
+              "generic_name": ["FENTANYL"]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

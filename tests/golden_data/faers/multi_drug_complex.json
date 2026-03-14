@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "results": {"total": 3}
+  },
+  "results": [
+    {
+      "safetyreportid": "MULTI001",
+      "serious": "1",
+      "seriousnesshospitalization": "1",
+      "occurcountry": "US",
+      "patient": {
+        "patientonsetage": "72",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "patientweight": "85.0",
+        "reaction": [
+          {"reactionmeddrapt": "CARDIAC ARREST", "reactionoutcome": "5"},
+          {"reactionmeddrapt": "HYPOTENSION", "reactionoutcome": "1"},
+          {"reactionmeddrapt": "BRADYCARDIA", "reactionoutcome": "1"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "drugadministrationroute": "065",
+            "drugdosagetext": "200 MG IV BOLUS",
+            "drugindication": "ANAESTHESIA",
+            "openfda": {"generic_name": ["PROPOFOL"], "brand_name": ["DIPRIVAN"]}
+          },
+          {
+            "drugcharacterization": "2",
+            "medicinalproduct": "FENTANYL",
+            "drugadministrationroute": "065",
+            "drugdosagetext": "100 MCG IV",
+            "drugindication": "ANALGESIA",
+            "openfda": {"generic_name": ["FENTANYL"]}
+          },
+          {
+            "drugcharacterization": "2",
+            "medicinalproduct": "MIDAZOLAM",
+            "drugadministrationroute": "065",
+            "drugdosagetext": "2 MG IV",
+            "drugindication": "SEDATION",
+            "openfda": {"generic_name": ["MIDAZOLAM"]}
+          },
+          {
+            "drugcharacterization": "3",
+            "medicinalproduct": "METOPROLOL",
+            "drugadministrationroute": "048",
+            "drugindication": "HYPERTENSION",
+            "openfda": {"generic_name": ["METOPROLOL"]}
+          },
+          {
+            "drugcharacterization": "4",
+            "medicinalproduct": "ATORVASTATIN",
+            "drugadministrationroute": "048",
+            "drugindication": "HYPERCHOLESTEROLAEMIA",
+            "openfda": {"generic_name": ["ATORVASTATIN"]}
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "MULTI002",
+      "serious": "1",
+      "seriousnesslifethreatening": "1",
+      "occurcountry": "BR",
+      "patient": {
+        "patientonsetage": "58",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "reaction": [
+          {"reactionmeddrapt": "PROPOFOL INFUSION SYNDROME", "reactionoutcome": "3"},
+          {"reactionmeddrapt": "RHABDOMYOLYSIS", "reactionoutcome": "3"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL INJECTION",
+            "drugdosagetext": "continuous infusion 4mg/kg/h",
+            "drugindication": "SEDATION"
+          },
+          {
+            "drugcharacterization": "2",
+            "medicinalproduct": "UNKNOWN DRUG ABC",
+            "drugindication": "NOT SPECIFIED"
+          },
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": ""
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "MULTI003",
+      "serious": "1",
+      "seriousnessdeath": "1",
+      "occurcountry": "JP",
+      "patient": {
+        "patientonsetage": "85",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "patientweight": "52.0",
+        "reaction": [
+          {"reactionmeddrapt": "DEATH", "reactionoutcome": "5"},
+          {"reactionmeddrapt": "RESPIRATORY FAILURE", "reactionoutcome": "5"},
+          {"reactionmeddrapt": "HYPOTENSION", "reactionoutcome": "5"},
+          {"reactionmeddrapt": "", "reactionoutcome": "5"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "openfda": {"generic_name": []}
+          },
+          {
+            "drugcharacterization": "2",
+            "medicinalproduct": "REMIFENTANIL",
+            "openfda": {"generic_name": ["REMIFENTANIL"]}
+          }
+        ]
+      }
+    }
+  ]
+}

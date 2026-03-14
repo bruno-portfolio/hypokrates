@@ -1,0 +1,22 @@
+{
+  "errors": {
+    "invalid_search": {
+      "error": {
+        "code": "INVALID_SEARCH",
+        "message": "Invalid search parameter: invalid.field. Possible fields: patient.drug.openfda.generic_name.exact"
+      }
+    },
+    "server_error": {
+      "error": {
+        "code": "SERVER_ERROR",
+        "message": "An internal server error occurred. Please try again later."
+      }
+    },
+    "not_found": {
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No matches found!"
+      }
+    }
+  }
+}

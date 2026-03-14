@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "results": {"total": 3}
+  },
+  "results": [
+    {
+      "safetyreportid": "SER001",
+      "serious": "1",
+      "seriousnessdeath": "1",
+      "seriousnesshospitalization": "1",
+      "seriousnesslifethreatening": "1",
+      "seriousnessdisabling": "1",
+      "seriousnesscongenitalanomali": "1",
+      "seriousnessother": "1",
+      "occurcountry": "US",
+      "patient": {
+        "patientonsetage": "55",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "patientweight": "70.0",
+        "reaction": [
+          {"reactionmeddrapt": "DEATH", "reactionoutcome": "5"},
+          {"reactionmeddrapt": "CARDIAC ARREST", "reactionoutcome": "5"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "openfda": {"generic_name": ["PROPOFOL"]}
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "SER002",
+      "serious": "2",
+      "occurcountry": "DE",
+      "patient": {
+        "patientonsetage": "35",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "reaction": [
+          {"reactionmeddrapt": "NAUSEA", "reactionoutcome": "1"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "openfda": {"generic_name": ["PROPOFOL"]}
+          }
+        ]
+      }
+    },
+    {
+      "safetyreportid": "SER003",
+      "serious": "1",
+      "occurcountry": "BR",
+      "patient": {
+        "patientonsetage": "60",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "reaction": [
+          {"reactionmeddrapt": "HYPOTENSION", "reactionoutcome": "2"}
+        ],
+        "drug": [
+          {
+            "drugcharacterization": "1",
+            "medicinalproduct": "PROPOFOL",
+            "openfda": {"generic_name": ["PROPOFOL"]}
+          }
+        ]
+      }
+    }
+  ]
+}

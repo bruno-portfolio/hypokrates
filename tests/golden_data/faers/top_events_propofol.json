@@ -1,0 +1,14 @@
+{
+  "results": [
+    {"term": "DEATH", "count": 5234},
+    {"term": "CARDIAC ARREST", "count": 3421},
+    {"term": "HYPOTENSION", "count": 2987},
+    {"term": "BRADYCARDIA", "count": 2145},
+    {"term": "PROPOFOL INFUSION SYNDROME", "count": 1876},
+    {"term": "RESPIRATORY DEPRESSION", "count": 1654},
+    {"term": "NAUSEA", "count": 1432},
+    {"term": "INJECTION SITE PAIN", "count": 1201},
+    {"term": "APNOEA", "count": 987},
+    {"term": "DRUG INEFFECTIVE", "count": 876}
+  ]
+}

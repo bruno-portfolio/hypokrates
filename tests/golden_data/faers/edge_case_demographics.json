@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "results": {"total": 9}
+  },
+  "results": [
+    {
+      "safetyreportid": "DEMO001",
+      "serious": "2",
+      "occurcountry": "US",
+      "patient": {
+        "patientonsetage": "0",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "patientweight": "3.5",
+        "reaction": [{"reactionmeddrapt": "APNOEA", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO002",
+      "serious": "2",
+      "occurcountry": "JP",
+      "patient": {
+        "patientonsetage": "120",
+        "patientonsetageunit": "801",
+        "patientsex": "1",
+        "patientweight": "45.0",
+        "reaction": [{"reactionmeddrapt": "HYPOTENSION", "reactionoutcome": "6"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO003",
+      "serious": "2",
+      "occurcountry": "BR",
+      "patient": {
+        "patientsex": "1",
+        "reaction": [{"reactionmeddrapt": "NAUSEA", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO004",
+      "serious": "2",
+      "occurcountry": "DE",
+      "patient": {
+        "patientonsetage": "abc",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "reaction": [{"reactionmeddrapt": "PAIN", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO005",
+      "serious": "2",
+      "occurcountry": "FR",
+      "patient": {
+        "patientonsetage": "1",
+        "patientonsetageunit": "801",
+        "patientsex": "2",
+        "patientweight": "0.5",
+        "reaction": [{"reactionmeddrapt": "BRADYCARDIA", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO006",
+      "serious": "2",
+      "occurcountry": "CA",
+      "patient": {
+        "patientonsetage": "70",
+        "patientonsetageunit": "801",
+        "patientsex": "0",
+        "reaction": [{"reactionmeddrapt": "NAUSEA", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO007",
+      "serious": "2",
+      "occurcountry": "AU",
+      "patient": {
+        "patientonsetage": "55",
+        "patientonsetageunit": "801",
+        "patientsex": "99",
+        "reaction": [{"reactionmeddrapt": "HEADACHE", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO008",
+      "serious": "2",
+      "occurcountry": "MX",
+      "patient": {
+        "patientonsetage": "40",
+        "patientonsetageunit": "801",
+        "reaction": [{"reactionmeddrapt": "DIZZINESS", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    },
+    {
+      "safetyreportid": "DEMO009",
+      "serious": "2",
+      "occurcountry": "IT",
+      "patient": {
+        "patientonsetage": "30",
+        "patientsex": "1",
+        "patientweight": "abc",
+        "reaction": [{"reactionmeddrapt": "VOMITING", "reactionoutcome": "1"}],
+        "drug": [{"drugcharacterization": "1", "medicinalproduct": "PROPOFOL", "openfda": {"generic_name": ["PROPOFOL"]}}]
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+default_language_version:
+  python: python3.11
+
+repos:
+  # --- Hooks padrão ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: detect-private-key
+
+  # --- Ruff (lint + format) ---
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # --- mypy (strict, local — usa o mypy instalado no env) ---
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict)
+        entry: python -m mypy hypokrates/ --strict
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^hypokrates/
+
+  # --- Testes (pre-push) ---
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest (fast)
+        entry: python -m pytest tests/ -x -q --timeout=30 --no-header
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
