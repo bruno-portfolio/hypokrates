@@ -21,6 +21,8 @@ class Source(StrEnum):
     WHO = "who"
     GBD = "gbd"
     DATASUS = "datasus"
+    RXNORM = "rxnorm"
+    MESH = "mesh"
 
 
 # --- URLs base ---
@@ -29,6 +31,8 @@ OPENFDA_BASE_URL = "https://api.fda.gov"
 OPENFDA_DRUG_EVENT = f"{OPENFDA_BASE_URL}/drug/event.json"
 
 NCBI_EUTILS_BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+RXNORM_BASE_URL = "https://rxnav.nlm.nih.gov/REST"
 
 
 # --- Cache settings ---
@@ -59,4 +63,5 @@ class HTTPSettings:
     RATE_LIMITS: ClassVar[dict[Source, int]] = {
         Source.FAERS: 40,  # sem API key; com key = 240
         Source.PUBMED: 180,  # 3/s sem key; com key = 600 (10/s)
+        Source.RXNORM: 120,
     }

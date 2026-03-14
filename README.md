@@ -87,6 +87,45 @@ result = await hp.cross.hypothesis(
 )
 ```
 
+## Drug scanning
+
+Automated scan of top adverse events with hypothesis classification:
+
+```python
+# Scan top 20 events for propofol (async)
+result = await hp.scan.scan_drug("propofol", top_n=20)
+
+for item in result.items:
+    print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f})")
+
+print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
+
+# Sync
+from hypokrates.sync import scan
+result = scan.scan_drug("propofol", top_n=10)
+```
+
+## Drug normalization
+
+Normalize drug names (brand → generic) and map to MeSH:
+
+```python
+# RxNorm: brand → generic
+norm = await hp.vocab.normalize_drug("advil")
+print(norm.generic_name)  # "ibuprofen"
+print(norm.brand_names)   # ["Advil", "Motrin"]
+
+# MeSH mapping
+mesh = await hp.vocab.map_to_mesh("aspirin")
+print(mesh.mesh_term)     # "Aspirin"
+print(mesh.mesh_id)       # "D001241"
+
+# Sync
+from hypokrates.sync import vocab
+norm = vocab.normalize_drug("advil")
+mesh = vocab.map_to_mesh("aspirin")
+```
+
 ## Evidence blocks
 
 Structured provenance for any result:
@@ -108,22 +147,26 @@ events = await hypokrates.faers.adverse_events("propofol")
 signal = await hypokrates.stats.signal("propofol", "DEATH")
 papers = await hypokrates.pubmed.search_papers("propofol", "DEATH")
 hyp = await hypokrates.cross.hypothesis("propofol", "DEATH")
+scan_result = await hypokrates.scan.scan_drug("propofol")
+norm = await hypokrates.vocab.normalize_drug("advil")
 ```
 
 ## Sync wrapper
 
 ```python
-from hypokrates.sync import faers, stats, pubmed, cross
+from hypokrates.sync import faers, stats, pubmed, cross, scan, vocab
 
 events = faers.adverse_events("propofol")
 signal = stats.signal("propofol", "DEATH")
 papers = pubmed.search_papers("propofol", "DEATH")
 hyp = cross.hypothesis("propofol", "DEATH")
+scan_result = scan.scan_drug("propofol")
+norm = vocab.normalize_drug("advil")
 ```
 
 ## Status
 
-**Alpha** — Sprint 3 (FAERS + signal detection + PubMed + hypothesis cross-referencing). Not for clinical use.
+**Alpha** — Sprint 4 (FAERS + signal detection + PubMed + hypothesis + scan + vocab). Not for clinical use.
 
 ## License
 

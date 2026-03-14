@@ -1,0 +1,19 @@
+{
+  "header": {
+    "type": "esummary",
+    "version": "0.3"
+  },
+  "result": {
+    "uids": ["68001241"],
+    "68001241": {
+      "uid": "68001241",
+      "ds_meshui": "D001241",
+      "ds_meshterms": ["Aspirin"],
+      "ds_treenumberlist": [
+        "D02.455.426.559.389.657.109",
+        "D09.698.629.200"
+      ],
+      "ds_scopenote": "The prototypical analgesic used in the treatment of mild to moderate pain."
+    }
+  }
+}

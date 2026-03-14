@@ -1,0 +1,13 @@
+{
+  "drugGroup": {
+    "name": "xyz123nonexistent",
+    "conceptGroup": [
+      {
+        "tty": "IN"
+      },
+      {
+        "tty": "BN"
+      }
+    ]
+  }
+}

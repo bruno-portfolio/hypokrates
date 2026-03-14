@@ -42,6 +42,8 @@ nav:
       - Signal Detection: api/stats.md
       - PubMed: api/pubmed.md
       - Cross-Reference: api/cross.md
+      - Scan: api/scan.md
+      - Vocab: api/vocab.md
       - Evidence: api/evidence.md
   - Data Sources:
       - Overview: sources/index.md

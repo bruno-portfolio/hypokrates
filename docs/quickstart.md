@@ -154,7 +154,57 @@ Combine FAERS signal detection with PubMed literature to classify the hypothesis
     print(f"Confidence: {result.evidence.confidence}")
     ```
 
-## Step 6 — Evidence Provenance
+## Step 6 — Scan Drug
+
+Automatically scan the top adverse events for a drug and classify each:
+
+=== "Async"
+
+    ```python
+    from hypokrates.scan import api as scan
+
+    result = await scan.scan_drug("propofol", top_n=10)
+    for item in result.items:
+        print(f"#{item.rank} {item.event}: {item.classification.value}")
+    print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
+    ```
+
+=== "Sync"
+
+    ```python
+    from hypokrates.sync import scan
+
+    result = scan.scan_drug("propofol", top_n=10)
+    for item in result.items:
+        print(f"#{item.rank} {item.event}: {item.classification.value}")
+    ```
+
+## Step 7 — Normalize Drug Names
+
+Resolve brand names to generic names and map to MeSH:
+
+=== "Async"
+
+    ```python
+    from hypokrates.vocab import api as vocab
+
+    norm = await vocab.normalize_drug("advil")
+    print(f"{norm.original} -> {norm.generic_name}")  # advil -> ibuprofen
+
+    mesh = await vocab.map_to_mesh("aspirin")
+    print(f"{mesh.query} -> {mesh.mesh_term} ({mesh.mesh_id})")
+    ```
+
+=== "Sync"
+
+    ```python
+    from hypokrates.sync import vocab
+
+    norm = vocab.normalize_drug("advil")
+    print(f"{norm.original} -> {norm.generic_name}")
+    ```
+
+## Step 8 — Evidence Provenance
 
 Every result carries full provenance metadata:
 

@@ -121,6 +121,14 @@ ignore_missing_imports = true
 module = "scipy.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "mcp.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "hypokrates.mcp.*"
+disallow_untyped_decorators = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

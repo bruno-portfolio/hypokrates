@@ -14,7 +14,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from hypokrates.cross import api as cross_api
 from hypokrates.faers import api as faers_api
 from hypokrates.pubmed import api as pubmed_api
+from hypokrates.scan import api as scan_api
 from hypokrates.stats import api as stats_api
+from hypokrates.vocab import api as vocab_api
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -76,7 +78,22 @@ class _SyncCross:
     hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
 
 
+class _SyncScan:
+    """Wrapper síncrono para hypokrates.scan."""
+
+    scan_drug = staticmethod(_make_sync(scan_api.scan_drug))
+
+
+class _SyncVocab:
+    """Wrapper síncrono para hypokrates.vocab."""
+
+    normalize_drug = staticmethod(_make_sync(vocab_api.normalize_drug))
+    map_to_mesh = staticmethod(_make_sync(vocab_api.map_to_mesh))
+
+
 faers = _SyncFAERS()
 stats = _SyncStats()
 pubmed = _SyncPubMed()
 cross = _SyncCross()
+scan = _SyncScan()
+vocab = _SyncVocab()

@@ -7,6 +7,8 @@ from hypokrates.constants import CacheSettings, Source
 _TTL_MAP: dict[str, int] = {
     Source.FAERS: CacheSettings.FAERS_TTL,
     Source.PUBMED: CacheSettings.DEFAULT_TTL,
+    Source.RXNORM: CacheSettings.VOCAB_TTL,
+    Source.MESH: CacheSettings.VOCAB_TTL,
 }
 
 

@@ -1,0 +1,50 @@
+{
+  "drugGroup": {
+    "name": "advil",
+    "conceptGroup": [
+      {
+        "tty": "IN",
+        "conceptProperties": [
+          {
+            "rxcui": "5640",
+            "name": "ibuprofen",
+            "synonym": "",
+            "tty": "IN",
+            "language": "ENG",
+            "suppress": "N",
+            "umlscui": ""
+          }
+        ]
+      },
+      {
+        "tty": "BN",
+        "conceptProperties": [
+          {
+            "rxcui": "153010",
+            "name": "Advil",
+            "synonym": "",
+            "tty": "BN",
+            "language": "ENG",
+            "suppress": "N",
+            "umlscui": ""
+          },
+          {
+            "rxcui": "202488",
+            "name": "Motrin",
+            "synonym": "",
+            "tty": "BN",
+            "language": "ENG",
+            "suppress": "N",
+            "umlscui": ""
+          }
+        ]
+      },
+      {
+        "tty": "SBDF"
+      },
+      {
+        "tty": "SCD"
+      }
+    ]
+  }
+}

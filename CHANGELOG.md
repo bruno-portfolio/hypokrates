@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.4.0] - 2026-03-14
+
+### Added
+- Sprint 4: scan/ + vocab/ modules
+- `hp.scan.scan_drug()` — automated scan of top FAERS adverse events with parallel hypothesis generation
+- `ScanItem`, `ScanResult` models with scoring and ranking
+- Configurable concurrency via `asyncio.Semaphore`, progress callback (`on_progress`)
+- `hp.vocab.normalize_drug()` — normalize drug names via RxNorm (brand → generic)
+- `hp.vocab.map_to_mesh()` — map medical terms to MeSH headings via NCBI E-utilities
+- `DrugNormResult`, `MeSHResult` models
+- `RxNormClient` with cache/retry/rate-limit (Source.RXNORM, 120/min)
+- `MeSHClient` sharing NCBI rate limit with PubMed (Source.MESH for cache, Source.PUBMED for rate)
+- RxNorm/MeSH parsers (`parse_rxnorm_drugs`, `parse_mesh_search`, `parse_mesh_descriptor`)
+- `Source.RXNORM`, `Source.MESH` enum values, `RXNORM_BASE_URL`
+- Cache TTL 90 days for vocab sources (RxNorm, MeSH)
+- Sync wrappers for scan and vocab (`from hypokrates.sync import scan, vocab`)
+- MCP server with 12 tools (faers:3, stats:1, pubmed:2, cross:1, scan:1, vocab:2, meta:2)
+- Golden data for vocab tests (RxNorm, MeSH)
+- 41 new tests (403 → 444 total)
+
+### Changed
+- `CLASSIFICATION_WEIGHTS` uses `HypothesisClassification` enum keys instead of strings
+- `vocab/constants.py` imports NCBI constants from `pubmed/constants.py` (deduplication)
+
 ## [0.3.0] - 2026-03-14
 
 ### Added

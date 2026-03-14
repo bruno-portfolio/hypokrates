@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## 0.1.0 (Unreleased)
+## 0.4.0 (Unreleased)
+
+### Sprint 4 — Scan & Vocab
+
+- **scan/** module: `scan_drug()` — automated scanning of top FAERS adverse events with parallel hypothesis generation
+- `ScanItem`, `ScanResult` models with scoring and ranking
+- Configurable concurrency via `asyncio.Semaphore`, progress callback
+- **vocab/** module: `normalize_drug()` (RxNorm), `map_to_mesh()` (NCBI MeSH)
+- `RxNormClient`, `MeSHClient` with cache/retry/rate-limit
+- `Source.RXNORM`, `Source.MESH`, cache TTL 90 days
+- MCP server updated to 12 tools (+scan_drug, +normalize_drug, +map_to_mesh)
+- 41 new tests (403 -> 444 total)
 
 ### Sprint 3 — Cross-Reference & MCP
 
@@ -28,4 +39,4 @@ All notable changes to this project will be documented in this file.
 - Configuration singleton (`configure()`, `get_config()`)
 - Exception hierarchy (7 exception types)
 - Pydantic v2 models with full type coverage
-- mypy strict, ruff clean, 403 tests, 91% coverage
+- mypy strict, ruff clean

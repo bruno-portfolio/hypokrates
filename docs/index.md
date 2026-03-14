@@ -3,7 +3,7 @@
 **Cross-reference pharmacovigilance data for medical hypothesis generation.**
 
 [![PyPI](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
-[![Tests](https://img.shields.io/badge/tests-403%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/brunoescalhao/hypokrates/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
@@ -52,6 +52,8 @@ It is designed for researchers, pharmacovigilance professionals, and developers 
 | [`stats`](api/stats.md) | Disproportionality signal detection | `signal()` |
 | [`pubmed`](api/pubmed.md) | Search NCBI/PubMed literature | `count_papers()`, `search_papers()` |
 | [`cross`](api/cross.md) | Cross-reference FAERS + PubMed | `hypothesis()` |
+| [`scan`](api/scan.md) | Automated drug adverse event scanning | `scan_drug()` |
+| [`vocab`](api/vocab.md) | Drug name normalization, MeSH mapping | `normalize_drug()`, `map_to_mesh()` |
 | [`evidence`](api/evidence.md) | Evidence provenance blocks | `build_evidence()`, `build_faers_evidence()` |
 
 ## Data Sources
@@ -60,6 +62,8 @@ It is designed for researchers, pharmacovigilance professionals, and developers 
 |--------|--------|----------|
 | [OpenFDA/FAERS](sources/faers.md) | Implemented | 20M+ reports (2004–present) |
 | [NCBI/PubMed](sources/pubmed.md) | Implemented | 36M+ citations |
+| RxNorm (NLM) | Implemented | Drug name normalization |
+| NCBI/MeSH | Implemented | Medical Subject Headings |
 | DrugBank | Planned | — |
 | WHO VigiBase | Planned | — |
 | GBD | Planned | — |

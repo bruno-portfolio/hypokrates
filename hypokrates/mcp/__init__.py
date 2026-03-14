@@ -1,1 +1,1 @@
-"""Scaffold — to be implemented."""
+"""MCP server para hypokrates."""
