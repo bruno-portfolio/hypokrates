@@ -119,7 +119,6 @@ class DailyMedClient:
             client,
             "GET",
             endpoint,
-            headers={"Accept": "application/xml"},
             source_name=Source.DAILYMED,
         )
 

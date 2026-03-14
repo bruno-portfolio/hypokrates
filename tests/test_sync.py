@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -194,6 +195,7 @@ class TestSyncTrials:
     """Sync wrapper para Trials."""
 
     @respx.mock
+    @patch("hypokrates.trials.client._HAS_CURL_CFFI", False)
     def test_sync_search_trials(self) -> None:
         configure(cache_enabled=False)
         respx.get(url__startswith="https://clinicaltrials.gov/api/v2/studies").mock(

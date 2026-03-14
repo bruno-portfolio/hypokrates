@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -13,6 +14,13 @@ from hypokrates.constants import TRIALS_BASE_URL
 from hypokrates.exceptions import ParseError
 from hypokrates.trials.client import TrialsClient
 from tests.helpers import load_golden
+
+
+@pytest.fixture(autouse=True)
+def _force_httpx() -> Any:
+    """Força o path httpx nos testes (respx não intercepta curl_cffi)."""
+    with patch("hypokrates.trials.client._HAS_CURL_CFFI", False):
+        yield
 
 
 @pytest.fixture()
