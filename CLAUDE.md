@@ -48,6 +48,8 @@ Python 3.11+, Hatchling, httpx, DuckDB, Pydantic 2, scipy, mypy strict, ruff. cu
 - `hypokrates/anvisa/api.py` — ANVISA (buscar_medicamento, buscar_por_substancia, mapear_nome)
 - `hypokrates/anvisa/store.py` — DuckDB store para ANVISA CSV (auto-download)
 - `hypokrates/anvisa/constants.py` — Mapeamento PT↔EN (~95 drogas)
+- `hypokrates/faers/api.py:co_suspect_profile` — Layer 1: co-admin detection (suspects/report)
+- `hypokrates/cross/api.py:coadmin_analysis` — Layer 2: overlap + comparative PRR
 
 ## Git
 - Commits em portugues: `tipo: descricao`

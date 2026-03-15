@@ -18,6 +18,7 @@ CLASSIFICATION_WEIGHTS: dict[HypothesisClassification, float] = {
 LABEL_NOT_IN_MULTIPLIER: float = 1.5
 LABEL_IN_MULTIPLIER: float = 0.5
 INDICATION_MULTIPLIER: float = 0.3
+CO_ADMIN_MULTIPLIER: float = 0.3  # penalty para items com co-admin confounding
 
 # ---------------------------------------------------------------------------
 # Termos MedDRA operacionais/regulatórios — NÃO representam toxicidade biológica.

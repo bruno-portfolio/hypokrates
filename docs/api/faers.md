@@ -92,6 +92,58 @@ for drug_name, result in results.items():
 
 ---
 
+## `drugs_by_event()`
+
+Reverse lookup: get the top drugs reported for a given adverse event.
+
+```python
+result = await faers.drugs_by_event("anaphylactic shock", limit=10)
+for d in result.drugs:
+    print(f"{d.name}: {d.count} reports")
+```
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `event` | `str` | *required* | MedDRA adverse event term |
+| `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
+| `limit` | `int` | `10` | Number of top drugs |
+| `use_cache` | `bool` | `True` | Use DuckDB cache |
+
+**Returns:** `DrugsByEventResult`
+
+---
+
+## `co_suspect_profile()`
+
+Analyze co-suspect drug patterns for a drug+event pair. Fetches individual reports and counts how many suspect drugs appear per report. Useful for detecting co-administration confounding (e.g., OR setting where propofol, fentanyl, rocuronium are all listed as suspect for the same event).
+
+```python
+profile = await faers.co_suspect_profile("propofol", "anaphylactic shock")
+print(f"Median suspects/report: {profile.median_suspects}")
+print(f"Co-admin flag: {profile.co_admin_flag}")
+for drug_name, count in profile.top_co_drugs:
+    print(f"  {drug_name}: {count}")
+```
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `drug` | `str` | *required* | Generic drug name |
+| `event` | `str` | *required* | MedDRA adverse event term |
+| `sample_size` | `int` | `100` | Number of reports to analyze |
+| `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
+| `use_cache` | `bool` | `True` | Use DuckDB cache |
+
+**Returns:** [`CoSuspectProfile`](#cosuspectprofile)
+
+!!! warning "Co-administration confounding"
+    A high `median_suspects` (>3) indicates a procedural setting (e.g., operating room) where multiple drugs are routinely administered together. The PRR may be inflated by ubiquity, not causality. Use `coadmin_analysis()` from the Cross API for full Layer 2 analysis.
+
+---
+
 ## Models
 
 ### `FAERSResult`
@@ -164,3 +216,24 @@ Set `serious=True` to filter for reports classified as serious by the FDA (death
 ### Age Ranges
 
 Use `age_min` and `age_max` to filter by patient age at onset. Both are optional and can be used independently.
+
+### `CoSuspectProfile`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `drug` | `str` | Index drug name |
+| `event` | `str` | Adverse event term |
+| `sample_size` | `int` | Number of reports analyzed |
+| `median_suspects` | `float` | Median suspect drugs per report |
+| `mean_suspects` | `float` | Mean suspect drugs per report |
+| `max_suspects` | `int` | Max suspects in a single report |
+| `top_co_drugs` | `list[tuple[str, int]]` | Most frequent co-suspect drugs (name, count) |
+| `co_admin_flag` | `bool` | `True` if `median_suspects > 3.0` |
+
+### `DrugsByEventResult`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `event` | `str` | MedDRA event term (uppercased) |
+| `drugs` | `list[DrugCount]` | Drugs ordered by report count |
+| `meta` | `MetaInfo` | Provenance metadata |

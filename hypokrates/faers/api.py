@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import statistics
+from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
 from hypokrates.faers.client import FAERSClient
 from hypokrates.faers.constants import (
+    CO_ADMIN_SAMPLE_SIZE,
+    CO_ADMIN_THRESHOLD,
+    CO_ADMIN_TOP_DRUGS,
     COUNT_FIELDS,
     DRUG_CHARACTERIZATION_FIELD,
     DRUG_CHARACTERIZATION_SUSPECT,
@@ -15,7 +20,7 @@ from hypokrates.faers.constants import (
     SEARCH_FIELDS,
     SEX_MAP,
 )
-from hypokrates.faers.models import DrugsByEventResult, FAERSResult
+from hypokrates.faers.models import CoSuspectProfile, DrugsByEventResult, FAERSResult
 from hypokrates.faers.parser import parse_count_results, parse_drug_count_results, parse_reports
 from hypokrates.models import MetaInfo
 
@@ -222,6 +227,85 @@ async def drugs_by_event(
             total_results=len(drugs),
             retrieved_at=datetime.now(UTC),
         ),
+    )
+
+
+async def co_suspect_profile(
+    drug: str,
+    event: str,
+    *,
+    sample_size: int = CO_ADMIN_SAMPLE_SIZE,
+    suspect_only: bool = False,
+    use_cache: bool = True,
+    _client: FAERSClient | None = None,
+    _drug_search: str | None = None,
+) -> CoSuspectProfile:
+    """Analisa padrões de co-suspects em reports de um par droga+evento.
+
+    Busca uma amostra de reports individuais e conta quantos outros
+    medicamentos são listados como suspect nos mesmos reports.
+    Mediana alta (>3) indica setting procedimental (ex: centro cirúrgico)
+    onde o PRR pode ser inflado por co-administração, não por causalidade.
+
+    Args:
+        drug: Nome genérico do medicamento.
+        event: Termo MedDRA do evento adverso.
+        sample_size: Nº de reports para amostrar (1 API call).
+        suspect_only: Se True, filtra apenas reports onde a droga é suspect.
+        use_cache: Se deve usar cache.
+        _client: FAERSClient reutilizável (evita criar novo).
+        _drug_search: Query de droga pré-resolvida (evita resolução redundante).
+
+    Returns:
+        CoSuspectProfile com estatísticas de co-administração.
+    """
+    own_client = _client is None
+    client = _client if _client is not None else FAERSClient()
+
+    try:
+        drug_search = _drug_search or await resolve_drug_field(
+            drug, client=client, use_cache=use_cache
+        )
+        reaction_field = f'{SEARCH_FIELDS["reaction"]}:"{event.upper()}"'
+        search = f"{drug_search} AND {reaction_field}"
+        if suspect_only:
+            search += f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
+
+        data = await client.fetch(search, limit=sample_size, use_cache=use_cache)
+    finally:
+        if own_client:
+            await client.close()
+
+    raw_results: list[dict[str, Any]] = data.get("results", [])
+    reports = parse_reports(raw_results)
+
+    if not reports:
+        return CoSuspectProfile(drug=drug.upper(), event=event.upper())
+
+    drug_upper = drug.upper()
+    suspect_counts: list[int] = []
+    co_drug_counter: Counter[str] = Counter()
+
+    for report in reports:
+        suspects = [d for d in report.drugs if d.role == DRUG_CHARACTERIZATION_SUSPECT]
+        suspect_counts.append(len(suspects))
+        for d in suspects:
+            if d.name.upper() != drug_upper:
+                co_drug_counter[d.name.upper()] += 1
+
+    median_val = statistics.median(suspect_counts)
+    mean_val = statistics.mean(suspect_counts)
+    max_val = max(suspect_counts)
+
+    return CoSuspectProfile(
+        drug=drug_upper,
+        event=event.upper(),
+        sample_size=len(reports),
+        median_suspects=median_val,
+        mean_suspects=round(mean_val, 2),
+        max_suspects=max_val,
+        top_co_drugs=co_drug_counter.most_common(CO_ADMIN_TOP_DRUGS),
+        co_admin_flag=median_val > CO_ADMIN_THRESHOLD,
     )
 
 

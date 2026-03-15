@@ -45,6 +45,16 @@ class ScanItem(BaseModel):
         "não um efeito adverso. PRR alto reflete perfil de uso, não toxicidade. "
         "Score penalizado para afundar no ranking.",
     )
+    coadmin_flag: bool = Field(
+        default=False,
+        description="True se confounding por co-administração detectado. "
+        "Mediana de suspects por report > threshold indica setting procedimental "
+        "(ex: centro cirúrgico) onde múltiplas drogas são listadas juntas.",
+    )
+    coadmin_detail: str | None = Field(
+        default=None,
+        description="Resumo da análise de co-admin (ex: 'median 5.2 co-suspects').",
+    )
     cluster: str = Field(
         default="",
         description="Cluster semântico por sistema clínico "
@@ -69,6 +79,10 @@ class ScanResult(BaseModel):
     filtered_operational_count: int = Field(
         default=0,
         description="Nº de eventos filtrados por serem termos MedDRA operacionais/regulatórios.",
+    )
+    coadmin_flagged_count: int = Field(
+        default=0,
+        description="Nº de eventos flaggados como potencial confounding por co-administração.",
     )
     skipped_events: list[str] = Field(default_factory=list)
     mechanism: str | None = None

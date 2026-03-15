@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import statistics
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from hypokrates.cross.constants import (
+    CO_ADMIN_COMPARE_TOP_N,
     COMPARE_RATIO_EQUAL_THRESHOLD,
     DEFAULT_COMPARE_CONCURRENCY,
     DEFAULT_COMPARE_TOP_N,
     DEFAULT_EMERGING_MAX,
     DEFAULT_NOVEL_MAX,
+    OVERLAP_THRESHOLD,
+    SPECIFICITY_RATIO_THRESHOLD,
 )
 
 if TYPE_CHECKING:
@@ -20,10 +24,13 @@ if TYPE_CHECKING:
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.faers.client import FAERSClient
+    from hypokrates.faers.models import CoSuspectProfile
     from hypokrates.opentargets.models import OTDrugSafety
 from hypokrates.cross.models import (
+    CoAdminAnalysis,
     CompareResult,
     CompareSignalItem,
+    CoSignalItem,
     HypothesisClassification,
     HypothesisResult,
 )
@@ -49,6 +56,112 @@ _CROSS_METHODOLOGY = (
 )
 
 
+async def coadmin_analysis(
+    drug: str,
+    event: str,
+    profile: CoSuspectProfile,
+    *,
+    drug_prr: float = 0.0,
+    top_n_compare: int = CO_ADMIN_COMPARE_TOP_N,
+    suspect_only: bool = False,
+    use_cache: bool = True,
+) -> CoAdminAnalysis:
+    """Analisa se o sinal é específico da droga ou artefato de co-administração.
+
+    Layer 2: compara os top drugs para o evento (via drugs_by_event) com os
+    co-suspects do Layer 1 (profile). Alta sobreposição + PRR similar entre
+    co-drugs indica que o sinal é provavelmente confounding por co-administração.
+
+    Args:
+        drug: Nome genérico do medicamento-índice.
+        event: Termo MedDRA do evento adverso.
+        profile: CoSuspectProfile do Layer 1.
+        drug_prr: PRR do medicamento-índice (de signal()).
+        top_n_compare: Máximo de co-drugs para rodar signal() comparativo.
+        suspect_only: Se True, conta apenas reports com droga suspect.
+        use_cache: Se deve usar cache.
+
+    Returns:
+        CoAdminAnalysis com verdict (specific/co_admin_artifact/inconclusive).
+    """
+    # 1. Buscar top drugs para este evento
+    dbe_result = await faers_api.drugs_by_event(
+        event, suspect_only=suspect_only, limit=20, use_cache=use_cache
+    )
+
+    if not dbe_result.drugs or not profile.top_co_drugs:
+        return CoAdminAnalysis(profile=profile, verdict="inconclusive")
+
+    # 2. Calcular overlap entre top-event-drugs e co-suspects
+    co_drug_names = {name for name, _ in profile.top_co_drugs}
+    event_drug_names = {d.name.upper() for d in dbe_result.drugs}
+    # Excluir a droga-índice
+    event_drug_names.discard(drug.upper())
+
+    if not event_drug_names:
+        return CoAdminAnalysis(profile=profile, verdict="inconclusive")
+
+    overlap = co_drug_names & event_drug_names
+    overlap_ratio = len(overlap) / len(event_drug_names)
+
+    # 3. Se overlap baixo ou não flaggado → provavelmente específico
+    if overlap_ratio < OVERLAP_THRESHOLD or not profile.co_admin_flag:
+        return CoAdminAnalysis(
+            profile=profile,
+            overlap_ratio=round(overlap_ratio, 3),
+            is_specific=True,
+            verdict="specific",
+        )
+
+    # 4. Rodar signal() comparativo para top co-drugs
+    co_drugs_to_compare = [name for name, _ in profile.top_co_drugs[:top_n_compare]]
+
+    async def _safe_signal(co_drug: str) -> CoSignalItem | None:
+        try:
+            sig = await stats_api.signal(
+                co_drug, event, suspect_only=suspect_only, use_cache=use_cache
+            )
+            return CoSignalItem(
+                drug=co_drug,
+                prr=round(sig.prr.value, 2),
+                signal_detected=sig.signal_detected,
+            )
+        except Exception:
+            logger.warning("coadmin signal failed: %s + %s", co_drug, event)
+            return None
+
+    co_results = await asyncio.gather(*[_safe_signal(d) for d in co_drugs_to_compare])
+    co_signals = [r for r in co_results if r is not None]
+
+    # 5. Calcular specificity ratio
+    co_prrs = [cs.prr for cs in co_signals if cs.signal_detected and cs.prr > 0]
+    specificity_ratio: float | None = None
+
+    if co_prrs and drug_prr > 0:
+        median_co = statistics.median(co_prrs)
+        specificity_ratio = round(drug_prr / median_co, 2) if median_co > 0 else None
+
+    # 6. Determinar verdict
+    if specificity_ratio is not None and specificity_ratio > SPECIFICITY_RATIO_THRESHOLD:
+        verdict = "specific"
+        is_specific = True
+    elif specificity_ratio is not None and specificity_ratio <= SPECIFICITY_RATIO_THRESHOLD:
+        verdict = "co_admin_artifact"
+        is_specific = False
+    else:
+        verdict = "inconclusive"
+        is_specific = True
+
+    return CoAdminAnalysis(
+        profile=profile,
+        overlap_ratio=round(overlap_ratio, 3),
+        specificity_ratio=specificity_ratio,
+        is_specific=is_specific,
+        co_signals=co_signals,
+        verdict=verdict,
+    )
+
+
 async def hypothesis(
     drug: str,
     event: str,
@@ -63,6 +176,7 @@ async def hypothesis(
     check_drugbank: bool = False,
     check_opentargets: bool = False,
     check_chembl: bool = False,
+    check_coadmin: bool = False,
     suspect_only: bool = False,
     use_bulk: bool | None = None,
     _label_cache: LabelEventsResult | None = None,
@@ -89,6 +203,7 @@ async def hypothesis(
         check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
         check_opentargets: Se deve buscar LRT score no OpenTargets.
         check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
+        check_coadmin: Se deve analisar confounding por co-administração (Layer 1+2).
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
 
@@ -233,6 +348,26 @@ async def hypothesis(
         confidence=_confidence_label(classification),
     )
 
+    # 3e. Co-administration analysis (Layer 1 + 2, apenas se sinal detectado)
+    coadmin_result: CoAdminAnalysis | None = None
+    if check_coadmin and signal_result.signal_detected:
+        coadmin_profile = await faers_api.co_suspect_profile(
+            drug,
+            event,
+            suspect_only=suspect_only,
+            use_cache=use_cache,
+            _client=_faers_client,
+            _drug_search=_drug_search,
+        )
+        coadmin_result = await coadmin_analysis(
+            drug,
+            event,
+            coadmin_profile,
+            drug_prr=signal_result.prr.value,
+            suspect_only=suspect_only,
+            use_cache=use_cache,
+        )
+
     return HypothesisResult(
         drug=drug,
         event=event,
@@ -251,6 +386,7 @@ async def hypothesis(
         interactions=interactions_list,
         enzymes=enzymes_list,
         ot_llr=ot_llr,
+        coadmin=coadmin_result,
     )
 
 

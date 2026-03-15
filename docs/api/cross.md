@@ -35,6 +35,13 @@ print(result.articles)         # PubMedArticle list
 | `emerging_max` | `int` | `5` | Max papers for `emerging_signal` classification |
 | `literature_limit` | `int` | `5` | Max articles returned from PubMed |
 | `use_mesh` | `bool` | `False` | Use MeSH qualifiers for PubMed search |
+| `check_label` | `bool` | `False` | Check FDA label via DailyMed |
+| `check_trials` | `bool` | `False` | Search ClinicalTrials.gov |
+| `check_drugbank` | `bool` | `False` | Check DrugBank for mechanism/interactions |
+| `check_opentargets` | `bool` | `False` | Check OpenTargets for LRT score |
+| `check_chembl` | `bool` | `False` | Check ChEMBL for mechanism/targets |
+| `check_coadmin` | `bool` | `False` | Analyze co-administration confounding (Layer 1 + 2) |
+| `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
 | `use_cache` | `bool` | `True` | Use DuckDB cache |
 
 **Returns:** [`HypothesisResult`](#hypothesisresult)
@@ -110,3 +117,29 @@ result = await cross.hypothesis(
 | `evidence` | `EvidenceBlock` | Provenance and limitations |
 | `summary` | `str` | Human-readable summary |
 | `thresholds_used` | `dict[str, int]` | `{"novel_max": 0, "emerging_max": 5}` |
+| `in_label` | `bool \| None` | Whether event is in FDA label (if `check_label=True`) |
+| `active_trials` | `int \| None` | Active clinical trials (if `check_trials=True`) |
+| `mechanism` | `str \| None` | Drug mechanism of action (if DrugBank/ChEMBL checked) |
+| `ot_llr` | `float \| None` | OpenTargets log-likelihood ratio (if `check_opentargets=True`) |
+| `coadmin` | `CoAdminAnalysis \| None` | Co-administration analysis (if `check_coadmin=True`) |
+
+### `CoAdminAnalysis`
+
+Result of co-administration confounding analysis (Layer 1 + Layer 2).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `profile` | `CoSuspectProfile` | Layer 1: co-suspect statistics |
+| `overlap_ratio` | `float` | Fraction of top-event-drugs that are co-suspects (0–1) |
+| `specificity_ratio` | `float \| None` | Drug PRR / median co-drug PRR (if computed) |
+| `is_specific` | `bool` | `True` = drug-specific signal |
+| `co_signals` | `list[CoSignalItem]` | PRR for each co-drug tested |
+| `verdict` | `str` | `"specific"`, `"co_admin_artifact"`, or `"inconclusive"` |
+
+### `CoSignalItem`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `drug` | `str` | Co-drug name |
+| `prr` | `float` | PRR for the co-drug + event |
+| `signal_detected` | `bool` | Whether signal was detected |

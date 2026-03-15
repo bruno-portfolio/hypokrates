@@ -23,6 +23,7 @@ class TestLimitation:
             "indication_bias",
             "notoriety_bias",
             "no_causation",
+            "co_administration",
         }
         actual = {lim.value for lim in Limitation}
         assert expected == actual

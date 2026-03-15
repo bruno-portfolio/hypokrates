@@ -78,6 +78,57 @@ def register(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
+    async def co_suspect_profile(
+        drug: str,
+        event: str,
+        sample_size: int = 100,
+        suspect_only: bool = False,
+    ) -> str:
+        """Analyze co-suspect drug patterns for a drug+event pair in FAERS.
+
+        Shows how many other drugs are listed as suspect in the same reports.
+        High median suspects (>3) suggests co-administration confounding
+        (e.g., OR setting where propofol, fentanyl, rocuronium all listed).
+
+        Args:
+            drug: Generic drug name (e.g., "propofol").
+            event: Adverse event term (e.g., "anaphylactic shock").
+            sample_size: Number of reports to analyze (max 100).
+            suspect_only: Only count reports where drug is suspect.
+        """
+        clamped = min(sample_size, 100)
+        result = await faers_api.co_suspect_profile(
+            drug, event, sample_size=clamped, suspect_only=suspect_only
+        )
+        lines = [
+            f"# Co-Suspect Profile: {drug.upper()} + {event.upper()}",
+            f"**Sample size:** {result.sample_size} reports",
+            f"**Median suspects/report:** {result.median_suspects:.1f}",
+            f"**Mean suspects/report:** {result.mean_suspects:.1f}",
+            f"**Max suspects in a report:** {result.max_suspects}",
+            f"**Co-admin flag:** {'YES ⚠' if result.co_admin_flag else 'NO'}",
+            "",
+        ]
+        if result.top_co_drugs:
+            lines.append("## Top Co-Suspect Drugs")
+            lines.append("")
+            lines.append("| Drug | Reports |")
+            lines.append("|------|---------|")
+            for name, count in result.top_co_drugs:
+                lines.append(f"| {name} | {count} |")
+            lines.append("")
+        if result.co_admin_flag:
+            lines.extend(
+                [
+                    "---",
+                    "**⚠ Co-administration detected.** High median suspect count suggests "
+                    "this drug-event pair may be confounded by procedural co-administration. "
+                    "PRR may be inflated by onipresence, not causality.",
+                ]
+            )
+        return "\n".join(lines)
+
+    @mcp.tool()
     async def compare_drugs(drugs: str, limit: int = 10) -> str:
         """Compare adverse events between multiple drugs.
 

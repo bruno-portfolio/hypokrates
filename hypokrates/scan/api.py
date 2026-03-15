@@ -19,6 +19,7 @@ from hypokrates.models import MetaInfo
 from hypokrates.scan.clusters import get_cluster
 from hypokrates.scan.constants import (
     CLASSIFICATION_WEIGHTS,
+    CO_ADMIN_MULTIPLIER,
     DEFAULT_CONCURRENCY,
     DEFAULT_TOP_N,
     INDICATION_MULTIPLIER,
@@ -59,6 +60,7 @@ async def scan_drug(
     group_events: bool = True,
     filter_operational: bool = True,
     suspect_only: bool = False,
+    check_coadmin: bool = False,
     use_bulk: bool | None = None,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
@@ -85,6 +87,7 @@ async def scan_drug(
         group_events: Se deve agrupar termos MedDRA sinônimos.
         filter_operational: Se deve filtrar termos MedDRA operacionais/regulatórios.
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
+        check_coadmin: Se True, analisa confounding por co-administração (Layer 1).
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         on_progress: Callback opcional (completed, total, event_term).
 
@@ -324,7 +327,59 @@ async def scan_drug(
     # Re-sort after score penalty
     items.sort(key=lambda x: x.score, reverse=True)
 
-    # 5b. Truncar para top_n, atribuir ranks e clusters semânticos
+    # 5b. Co-administration analysis (Layer 1 only — Layer 2 é caro demais para N items)
+    coadmin_flagged_count = 0
+    if check_coadmin and items:
+        coadmin_client: FAERSClient | None = None
+        try:
+            coadmin_client = FAERSClient()
+            coadmin_drug_search = drug_search or await faers_api.resolve_drug_field(
+                drug, client=coadmin_client, use_cache=use_cache
+            )
+
+            async def _run_coadmin(item: ScanItem) -> ScanItem:
+                if not item.signal.signal_detected:
+                    return item
+                try:
+                    profile = await faers_api.co_suspect_profile(
+                        drug,
+                        item.event,
+                        suspect_only=suspect_only,
+                        use_cache=use_cache,
+                        _client=coadmin_client,
+                        _drug_search=coadmin_drug_search,
+                    )
+                except Exception:
+                    logger.warning("Scan %s: coadmin failed for %s", drug, item.event)
+                    return item
+                if profile.co_admin_flag:
+                    top_drugs_str = ", ".join(n for n, _ in profile.top_co_drugs[:5])
+                    return item.model_copy(
+                        update={
+                            "coadmin_flag": True,
+                            "coadmin_detail": (
+                                f"median {profile.median_suspects:.1f} co-suspects/report, "
+                                f"top: {top_drugs_str}"
+                            ),
+                            "score": item.score * CO_ADMIN_MULTIPLIER,
+                        }
+                    )
+                return item
+
+            coadmin_sem = asyncio.Semaphore(concurrency)
+
+            async def _guarded_coadmin(item: ScanItem) -> ScanItem:
+                async with coadmin_sem:
+                    return await _run_coadmin(item)
+
+            items = list(await asyncio.gather(*[_guarded_coadmin(it) for it in items]))
+            coadmin_flagged_count = sum(1 for it in items if it.coadmin_flag)
+            items.sort(key=lambda x: x.score, reverse=True)
+        finally:
+            if coadmin_client is not None:
+                await coadmin_client.close()
+
+    # 5c. Truncar para top_n, atribuir ranks e clusters semânticos
     items = items[:top_n]
     items = [
         item.model_copy(update={"rank": idx + 1, "cluster": get_cluster(item.event)})
@@ -357,6 +412,7 @@ async def scan_drug(
         failed_count=failed_count,
         groups_applied=groups_applied,
         filtered_operational_count=filtered_operational_count,
+        coadmin_flagged_count=coadmin_flagged_count,
         skipped_events=skipped_events,
         mechanism=scan_mechanism,
         interactions_count=scan_interactions_count,

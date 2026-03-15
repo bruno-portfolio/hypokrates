@@ -22,6 +22,7 @@ def register(mcp: FastMCP) -> None:
         check_drugbank: bool = False,
         check_opentargets: bool = False,
         check_chembl: bool = False,
+        check_coadmin: bool = False,
         suspect_only: bool = False,
     ) -> str:
         """Cross-reference FAERS signal with PubMed literature for a drug-event pair.
@@ -37,6 +38,7 @@ def register(mcp: FastMCP) -> None:
             check_drugbank: Check DrugBank for mechanism/interactions (opt-in).
             check_opentargets: Check OpenTargets for LRT score (opt-in).
             check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
+            check_coadmin: Check co-administration confounding (opt-in).
             suspect_only: Only count reports where drug is suspect (not concomitant).
         """
         result = await cross_api.hypothesis(
@@ -47,6 +49,7 @@ def register(mcp: FastMCP) -> None:
             check_drugbank=check_drugbank,
             check_opentargets=check_opentargets,
             check_chembl=check_chembl,
+            check_coadmin=check_coadmin,
             suspect_only=suspect_only,
         )
         lines = [
@@ -70,6 +73,33 @@ def register(mcp: FastMCP) -> None:
             lines.append(f"**CYP enzymes:** {', '.join(result.enzymes)}")
         if result.ot_llr is not None:
             lines.append(f"**OpenTargets logLR:** {result.ot_llr:.4f}")
+        if result.coadmin is not None:
+            lines.extend(["", "## Co-Administration Analysis"])
+            lines.append(f"**Verdict:** {result.coadmin.verdict}")
+            lines.append(
+                f"**Median suspects/report:** {result.coadmin.profile.median_suspects:.1f}"
+            )
+            lines.append(
+                f"**Co-admin flag:** {'YES' if result.coadmin.profile.co_admin_flag else 'NO'}"
+            )
+            lines.append(f"**Overlap ratio:** {result.coadmin.overlap_ratio:.2f}")
+            if result.coadmin.specificity_ratio is not None:
+                lines.append(f"**Specificity ratio:** {result.coadmin.specificity_ratio:.2f}")
+            if result.coadmin.co_signals:
+                lines.append("")
+                lines.append("| Co-Drug | PRR | Signal |")
+                lines.append("|---------|-----|--------|")
+                for cs in result.coadmin.co_signals:
+                    sig_str = "YES" if cs.signal_detected else "NO"
+                    lines.append(f"| {cs.drug} | {cs.prr:.2f} | {sig_str} |")
+            if result.coadmin.profile.co_admin_flag:
+                lines.extend(
+                    [
+                        "",
+                        "**⚠ Co-admin confounding likely.** PRR may be inflated by "
+                        "procedural co-administration, not causality.",
+                    ]
+                )
         if result.articles:
             lines.append("")
             lines.append("## Articles")

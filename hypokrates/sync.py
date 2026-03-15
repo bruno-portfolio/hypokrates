@@ -66,6 +66,7 @@ class _SyncFAERS:
     top_events = staticmethod(_make_sync(faers_api.top_events))
     compare = staticmethod(_make_sync(faers_api.compare))
     drugs_by_event = staticmethod(_make_sync(faers_api.drugs_by_event))
+    co_suspect_profile = staticmethod(_make_sync(faers_api.co_suspect_profile))
 
 
 class _SyncStats:
@@ -87,6 +88,7 @@ class _SyncCross:
 
     hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
     compare_signals = staticmethod(_make_sync(cross_api.compare_signals))
+    coadmin_analysis = staticmethod(_make_sync(cross_api.coadmin_analysis))
 
 
 class _SyncScan:

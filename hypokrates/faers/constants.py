@@ -58,6 +58,11 @@ DRUG_CHARACTERIZATION_CONCOMITANT = "2"
 DRUG_CHARACTERIZATION_INTERACTING = "3"
 DRUG_CHARACTERIZATION_FIELD = "patient.drug.drugcharacterization"
 
+# Co-administration detection
+CO_ADMIN_SAMPLE_SIZE: int = 100  # reports para amostrar por par droga+evento
+CO_ADMIN_THRESHOLD: float = 3.0  # median suspects > threshold → co_admin_flag
+CO_ADMIN_TOP_DRUGS: int = 10  # max co-suspect drugs retornados
+
 # Limites da API
 MAX_SKIP = 25_000  # OpenFDA max skip value
 MAX_LIMIT = 1_000  # max results per request

@@ -62,3 +62,37 @@ class DrugsByEventResult(BaseModel):
     event: str = Field(description="Termo MedDRA do evento adverso")
     drugs: list[DrugCount] = Field(default_factory=list)
     meta: MetaInfo
+
+
+class CoSuspectProfile(BaseModel):
+    """Perfil de co-suspects em reports de um par droga+evento.
+
+    Analisa quantos outros medicamentos são listados como suspect
+    nos mesmos reports. Mediana alta (>3) indica co-administração
+    procedimental (ex: centro cirúrgico), onde o PRR pode ser
+    inflado por onipresença, não por causalidade.
+    """
+
+    drug: str = Field(description="Droga-índice")
+    event: str = Field(description="Evento adverso")
+    sample_size: int = Field(default=0, description="Nº de reports analisados")
+    median_suspects: float = Field(
+        default=0.0,
+        description="Mediana de drogas suspect por report",
+    )
+    mean_suspects: float = Field(
+        default=0.0,
+        description="Média de drogas suspect por report",
+    )
+    max_suspects: int = Field(
+        default=0,
+        description="Máximo de drogas suspect em um único report",
+    )
+    top_co_drugs: list[tuple[str, int]] = Field(
+        default_factory=list,
+        description="Co-suspects mais frequentes (nome, contagem)",
+    )
+    co_admin_flag: bool = Field(
+        default=False,
+        description="True se median_suspects > CO_ADMIN_THRESHOLD",
+    )

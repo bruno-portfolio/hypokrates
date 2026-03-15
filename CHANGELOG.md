@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Added
+- Co-administration confounding detection (Layer 1 + Layer 2)
+  - `co_suspect_profile(drug, event)` — analyzes co-suspect patterns in FAERS reports (median suspects/report, top co-drugs)
+  - `coadmin_analysis(drug, event, profile)` — compares drug PRR vs co-administered drugs PRR to determine specificity
+  - `check_coadmin` parameter on `hypothesis()` and `scan_drug()` (opt-in)
+  - `CoSuspectProfile`, `CoAdminAnalysis`, `CoSignalItem` models
+  - Verdict system: `"specific"`, `"co_admin_artifact"`, `"inconclusive"`
+  - Scan integration: `coadmin_flag`, `coadmin_detail` on ScanItem, `coadmin_flagged_count` on ScanResult, `CO_ADMIN_MULTIPLIER=0.3` score penalty
+  - MCP tool: `co_suspect_profile` for interactive analysis
+  - `Limitation.CO_ADMINISTRATION` evidence enum
+  - 20 new tests covering both layers
+- `drugs_by_event(event)` — reverse lookup FAERS (event → top drugs)
 - `hypokrates.anvisa` module — Brazilian drug registry (ANVISA open data)
 - `buscar_medicamento()` — search by brand name or active ingredient (accent-insensitive, partial match)
 - `buscar_por_substancia()` — search by active ingredient with optional category filter (Genérico/Similar/Referência)

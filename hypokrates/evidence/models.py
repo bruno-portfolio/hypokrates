@@ -18,6 +18,7 @@ class Limitation(StrEnum):
     INDICATION_BIAS = "indication_bias"
     NOTORIETY_BIAS = "notoriety_bias"
     NO_CAUSATION = "no_causation"
+    CO_ADMINISTRATION = "co_administration"
 
 
 class EvidenceBlock(BaseModel):

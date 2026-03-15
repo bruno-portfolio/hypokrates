@@ -31,6 +31,7 @@ def register(mcp: FastMCP) -> None:
         group_events: bool = True,
         filter_operational: bool = True,
         suspect_only: bool = False,
+        check_coadmin: bool = False,
         use_bulk: bool | None = None,
     ) -> str:
         """Scan a drug's adverse events and classify each as novel/emerging/known signal.
@@ -56,6 +57,7 @@ def register(mcp: FastMCP) -> None:
             group_events: Group synonymous MedDRA terms (default True).
             filter_operational: Filter operational/regulatory MedDRA terms (default True).
             suspect_only: Only count reports where drug is suspect (not concomitant).
+            check_coadmin: Check co-administration confounding (opt-in, +1 API call/event).
             use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
         clamped_top_n = min(top_n, 20)
@@ -76,6 +78,7 @@ def register(mcp: FastMCP) -> None:
                 group_events=group_events,
                 filter_operational=filter_operational,
                 suspect_only=suspect_only,
+                check_coadmin=check_coadmin,
                 use_bulk=use_bulk,
                 on_progress=_on_progress,
             )
@@ -115,13 +118,16 @@ def register(mcp: FastMCP) -> None:
                 indication_info = ""
                 if item.is_indication:
                     indication_info = " | ⚠ INDICATION"
+                coadmin_info = ""
+                if item.coadmin_flag:
+                    coadmin_info = " | ⚠ CO-ADMIN"
                 lines.append(
                     f"{item.rank}. **{item.event}** — "
                     f"{item.classification.value} | "
                     f"PRR={prr_val} | "
                     f"lit={item.literature_count}"
                     f"{label_info}{trials_info}{ot_info}"
-                    f"{vol_info}{indication_info}"
+                    f"{vol_info}{indication_info}{coadmin_info}"
                     f"{grouped_info}"
                 )
             lines.append("")
@@ -159,6 +165,8 @@ def register(mcp: FastMCP) -> None:
             summary_parts.append(f"{result.labeled_count} in label")
         if result.filtered_operational_count > 0:
             summary_parts.append(f"{result.filtered_operational_count} operational filtered")
+        if result.coadmin_flagged_count > 0:
+            summary_parts.append(f"{result.coadmin_flagged_count} co-admin flagged")
         if result.groups_applied:
             summary_parts.append("MedDRA grouped")
         if result.interactions_count is not None:

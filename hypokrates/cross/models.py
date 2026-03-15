@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from hypokrates.evidence.models import EvidenceBlock  # noqa: TC001 — Pydantic needs at runtime
+from hypokrates.faers.models import CoSuspectProfile  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.models import MetaInfo  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.pubmed.models import PubMedArticle  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.stats.models import SignalResult  # noqa: TC001 — Pydantic needs at runtime
@@ -19,6 +20,42 @@ class HypothesisClassification(StrEnum):
     EMERGING_SIGNAL = "emerging_signal"
     KNOWN_ASSOCIATION = "known_association"
     NO_SIGNAL = "no_signal"
+
+
+class CoSignalItem(BaseModel):
+    """Sinal de uma co-drug para o mesmo evento."""
+
+    drug: str = Field(description="Nome da co-drug")
+    prr: float = Field(description="PRR da co-drug para o evento")
+    signal_detected: bool = Field(description="Se sinal detectado para a co-drug")
+
+
+class CoAdminAnalysis(BaseModel):
+    """Resultado da análise de confounding por co-administração.
+
+    Combina Layer 1 (co-suspect profile) com Layer 2 (overlap + PRR comparativo)
+    para determinar se o sinal é específico da droga ou artefato de co-administração.
+    """
+
+    profile: CoSuspectProfile
+    overlap_ratio: float = Field(
+        default=0.0,
+        description="Fração dos top drugs para o evento que são co-suspects (0-1)",
+    )
+    specificity_ratio: float | None = Field(
+        default=None,
+        description="PRR da droga-índice / mediana PRR das co-drugs. "
+        "Calculado apenas quando overlap e co_admin_flag são altos.",
+    )
+    is_specific: bool = Field(
+        default=True,
+        description="True = sinal específico da droga, False = provável co-admin artifact",
+    )
+    co_signals: list[CoSignalItem] = Field(default_factory=list)
+    verdict: str = Field(
+        default="inconclusive",
+        description="'specific', 'co_admin_artifact', ou 'inconclusive'",
+    )
 
 
 class HypothesisResult(BaseModel):
@@ -41,6 +78,7 @@ class HypothesisResult(BaseModel):
     interactions: list[str] = Field(default_factory=list)
     enzymes: list[str] = Field(default_factory=list)
     ot_llr: float | None = None
+    coadmin: CoAdminAnalysis | None = None
 
 
 class CompareSignalItem(BaseModel):
