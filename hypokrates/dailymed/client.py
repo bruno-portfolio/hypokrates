@@ -46,7 +46,7 @@ class DailyMedClient(BaseClient):
         """
         params: ParamsType = {
             "drug_name": drug_name,
-            "pagesize": 10,
+            "pagesize": 100,
         }
         return await self._cached_get(SPLS_ENDPOINT, params, use_cache=use_cache)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from hypokrates.dailymed.parser import (
+    _score_spl_candidate,
     has_safety_sections,
     match_event_in_label,
     parse_adverse_reactions_xml,
@@ -16,7 +17,7 @@ GOLDEN_DATA = Path(__file__).parent.parent / "golden_data"
 
 
 class TestParseSplSearch:
-    """parse_spl_search — extrai SET IDs."""
+    """parse_spl_search — extrai SET IDs rankeados."""
 
     def test_propofol(self) -> None:
         data = load_golden("dailymed", "spls_propofol.json")
@@ -35,6 +36,102 @@ class TestParseSplSearch:
     def test_missing_setid(self) -> None:
         set_ids = parse_spl_search({"data": [{"title": "test"}]})
         assert set_ids == []
+
+    def test_ranks_injection_over_patch(self) -> None:
+        """Bug #22: lidocaine injection deve vir antes de patch OTC."""
+        data = {
+            "data": [
+                {
+                    "setid": "patch-otc",
+                    "spl_version": "6",
+                    "title": "CARELAND LIDOCAINE 4 PLUS MENTHOL PAIN RELIEVING GEL PATCHES",
+                },
+                {
+                    "setid": "injection-rx",
+                    "spl_version": "5",
+                    "title": "LIDOCAINE HYDROCHLORIDE INJECTION, USP",
+                },
+            ],
+        }
+        set_ids = parse_spl_search(data)
+        assert set_ids[0] == "injection-rx"
+
+    def test_filters_veterinary_labels(self) -> None:
+        """Bug #23: ketamine vet deve ficar atrás de human."""
+        data = {
+            "data": [
+                {
+                    "setid": "vet-covetrus",
+                    "spl_version": "3",
+                    "title": "KETAMINE HYDROCHLORIDE INJECTION [COVETRUS]",
+                },
+                {
+                    "setid": "vet-dechra",
+                    "spl_version": "2",
+                    "title": "KETAMINE HYDROCHLORIDE INJECTION [DECHRA VETERINARY PRODUCTS LLC]",
+                },
+                {
+                    "setid": "human-ketalar",
+                    "spl_version": "30",
+                    "title": "KETALAR (KETAMINE HYDROCHLORIDE) INJECTION [PAR HEALTH USA, LLC]",
+                },
+            ],
+        }
+        set_ids = parse_spl_search(data)
+        assert set_ids[0] == "human-ketalar"
+        # Vet labels no final
+        assert set_ids[-1] in {"vet-covetrus", "vet-dechra"}
+
+    def test_ranks_by_spl_version_within_same_form(self) -> None:
+        """SPLs com mesma forma farmacêutica: spl_version maior primeiro."""
+        data = {
+            "data": [
+                {
+                    "setid": "old",
+                    "spl_version": "2",
+                    "title": "DRUG X TABLET",
+                },
+                {
+                    "setid": "new",
+                    "spl_version": "15",
+                    "title": "DRUG X TABLET",
+                },
+            ],
+        }
+        set_ids = parse_spl_search(data)
+        assert set_ids[0] == "new"
+
+
+class TestScoreSplCandidate:
+    """_score_spl_candidate — scoring heurístico."""
+
+    def test_injection_gets_bonus(self) -> None:
+        score = _score_spl_candidate(
+            {"setid": "a", "title": "PROPOFOL INJECTABLE EMULSION", "spl_version": 5}
+        )
+        assert score == 15  # 5 (version) + 10 (injection)
+
+    def test_patch_gets_penalty(self) -> None:
+        score = _score_spl_candidate(
+            {"setid": "b", "title": "LIDOCAINE PATCHES 4%", "spl_version": 6}
+        )
+        assert score == -4  # 6 (version) - 10 (patch)
+
+    def test_veterinary_gets_negative_100(self) -> None:
+        score = _score_spl_candidate(
+            {"setid": "c", "title": "KETAMINE INJECTION [COVETRUS]", "spl_version": 3}
+        )
+        assert score == -100
+
+    def test_veterinary_keyword(self) -> None:
+        score = _score_spl_candidate(
+            {"setid": "d", "title": "DRUG X [DECHRA VETERINARY PRODUCTS]", "spl_version": 2}
+        )
+        assert score == -100
+
+    def test_plain_title_uses_version_only(self) -> None:
+        score = _score_spl_candidate({"setid": "e", "title": "DRUG X CAPSULE", "spl_version": 8})
+        assert score == 18  # 8 (version) + 10 (capsule)
 
 
 class TestParseAdverseReactionsXml:

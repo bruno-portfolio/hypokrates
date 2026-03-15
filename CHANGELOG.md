@@ -62,6 +62,9 @@
 - **compare_signals MedDRA grouping**: Auto-detected events now deduplicated by `canonical_term()` — "ANAPHYLACTIC SHOCK" and "ANAPHYLACTIC REACTION" merge into "ANAPHYLAXIS".
 - **compare_signals operational filtering**: Auto-detected events now filtered via `OPERATIONAL_MEDDRA_TERMS` — removes "DRUG INEFFECTIVE", "DEATH", etc.
 - **Co-admin verdict/warning mismatch**: MCP output showed "⚠ Co-admin confounding likely" even when verdict was "specific". Now conditionally shows appropriate message.
+- **DailyMed SPL ranking (Bug #22/#23)**: `parse_spl_search()` now ranks SPL candidates by heuristic score — injection/tablet/capsule forms get +10 bonus, OTC topicals (patch/cream/gel) get -10 penalty, veterinary labels (Covetrus, Dechra, Zoetis, etc.) get -100. Fixes lidocaine returning OTC patch events ("avoid contact with eyes") and ketamine returning veterinary label events ("In the cat, myoclonic jerking").
+- **DailyMed SPL selection two-pass**: `label_events()` now selects SPLs in two passes — first prefers SPLs with formal Adverse Reactions section (LOINC 34084-4), then falls back to any safety section. OTC labels typically have only Warnings (34071-1), not Adverse Reactions.
+- **DailyMed SPL pagesize**: Increased from 10 to 100 to surface prescription labels for drugs with many OTC formulations (lidocaine: 2,403 SPLs, first 10 were all patches).
 
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability

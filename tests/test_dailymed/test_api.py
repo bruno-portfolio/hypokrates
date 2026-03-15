@@ -112,16 +112,21 @@ async def test_label_events_skips_spl_without_safety(mock_client_cls: AsyncMock)
       </section></component></structuredBody></component>
     </document>"""
 
+    async def xml_by_setid(set_id: str, *, use_cache: bool = True) -> str:
+        if set_id == "aaaa-powder-no-safety":
+            return powder_xml
+        return golden_xml_real
+
     instance = AsyncMock()
     instance.search_spls.return_value = golden_spls
-    # First SPL (powder) has no safety sections, second has
-    instance.fetch_spl_xml.side_effect = [powder_xml, golden_xml_real]
+    instance.fetch_spl_xml.side_effect = xml_by_setid
     mock_client_cls.return_value = instance
 
     result = await label_events("gabapentin")
 
     assert result.drug == "gabapentin"
-    # Should use second SPL (with safety sections), not the powder
+    # Ranking: capsule (version=5, +CAPSULE bonus) > tablet (version=3) > powder (version=1)
+    # Capsule has safety sections → should be selected
     assert result.set_id == "bbbb-capsule-with-safety"
     assert len(result.events) > 0
     instance.close.assert_called_once()

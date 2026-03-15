@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from hypokrates.dailymed.client import DailyMedClient
 from hypokrates.dailymed.models import LabelCheckResult, LabelEventsResult
 from hypokrates.dailymed.parser import (
+    has_adverse_reactions_section,
     has_safety_sections,
     match_event_in_label,
     parse_adverse_reactions_xml,
@@ -50,19 +51,35 @@ async def label_events(
                 ),
             )
 
-        # 2. Fetch XML — escolher SPL que tenha seções de segurança
+        # 2. Fetch XML — seleção em duas passadas (candidatos já rankeados)
+        #    Pass 1: SPL com seção Adverse Reactions (34084-4) — exclui OTC/vet
+        #    Pass 2: SPL com qualquer seção de segurança — fallback
         set_id = set_ids[0]
         xml_text = ""
+        fetched_xmls: dict[str, str] = {}
+
         for candidate_id in set_ids:
             candidate_xml = await client.fetch_spl_xml(candidate_id, use_cache=use_cache)
-            if has_safety_sections(candidate_xml):
+            fetched_xmls[candidate_id] = candidate_xml
+            if has_adverse_reactions_section(candidate_xml):
                 set_id = candidate_id
                 xml_text = candidate_xml
                 break
 
+        # Pass 2: qualquer seção de segurança (reusar XMLs já fetched)
+        if not xml_text:
+            for candidate_id in set_ids:
+                candidate_xml = fetched_xmls.get(candidate_id, "")
+                if candidate_xml and has_safety_sections(candidate_xml):
+                    set_id = candidate_id
+                    xml_text = candidate_xml
+                    break
+
         # Fallback: usar primeiro SPL se nenhum tem seções de segurança
         if not xml_text:
-            xml_text = await client.fetch_spl_xml(set_ids[0], use_cache=use_cache)
+            xml_text = fetched_xmls.get(set_ids[0], "")
+            if not xml_text:
+                xml_text = await client.fetch_spl_xml(set_ids[0], use_cache=use_cache)
             set_id = set_ids[0]
 
         # 3. Parsear adverse reactions
