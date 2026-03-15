@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from hypokrates.constants import __version__
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.evidence.models import EvidenceBlock
@@ -1718,6 +1720,7 @@ class TestMCPServer:
 
     def test_create_server_registers_all_tools(self) -> None:
         """create_server registra tools sem erro."""
+        pytest.importorskip("mcp")
         from hypokrates.mcp.server import create_server
 
         server = create_server()
