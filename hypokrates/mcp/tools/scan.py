@@ -107,16 +107,34 @@ def register(mcp: FastMCP) -> None:
                 vol_info = ""
                 if item.volume_flag:
                     vol_info = " | ⚠ VOLUME"
+                indication_info = ""
+                if item.is_indication:
+                    indication_info = " | ⚠ INDICATION"
                 lines.append(
                     f"{item.rank}. **{item.event}** — "
                     f"{item.classification.value} | "
                     f"PRR={prr_val} | "
                     f"lit={item.literature_count}"
                     f"{label_info}{trials_info}{ot_info}"
-                    f"{vol_info}"
+                    f"{vol_info}{indication_info}"
                     f"{grouped_info}"
                 )
             lines.append("")
+
+            # Agrupar por cluster semântico
+            clustered: dict[str, list[str]] = {}
+            for item in result.items:
+                cluster = item.cluster or "Other"
+                if cluster not in clustered:
+                    clustered[cluster] = []
+                clustered[cluster].append(f"{item.event} (PRR={item.signal.prr.value:.1f})")
+
+            if len(clustered) > 1 or (len(clustered) == 1 and "Other" not in clustered):
+                lines.append("## By Clinical System")
+                lines.append("")
+                for cluster_name, event_summaries in clustered.items():
+                    lines.append(f"**{cluster_name}:** {', '.join(event_summaries)}")
+                lines.append("")
 
         if result.mechanism:
             lines.extend(["## Mechanism of Action", result.mechanism[:300], ""])

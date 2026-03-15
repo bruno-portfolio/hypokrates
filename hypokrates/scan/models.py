@@ -37,6 +37,18 @@ class ScanItem(BaseModel):
         "Não invalida o sinal, mas marca pares cuja interpretação exige auditoria "
         "adicional por risco de stimulated reporting, duplicação, litigation ou notoriedade.",
     )
+    is_indication: bool = Field(
+        default=False,
+        description="True se o evento é uma indicação/condição de base conhecida, "
+        "não um efeito adverso. PRR alto reflete perfil de uso, não toxicidade. "
+        "Score penalizado para afundar no ranking.",
+    )
+    cluster: str = Field(
+        default="",
+        description="Cluster semântico por sistema clínico "
+        "(e.g., 'Cardiovascular', 'Psychiatric'). "
+        "Atribuído automaticamente pelo scan para facilitar interpretação.",
+    )
 
 
 class ScanResult(BaseModel):

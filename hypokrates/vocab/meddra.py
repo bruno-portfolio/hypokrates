@@ -153,6 +153,55 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
     "PROPOFOL INFUSION SYNDROME": [
         "PRIS",
     ],
+    "OSTEONECROSIS": [
+        "AVASCULAR NECROSIS",
+        "BONE NECROSIS",
+        "FEMORAL HEAD NECROSIS",
+        "OSTEONECROSIS OF JAW",
+    ],
+    "PSYCHIATRIC DISORDER": [
+        "PSYCHOTIC DISORDER",
+        "PSYCHOSIS",
+        "STEROID PSYCHOSIS",
+        "MENTAL STATUS CHANGES",
+        "MENTAL DISORDER",
+    ],
+    "MOOD DISORDER": [
+        "MOOD SWINGS",
+        "MOOD ALTERED",
+        "EMOTIONAL DISTRESS",
+        "EMOTIONAL DISORDER",
+        "AFFECT LABILITY",
+    ],
+    "ADRENAL INSUFFICIENCY": [
+        "ADRENAL SUPPRESSION",
+        "ADRENOCORTICAL INSUFFICIENCY",
+        "HYPOCORTICISM",
+        "ADRENAL CRISIS",
+    ],
+    "HYPERGLYCAEMIA": [
+        "BLOOD GLUCOSE INCREASED",
+        "DIABETES MELLITUS",
+        "HYPERGLYCEMIA",
+        "STEROID DIABETES",
+        "TYPE 2 DIABETES MELLITUS",
+    ],
+    "CUSHING'S SYNDROME": [
+        "CUSHINGOID",
+        "MOON FACE",
+        "CUSHINGOID FACIES",
+    ],
+    "OSTEOPOROSIS": [
+        "BONE DENSITY DECREASED",
+        "BONE LOSS",
+        "OSTEOPENIA",
+    ],
+    "DEEP VEIN THROMBOSIS": [
+        "DVT",
+        "VENOUS THROMBOSIS",
+        "THROMBOSIS",
+        "VENOUS THROMBOEMBOLISM",
+    ],
 }
 
 # Build reverse lookup: alias → canonical term
@@ -160,6 +209,20 @@ _ALIAS_MAP: dict[str, str] = {}
 for _canonical, _aliases in MEDDRA_GROUPS.items():
     for _alias in _aliases:
         _ALIAS_MAP[_alias.upper()] = _canonical
+
+
+def expand_event_terms(event: str) -> list[str]:
+    """Expande um termo (canonical ou alias) para todos os termos FAERS equivalentes.
+
+    Se o input é canonical, retorna canonical + aliases (para query OR no FAERS).
+    Se é alias ou desconhecido, retorna apenas o input.
+    """
+    upper = event.upper().strip()
+    # É canonical? Retorna canonical + aliases
+    if upper in MEDDRA_GROUPS:
+        return [upper, *MEDDRA_GROUPS[upper]]
+    # É alias ou desconhecido? Retorna só ele
+    return [upper]
 
 
 def canonical_term(event: str) -> str:

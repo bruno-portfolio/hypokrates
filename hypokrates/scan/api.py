@@ -16,10 +16,12 @@ from hypokrates.faers.constants import (
     DRUG_CHARACTERIZATION_SUSPECT,
 )
 from hypokrates.models import MetaInfo
+from hypokrates.scan.clusters import get_cluster
 from hypokrates.scan.constants import (
     CLASSIFICATION_WEIGHTS,
     DEFAULT_CONCURRENCY,
     DEFAULT_TOP_N,
+    INDICATION_MULTIPLIER,
     LABEL_IN_MULTIPLIER,
     LABEL_NOT_IN_MULTIPLIER,
     OPERATIONAL_MEDDRA_TERMS,
@@ -28,6 +30,7 @@ from hypokrates.scan.constants import (
     SCAN_METHODOLOGY,
     VOLUME_ANOMALY_THRESHOLD,
 )
+from hypokrates.scan.indications import is_indication_term
 from hypokrates.scan.models import ScanItem, ScanResult
 
 if TYPE_CHECKING:
@@ -294,9 +297,30 @@ async def scan_drug(
             items = grouped
             groups_applied = True
 
-    # 5b. Truncar para top_n e atribuir ranks
+    # 5a. Flag indication terms e penalizar score
+    flagged_items: list[ScanItem] = []
+    for item in items:
+        if is_indication_term(item.event):
+            flagged_items.append(
+                item.model_copy(
+                    update={
+                        "is_indication": True,
+                        "score": item.score * INDICATION_MULTIPLIER,
+                    }
+                )
+            )
+        else:
+            flagged_items.append(item)
+    items = flagged_items
+    # Re-sort after score penalty
+    items.sort(key=lambda x: x.score, reverse=True)
+
+    # 5b. Truncar para top_n, atribuir ranks e clusters semânticos
     items = items[:top_n]
-    items = [item.model_copy(update={"rank": idx + 1}) for idx, item in enumerate(items)]
+    items = [
+        item.model_copy(update={"rank": idx + 1, "cluster": get_cluster(item.event)})
+        for idx, item in enumerate(items)
+    ]
 
     # 6. Enriquecer ScanResult com dados drug-level (DrugBank ou ChEMBL)
     scan_mechanism: str | None = None

@@ -8,8 +8,68 @@ from hypokrates.vocab.meddra import (
     _ALIAS_MAP,
     MEDDRA_GROUPS,
     canonical_term,
+    expand_event_terms,
     group_scan_items,
 )
+
+# ---------------------------------------------------------------------------
+# expand_event_terms()
+# ---------------------------------------------------------------------------
+
+
+class TestExpandEventTerms:
+    """Testes para expand_event_terms()."""
+
+    def test_expand_canonical_term(self) -> None:
+        terms = expand_event_terms("QT PROLONGATION")
+        assert "QT PROLONGATION" in terms
+        assert "ELECTROCARDIOGRAM QT PROLONGED" in terms
+        assert "LONG QT SYNDROME" in terms
+        assert "TORSADE DE POINTES" in terms
+        assert len(terms) == 4
+
+    def test_expand_alias_term(self) -> None:
+        terms = expand_event_terms("ELECTROCARDIOGRAM QT PROLONGED")
+        assert terms == ["ELECTROCARDIOGRAM QT PROLONGED"]
+
+    def test_expand_unknown_term(self) -> None:
+        terms = expand_event_terms("headache")
+        assert terms == ["HEADACHE"]
+
+    def test_expand_case_insensitive(self) -> None:
+        terms = expand_event_terms("qt prolongation")
+        assert "QT PROLONGATION" in terms
+        assert len(terms) == 4
+
+    def test_expand_with_whitespace(self) -> None:
+        terms = expand_event_terms("  ANAPHYLAXIS  ")
+        assert "ANAPHYLAXIS" in terms
+        assert "ANAPHYLACTIC SHOCK" in terms
+        assert len(terms) == 5
+
+    def test_expand_empty_string(self) -> None:
+        terms = expand_event_terms("")
+        assert terms == [""]
+
+    def test_expand_osteonecrosis(self) -> None:
+        terms = expand_event_terms("OSTEONECROSIS")
+        assert "OSTEONECROSIS" in terms
+        assert "AVASCULAR NECROSIS" in terms
+        assert "BONE NECROSIS" in terms
+        assert "FEMORAL HEAD NECROSIS" in terms
+        assert "OSTEONECROSIS OF JAW" in terms
+        assert len(terms) == 5
+
+    def test_expand_hyperglycaemia(self) -> None:
+        terms = expand_event_terms("HYPERGLYCAEMIA")
+        assert "HYPERGLYCAEMIA" in terms
+        assert "BLOOD GLUCOSE INCREASED" in terms
+        assert "DIABETES MELLITUS" in terms
+        assert "HYPERGLYCEMIA" in terms
+        assert "STEROID DIABETES" in terms
+        assert "TYPE 2 DIABETES MELLITUS" in terms
+        assert len(terms) == 6
+
 
 # ---------------------------------------------------------------------------
 # canonical_term()
@@ -63,6 +123,26 @@ class TestCanonicalTerm:
     def test_methemoglobinaemia_spellings(self) -> None:
         assert canonical_term("METHEMOGLOBINEMIA") == "METHEMOGLOBINAEMIA"
         assert canonical_term("METHAEMOGLOBINAEMIA") == "METHEMOGLOBINAEMIA"
+
+    def test_canonical_avascular_necrosis(self) -> None:
+        assert canonical_term("AVASCULAR NECROSIS") == "OSTEONECROSIS"
+
+    def test_canonical_hyperglycemia(self) -> None:
+        assert canonical_term("HYPERGLYCEMIA") == "HYPERGLYCAEMIA"
+        assert canonical_term("BLOOD GLUCOSE INCREASED") == "HYPERGLYCAEMIA"
+        assert canonical_term("STEROID DIABETES") == "HYPERGLYCAEMIA"
+
+    def test_canonical_mood_disorder(self) -> None:
+        assert canonical_term("MOOD SWINGS") == "MOOD DISORDER"
+        assert canonical_term("AFFECT LABILITY") == "MOOD DISORDER"
+
+    def test_canonical_psychiatric_disorder(self) -> None:
+        assert canonical_term("PSYCHOSIS") == "PSYCHIATRIC DISORDER"
+        assert canonical_term("STEROID PSYCHOSIS") == "PSYCHIATRIC DISORDER"
+
+    def test_canonical_dvt(self) -> None:
+        assert canonical_term("DVT") == "DEEP VEIN THROMBOSIS"
+        assert canonical_term("VENOUS THROMBOSIS") == "DEEP VEIN THROMBOSIS"
 
 
 # ---------------------------------------------------------------------------
