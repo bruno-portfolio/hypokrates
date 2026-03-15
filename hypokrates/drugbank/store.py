@@ -73,6 +73,8 @@ class DrugBankStore:
     """Store DuckDB para dados do DrugBank.
 
     Singleton thread-safe. Persiste em ``~/.cache/hypokrates/drugbank.duckdb``.
+    Todas as queries são protegidas por ``_db_lock`` para segurança com
+    ``asyncio.to_thread()`` (chamadas concorrentes de threads diferentes).
     """
 
     _instance: ClassVar[DrugBankStore | None] = None
@@ -86,6 +88,7 @@ class DrugBankStore:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db_path = db_path
         self._conn = duckdb.connect(str(db_path))
+        self._db_lock = threading.Lock()
         self._conn.execute(_CREATE_TABLES)
         self._loaded = self._check_loaded()
 
@@ -132,21 +135,25 @@ class DrugBankStore:
             logger.warning("No drugs found in DrugBank XML")
             return 0
 
-        # Limpar tabelas antes de carregar
-        self._conn.execute("DELETE FROM drugbank_name_index")
-        self._conn.execute("DELETE FROM drugbank_enzymes")
-        self._conn.execute("DELETE FROM drugbank_targets")
-        self._conn.execute("DELETE FROM drugbank_interactions")
-        self._conn.execute("DELETE FROM drugbank_drugs")
+        with self._db_lock:
+            # Limpar tabelas antes de carregar
+            self._conn.execute("DELETE FROM drugbank_name_index")
+            self._conn.execute("DELETE FROM drugbank_enzymes")
+            self._conn.execute("DELETE FROM drugbank_targets")
+            self._conn.execute("DELETE FROM drugbank_interactions")
+            self._conn.execute("DELETE FROM drugbank_drugs")
 
-        self._batch_insert(drugs)
+            self._batch_insert(drugs)
 
         self._loaded = True
         logger.info("DrugBank loaded: %d drugs", len(drugs))
         return len(drugs)
 
     def _batch_insert(self, drugs: list[dict[str, Any]]) -> None:
-        """Insere todas as drogas em batch (executemany)."""
+        """Insere todas as drogas em batch (executemany).
+
+        NOTA: Chamado de dentro de ``load_from_xml`` que já detém ``_db_lock``.
+        """
         drug_rows: list[list[object]] = []
         name_rows: list[list[str]] = []
         interaction_rows: list[list[str]] = []
@@ -235,17 +242,18 @@ class DrugBankStore:
         Returns:
             DrugBankInfo ou None se não encontrado.
         """
-        # Lookup na name_index
-        result = self._conn.execute(
-            "SELECT drugbank_id FROM drugbank_name_index WHERE name_lower = ? LIMIT 1",
-            [name.lower()],
-        ).fetchone()
+        with self._db_lock:
+            # Lookup na name_index
+            result = self._conn.execute(
+                "SELECT drugbank_id FROM drugbank_name_index WHERE name_lower = ? LIMIT 1",
+                [name.lower()],
+            ).fetchone()
 
-        if result is None:
-            return None
+            if result is None:
+                return None
 
-        drug_id: str = result[0]
-        return self.get_drug(drug_id)
+            drug_id: str = result[0]
+            return self._get_drug_unlocked(drug_id)
 
     def get_drug(self, drug_id: str) -> DrugBankInfo | None:
         """Busca droga pelo DrugBank ID.
@@ -253,6 +261,11 @@ class DrugBankStore:
         Returns:
             DrugBankInfo ou None se não encontrado.
         """
+        with self._db_lock:
+            return self._get_drug_unlocked(drug_id)
+
+    def _get_drug_unlocked(self, drug_id: str) -> DrugBankInfo | None:
+        """Busca droga pelo ID (sem lock — chamador deve deter ``_db_lock``)."""
         row = self._conn.execute(
             "SELECT * FROM drugbank_drugs WHERE drugbank_id = ?",
             [drug_id],
@@ -280,15 +293,16 @@ class DrugBankStore:
 
     def find_interactions(self, name: str) -> list[DrugInteraction]:
         """Busca interações de uma droga por nome."""
-        result = self._conn.execute(
-            "SELECT drugbank_id FROM drugbank_name_index WHERE name_lower = ? LIMIT 1",
-            [name.lower()],
-        ).fetchone()
+        with self._db_lock:
+            result = self._conn.execute(
+                "SELECT drugbank_id FROM drugbank_name_index WHERE name_lower = ? LIMIT 1",
+                [name.lower()],
+            ).fetchone()
 
-        if result is None:
-            return []
+            if result is None:
+                return []
 
-        return self._get_interactions(result[0])
+            return self._get_interactions(result[0])
 
     def _get_targets(self, drug_id: str) -> list[DrugTarget]:
         """Busca targets de uma droga."""
@@ -335,6 +349,7 @@ class DrugBankStore:
 
     def close(self) -> None:
         """Fecha a conexão DuckDB."""
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None  # type: ignore[assignment]
+        with self._db_lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None  # type: ignore[assignment]

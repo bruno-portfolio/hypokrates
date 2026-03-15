@@ -41,7 +41,7 @@ class CacheStore:
 
         self._db_path = db_path
         self._conn = duckdb.connect(str(db_path))
-        self._async_lock = asyncio.Lock()
+        self._db_lock = threading.Lock()
         run_migrations(self._conn)
 
     @classmethod
@@ -63,36 +63,36 @@ class CacheStore:
 
     def get(self, key: str) -> dict[str, object] | None:
         """Busca valor no cache. Retorna None se ausente ou expirado."""
-        try:
-            result = self._conn.execute(
-                """
-                SELECT data FROM cache_entries
-                WHERE key = ? AND expires_at > CURRENT_TIMESTAMP
-                """,
-                [key],
-            ).fetchone()
+        with self._db_lock:
+            try:
+                result = self._conn.execute(
+                    """
+                    SELECT data FROM cache_entries
+                    WHERE key = ? AND expires_at > CURRENT_TIMESTAMP
+                    """,
+                    [key],
+                ).fetchone()
 
-            if result is None:
+                if result is None:
+                    return None
+
+                # Incrementa hit count
+                self._conn.execute(
+                    "UPDATE cache_entries SET hit_count = hit_count + 1 WHERE key = ?",
+                    [key],
+                )
+
+                raw: str = result[0]
+                data: dict[str, object] = json.loads(raw)
+                return data
+
+            except duckdb.Error as exc:
+                logger.warning("Cache read error for key=%s: %s", key, exc)
                 return None
 
-            # Incrementa hit count
-            self._conn.execute(
-                "UPDATE cache_entries SET hit_count = hit_count + 1 WHERE key = ?",
-                [key],
-            )
-
-            raw: str = result[0]
-            data: dict[str, object] = json.loads(raw)
-            return data
-
-        except duckdb.Error as exc:
-            logger.warning("Cache read error for key=%s: %s", key, exc)
-            return None
-
     async def aget(self, key: str) -> dict[str, object] | None:
-        """Busca valor no cache (async-safe via lock)."""
-        async with self._async_lock:
-            return self.get(key)
+        """Busca valor no cache (async-safe, offloaded to thread pool)."""
+        return await asyncio.to_thread(self.get, key)
 
     def set(self, key: str, data: dict[str, object], source: str) -> None:
         """Armazena valor no cache com TTL baseado na fonte."""
@@ -100,44 +100,46 @@ class CacheStore:
         expires_at = datetime.now(UTC) + timedelta(seconds=ttl)
         json_data = json.dumps(data, default=str)
 
-        try:
-            self._conn.execute(
-                """
-                INSERT OR REPLACE INTO cache_entries (key, source, data, created_at, expires_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
-                """,
-                [key, source, json_data, expires_at],
-            )
-        except duckdb.Error as exc:
-            raise CacheError(f"Cache write error for key={key}: {exc}") from exc
+        with self._db_lock:
+            try:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO cache_entries"
+                    " (key, source, data, created_at, expires_at)"
+                    " VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)",
+                    [key, source, json_data, expires_at],
+                )
+            except duckdb.Error as exc:
+                raise CacheError(f"Cache write error for key={key}: {exc}") from exc
 
     async def aset(self, key: str, data: dict[str, object], source: str) -> None:
-        """Armazena valor no cache (async-safe via lock)."""
-        async with self._async_lock:
-            self.set(key, data, source)
+        """Armazena valor no cache (async-safe, offloaded to thread pool)."""
+        await asyncio.to_thread(self.set, key, data, source)
 
     def invalidate(self, key: str) -> None:
         """Remove entrada específica do cache."""
-        self._conn.execute("DELETE FROM cache_entries WHERE key = ?", [key])
+        with self._db_lock:
+            self._conn.execute("DELETE FROM cache_entries WHERE key = ?", [key])
 
     def clear(self, source: str | None = None) -> int:
         """Limpa cache. Se source fornecido, apenas entradas daquela fonte."""
-        if source:
-            result = self._conn.execute("DELETE FROM cache_entries WHERE source = ?", [source])
-        else:
-            result = self._conn.execute("DELETE FROM cache_entries")
-        row = result.fetchone()
-        return int(row[0]) if row is not None else 0
+        with self._db_lock:
+            if source:
+                result = self._conn.execute("DELETE FROM cache_entries WHERE source = ?", [source])
+            else:
+                result = self._conn.execute("DELETE FROM cache_entries")
+            row = result.fetchone()
+            return int(row[0]) if row is not None else 0
 
     def cleanup_expired(self) -> int:
         """Remove entradas expiradas."""
-        result = self._conn.execute(
-            "DELETE FROM cache_entries WHERE expires_at <= CURRENT_TIMESTAMP"
-        )
-        row = result.fetchone()
-        return int(row[0]) if row is not None else 0
+        with self._db_lock:
+            result = self._conn.execute(
+                "DELETE FROM cache_entries WHERE expires_at <= CURRENT_TIMESTAMP"
+            )
+            row = result.fetchone()
+            return int(row[0]) if row is not None else 0
 
     def close(self) -> None:
         """Fecha conexão DuckDB."""
-        with contextlib.suppress(duckdb.Error):
+        with self._db_lock, contextlib.suppress(duckdb.Error):
             self._conn.close()

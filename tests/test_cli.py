@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-from typer.testing import CliRunner
+import pytest
 
-from hypokrates.cli import app
 from hypokrates.cross.models import CompareResult, CompareSignalItem
 from hypokrates.models import MetaInfo
 from hypokrates.scan.models import ScanItem, ScanResult
@@ -19,7 +19,21 @@ from hypokrates.stats.models import (
     TimelineResult,
 )
 
-runner = CliRunner()
+try:
+    from typer.testing import CliRunner
+
+    from hypokrates.cli import app
+
+    _HAS_TYPER = True
+except ImportError:
+    _HAS_TYPER = False
+
+if TYPE_CHECKING:
+    from typer.testing import CliRunner as CliRunnerType
+
+pytestmark = pytest.mark.skipif(not _HAS_TYPER, reason="typer not installed")
+
+runner: CliRunnerType = CliRunner() if _HAS_TYPER else None  # type: ignore[assignment]
 
 
 def _make_meta() -> MetaInfo:
