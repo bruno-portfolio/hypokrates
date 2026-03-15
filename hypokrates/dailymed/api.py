@@ -68,7 +68,8 @@ async def label_events(
             query={"drug": drug, "set_id": set_id},
             total_results=len(terms),
             retrieved_at=datetime.now(UTC),
-            disclaimer="Adverse reactions extracted from FDA SPL label. "
+            disclaimer="Safety events extracted from FDA SPL label "
+            "(Adverse Reactions, Boxed Warning, Warnings and Precautions). "
             "Matching is case-insensitive substring — may include false positives.",
         ),
     )

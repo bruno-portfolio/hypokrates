@@ -4,6 +4,26 @@
     <structuredBody>
       <component>
         <section>
+          <code code="34066-1" codeSystem="2.16.840.1.113883.6.1" displayName="BOXED WARNING"/>
+          <title>WARNING: SERIOUS RISKS</title>
+          <text>
+            <paragraph>Cardiac arrest and respiratory depression have been reported.</paragraph>
+            <paragraph>QT prolongation may occur with concurrent use of other agents.</paragraph>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="43685-7" codeSystem="2.16.840.1.113883.6.1" displayName="WARNINGS AND PRECAUTIONS"/>
+          <title>WARNINGS AND PRECAUTIONS</title>
+          <text>
+            <paragraph>Hyperlipidemia has been reported with prolonged use.</paragraph>
+            <paragraph>Perioperative myoclonia may occur.</paragraph>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
           <code code="34084-4" codeSystem="2.16.840.1.113883.6.1" displayName="ADVERSE REACTIONS"/>
           <title>ADVERSE REACTIONS</title>
           <text>

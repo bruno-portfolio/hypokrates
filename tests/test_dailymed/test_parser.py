@@ -46,10 +46,16 @@ class TestParseAdverseReactionsXml:
 
         assert len(terms) > 0
         assert raw_text != ""
-        # Verifica termos específicos (case-insensitive check)
+        # Verifica termos de Adverse Reactions (case-insensitive check)
         lower_terms = [t.lower() for t in terms]
         assert any("bradycardia" in t for t in lower_terms)
         assert any("hypotension" in t for t in lower_terms)
+        # Verifica termos de Boxed Warning
+        assert any("qt prolongation" in t for t in lower_terms)
+        assert any("cardiac arrest" in t for t in lower_terms)
+        # Verifica termos de Warnings and Precautions
+        assert any("hyperlipidemia" in t for t in lower_terms)
+        assert any("myoclonia" in t for t in lower_terms)
 
     def test_invalid_xml(self) -> None:
         terms, raw_text = parse_adverse_reactions_xml("not xml at all")
@@ -73,6 +79,89 @@ class TestParseAdverseReactionsXml:
         terms, raw_text = parse_adverse_reactions_xml(xml)
         assert terms == []
         assert raw_text == ""
+
+    def test_multiple_safety_sections(self) -> None:
+        """Verifica que todas as seções de segurança são parseadas."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <document xmlns="urn:hl7-org:v3">
+          <component>
+            <structuredBody>
+              <component>
+                <section>
+                  <code code="34066-1" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text><paragraph>Black box: Hepatotoxicity reported.</paragraph></text>
+                </section>
+              </component>
+              <component>
+                <section>
+                  <code code="34071-1" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text><paragraph>Renal impairment may occur.</paragraph></text>
+                </section>
+              </component>
+              <component>
+                <section>
+                  <code code="43685-7" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text><paragraph>Thrombocytopenia has been observed.</paragraph></text>
+                </section>
+              </component>
+              <component>
+                <section>
+                  <code code="34084-4" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text><paragraph>Nausea, Vomiting, Diarrhea</paragraph></text>
+                </section>
+              </component>
+            </structuredBody>
+          </component>
+        </document>"""
+        terms, raw_text = parse_adverse_reactions_xml(xml)
+
+        lower_terms = [t.lower() for t in terms]
+        # Adverse Reactions
+        assert any("nausea" in t for t in lower_terms)
+        assert any("diarrhea" in t for t in lower_terms)
+        # Boxed Warning
+        assert any("hepatotoxicity" in t for t in lower_terms)
+        # Warnings (old format)
+        assert any("renal impairment" in t for t in lower_terms)
+        # Warnings and Precautions (PLR format)
+        assert any("thrombocytopenia" in t for t in lower_terms)
+        # raw_text contém texto de todas as seções
+        assert "Hepatotoxicity" in raw_text
+        assert "Renal impairment" in raw_text
+        assert "Thrombocytopenia" in raw_text
+        assert "Nausea" in raw_text
+
+    def test_boxed_warning_only(self) -> None:
+        """Verifica que XML com apenas Boxed Warning (sem Adverse Reactions) funciona."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <document xmlns="urn:hl7-org:v3">
+          <component>
+            <structuredBody>
+              <component>
+                <section>
+                  <code code="34066-1" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text>
+                    <paragraph>WARNING: Risk of serious infections and malignancies.</paragraph>
+                    <paragraph>Tuberculosis reactivation has been reported.</paragraph>
+                  </text>
+                </section>
+              </component>
+              <component>
+                <section>
+                  <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+                  <text><paragraph>Dose info only.</paragraph></text>
+                </section>
+              </component>
+            </structuredBody>
+          </component>
+        </document>"""
+        terms, raw_text = parse_adverse_reactions_xml(xml)
+
+        assert len(terms) > 0
+        assert raw_text != ""
+        lower_terms = [t.lower() for t in terms]
+        assert any("tuberculosis" in t for t in lower_terms)
+        assert any("malignancies" in t for t in lower_terms)
 
     def test_empty_adverse_reactions(self) -> None:
         xml = """<?xml version="1.0" encoding="UTF-8"?>

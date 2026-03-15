@@ -7,7 +7,7 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from hypokrates.dailymed.constants import ADVERSE_REACTIONS_LOINC, SPL_NAMESPACE
+from hypokrates.dailymed.constants import SAFETY_LOINC_CODES, SPL_NAMESPACE
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +31,16 @@ def parse_spl_search(data: dict[str, Any]) -> list[str]:
 
 
 def parse_adverse_reactions_xml(xml_text: str) -> tuple[list[str], str]:
-    """Extrai termos de adverse reactions de um SPL XML.
+    """Extrai termos de safety sections de um SPL XML.
 
-    Busca a seção com LOINC code 34084-4 (Adverse Reactions) e extrai
-    os termos textuais encontrados.
+    Busca seções de Adverse Reactions, Boxed Warning, Warnings, e
+    Warnings and Precautions pelo LOINC code e extrai termos textuais.
 
     Args:
         xml_text: XML completo do SPL.
 
     Returns:
-        Tupla (lista de termos normalizados, texto raw da seção).
+        Tupla (lista de termos normalizados, texto raw combinado das seções).
     """
     try:
         root = ET.fromstring(xml_text)
@@ -48,14 +48,18 @@ def parse_adverse_reactions_xml(xml_text: str) -> tuple[list[str], str]:
         logger.warning("Failed to parse SPL XML")
         return [], ""
 
-    # Buscar seção de adverse reactions pelo LOINC code
-    section_text = _find_adverse_reactions_section(root)
-    if not section_text:
+    all_text_parts: list[str] = []
+    for loinc_code in SAFETY_LOINC_CODES:
+        section_text = _find_section_by_loinc(root, loinc_code)
+        if section_text:
+            all_text_parts.append(section_text)
+
+    if not all_text_parts:
         return [], ""
 
-    # Extrair termos individuais do texto
-    terms = _extract_terms(section_text)
-    return terms, section_text
+    combined_text = "\n".join(all_text_parts)
+    terms = _extract_terms(combined_text)
+    return terms, combined_text
 
 
 def match_event_in_label(
@@ -89,9 +93,8 @@ def match_event_in_label(
     return len(matched) > 0, matched
 
 
-def _find_adverse_reactions_section(root: ET.Element) -> str:
-    """Busca seção de adverse reactions em SPL XML pelo LOINC code."""
-    # SPL usa namespace hl7-org:v3
+def _find_section_by_loinc(root: ET.Element, loinc_code: str) -> str:
+    """Busca seção SPL por LOINC code."""
     ns = SPL_NAMESPACE
 
     for component in root.iter(f"{ns}component"):
@@ -99,7 +102,7 @@ def _find_adverse_reactions_section(root: ET.Element) -> str:
             code_elem = section.find(f"{ns}code")
             if code_elem is not None:
                 code_val = code_elem.get("code", "")
-                if code_val == ADVERSE_REACTIONS_LOINC:
+                if code_val == loinc_code:
                     return _extract_text_from_section(section)
 
     return ""

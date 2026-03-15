@@ -9,5 +9,18 @@ SPL_ENDPOINT = "/spls"  # /{set_id}.xml
 # LOINC code para seção "Adverse Reactions" em SPL
 ADVERSE_REACTIONS_LOINC = "34084-4"
 
+# LOINC codes para outras seções de segurança
+BOXED_WARNING_LOINC = "34066-1"
+WARNINGS_LOINC = "34071-1"
+WARNINGS_PRECAUTIONS_LOINC = "43685-7"
+
+# Todos os LOINC codes de segurança relevantes
+SAFETY_LOINC_CODES: dict[str, str] = {
+    ADVERSE_REACTIONS_LOINC: "Adverse Reactions",
+    BOXED_WARNING_LOINC: "Boxed Warning",
+    WARNINGS_LOINC: "Warnings",
+    WARNINGS_PRECAUTIONS_LOINC: "Warnings and Precautions",
+}
+
 # SPL XML namespace
 SPL_NAMESPACE = "{urn:hl7-org:v3}"
