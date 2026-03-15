@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
-from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
 from hypokrates.constants import NCBI_EUTILS_BASE_URL, HTTPSettings, Source
 from hypokrates.exceptions import ParseError, SourceUnavailableError
-from hypokrates.http.rate_limiter import RateLimiter
-from hypokrates.http.retry import retry_request
-from hypokrates.http.settings import create_client
+from hypokrates.http.auth import inject_ncbi_auth
+from hypokrates.http.base_client import BaseClient, ParamsType
 from hypokrates.pubmed.constants import (
     DATABASE,
     DEFAULT_RETMAX,
@@ -24,28 +21,23 @@ from hypokrates.pubmed.constants import (
 if TYPE_CHECKING:
     import httpx
 
-logger = logging.getLogger(__name__)
 
-
-class PubMedClient:
+class PubMedClient(BaseClient):
     """Client HTTP para a API NCBI E-utilities (PubMed).
 
     Gerencia rate limiting, retry, e cache transparente.
     """
 
     def __init__(self) -> None:
-        self._client: httpx.AsyncClient | None = None
         cfg = get_config()
-
         rate = HTTPSettings.RATE_LIMITS.get(Source.PUBMED, 180)
         if cfg.ncbi_api_key:
             rate = RATE_WITH_KEY
-        self._rate_limiter = RateLimiter.for_source(Source.PUBMED, rate)
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = create_client(base_url=NCBI_EUTILS_BASE_URL)
-        return self._client
+        super().__init__(
+            source=Source.PUBMED,
+            base_url=NCBI_EUTILS_BASE_URL,
+            rate=rate,
+        )
 
     async def search_count(
         self,
@@ -63,33 +55,12 @@ class PubMedClient:
             JSON response do ESearch.
         """
         params = self._build_params(term, rettype="count")
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, f"{ESEARCH_ENDPOINT}/count", params)
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
-
-        await self._rate_limiter.acquire()
-        client = await self._get_client()
-        response = await retry_request(
-            client,
-            "GET",
+        return await self._cached_get(
             ESEARCH_ENDPOINT,
-            params=params,
-            source_name=Source.PUBMED,
+            params,
+            use_cache=use_cache,
+            cache_suffix="/count",
         )
-
-        data = self._parse_response(response)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, f"{ESEARCH_ENDPOINT}/count", params)
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.PUBMED)
-
-        return data
 
     async def search_ids(
         self,
@@ -109,33 +80,7 @@ class PubMedClient:
             JSON response do ESearch com idlist.
         """
         params = self._build_params(term, retmax=retmax)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, ESEARCH_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
-
-        await self._rate_limiter.acquire()
-        client = await self._get_client()
-        response = await retry_request(
-            client,
-            "GET",
-            ESEARCH_ENDPOINT,
-            params=params,
-            source_name=Source.PUBMED,
-        )
-
-        data = self._parse_response(response)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, ESEARCH_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.PUBMED)
-
-        return data
+        return await self._cached_get(ESEARCH_ENDPOINT, params, use_cache=use_cache)
 
     async def fetch_summaries(
         self,
@@ -157,39 +102,7 @@ class PubMedClient:
 
         ids_str = ",".join(pmids)
         params = self._build_summary_params(ids_str)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, ESUMMARY_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
-
-        await self._rate_limiter.acquire()
-        client = await self._get_client()
-        response = await retry_request(
-            client,
-            "GET",
-            ESUMMARY_ENDPOINT,
-            params=params,
-            source_name=Source.PUBMED,
-        )
-
-        data = self._parse_response(response)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.PUBMED, ESUMMARY_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.PUBMED)
-
-        return data
-
-    async def close(self) -> None:
-        """Fecha o client HTTP."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+        return await self._cached_get(ESUMMARY_ENDPOINT, params, use_cache=use_cache)
 
     def _build_params(
         self,
@@ -197,9 +110,9 @@ class PubMedClient:
         *,
         retmax: int | None = None,
         rettype: str | None = None,
-    ) -> dict[str, str | int | float | bool | None]:
+    ) -> ParamsType:
         """Monta parâmetros do ESearch."""
-        params: dict[str, str | int | float | bool | None] = {
+        params: ParamsType = {
             "db": DATABASE,
             "term": term,
             "retmode": "json",
@@ -209,35 +122,25 @@ class PubMedClient:
             params["retmax"] = retmax
         if rettype is not None:
             params["rettype"] = rettype
-        self._inject_auth(params)
+        inject_ncbi_auth(params)
         return params
 
     def _build_summary_params(
         self,
         ids: str,
-    ) -> dict[str, str | int | float | bool | None]:
+    ) -> ParamsType:
         """Monta parâmetros do ESummary."""
-        params: dict[str, str | int | float | bool | None] = {
+        params: ParamsType = {
             "db": DATABASE,
             "id": ids,
             "retmode": "json",
             "tool": TOOL_NAME,
         }
-        self._inject_auth(params)
+        inject_ncbi_auth(params)
         return params
 
-    @staticmethod
-    def _inject_auth(params: dict[str, str | int | float | bool | None]) -> None:
-        """Injeta credenciais NCBI nos parâmetros."""
-        cfg = get_config()
-        if cfg.ncbi_email:
-            params["email"] = cfg.ncbi_email
-        if cfg.ncbi_api_key:
-            params["api_key"] = cfg.ncbi_api_key
-
-    @staticmethod
-    def _parse_response(response: httpx.Response) -> dict[str, Any]:
-        """Parseia JSON response com tratamento de erro."""
+    def _parse_response(self, response: httpx.Response) -> dict[str, Any]:
+        """Parseia JSON response com tratamento de erro NCBI."""
         try:
             data: dict[str, Any] = response.json()
         except Exception as exc:

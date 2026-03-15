@@ -91,6 +91,9 @@ class TestOpenTargetsClient:
 
     async def test_query_with_cache(self, tmp_path: object) -> None:
         """Verifica que cache é consultado."""
+        from hypokrates.config import configure
+
+        configure(cache_enabled=True, cache_dir=tmp_path)
         mock_response = httpx.Response(
             200,
             json={"data": {"result": True}},
@@ -113,5 +116,6 @@ class TestOpenTargetsClient:
 
     async def test_parse_response_invalid_json(self) -> None:
         response = httpx.Response(200, content=b"not json", headers={"content-type": "text/plain"})
+        client = OpenTargetsClient()
         with pytest.raises(ParseError, match="Invalid JSON"):
-            OpenTargetsClient._parse_response(response)
+            client._parse_response(response)

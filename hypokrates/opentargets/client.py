@@ -6,26 +6,24 @@ import asyncio
 import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+import httpx
 
 from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
 from hypokrates.constants import HTTPSettings, Source
 from hypokrates.exceptions import NetworkError, ParseError, RateLimitError
-from hypokrates.http.rate_limiter import RateLimiter
-from hypokrates.http.settings import create_client
+from hypokrates.http.base_client import BaseClient, ParamsType
 
 from .constants import GRAPHQL_URL
-
-if TYPE_CHECKING:
-    import httpx
 
 logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
-class OpenTargetsClient:
+class OpenTargetsClient(BaseClient):
     """Client HTTP para a API GraphQL do OpenTargets.
 
     Usa POST com JSON body (não GET com params como os outros clients).
@@ -34,14 +32,11 @@ class OpenTargetsClient:
     """
 
     def __init__(self) -> None:
-        self._client: httpx.AsyncClient | None = None
-        rate = HTTPSettings.RATE_LIMITS.get(Source.OPENTARGETS, 30)
-        self._rate_limiter = RateLimiter.for_source(Source.OPENTARGETS, rate)
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = create_client()
-        return self._client
+        super().__init__(
+            source=Source.OPENTARGETS,
+            base_url="",
+            rate=HTTPSettings.RATE_LIMITS.get(Source.OPENTARGETS, 30),
+        )
 
     async def query(
         self,
@@ -91,13 +86,11 @@ class OpenTargetsClient:
         body: dict[str, Any],
     ) -> httpx.Response:
         """POST com retry e backoff para erros transientes."""
-        import httpx as httpx_mod
-
         retries = HTTPSettings.MAX_RETRIES
         for attempt in range(retries + 1):
             try:
                 response = await client.post(GRAPHQL_URL, json=body)
-            except (httpx_mod.TimeoutException, httpx_mod.ConnectError) as exc:
+            except (httpx.TimeoutException, httpx.ConnectError) as exc:
                 if attempt < retries:
                     wait = HTTPSettings.BACKOFF_BASE * (HTTPSettings.BACKOFF_FACTOR**attempt)
                     logger.warning(
@@ -148,24 +141,17 @@ class OpenTargetsClient:
 
         raise NetworkError(GRAPHQL_URL, "Retry exhausted for OpenTargets")
 
-    async def close(self) -> None:
-        """Fecha o client HTTP."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
-
     @staticmethod
     def _build_cache_params(
         query: str,
         variables: dict[str, str],
-    ) -> dict[str, str | int | float | bool | None]:
+    ) -> ParamsType:
         """Gera params para cache key baseado em query+variables."""
         payload = json.dumps({"q": query.strip(), "v": variables}, sort_keys=True)
         query_hash = hashlib.sha256(payload.encode()).hexdigest()[:16]
         return {"query_hash": query_hash}
 
-    @staticmethod
-    def _parse_response(response: httpx.Response) -> dict[str, Any]:
+    def _parse_response(self, response: httpx.Response) -> dict[str, Any]:
         """Parseia JSON response GraphQL."""
         try:
             raw: dict[str, Any] = response.json()

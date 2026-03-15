@@ -8,20 +8,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
 from hypokrates.constants import TRIALS_BASE_URL, HTTPSettings, Source
 from hypokrates.exceptions import NetworkError, ParseError, RateLimitError
-from hypokrates.http.rate_limiter import RateLimiter
+from hypokrates.http.base_client import BaseClient, ParamsType
 from hypokrates.http.retry import retry_request
-from hypokrates.http.settings import create_client
 
 from .constants import STUDIES_ENDPOINT
-
-if TYPE_CHECKING:
-    import httpx
 
 try:
     from curl_cffi.requests import AsyncSession as CffiSession
@@ -34,7 +30,7 @@ logger = logging.getLogger(__name__)
 _WARNED_NO_CURL_CFFI = False
 
 
-class TrialsClient:
+class TrialsClient(BaseClient):
     """Client HTTP para ClinicalTrials.gov v2 API.
 
     Gerencia rate limiting, retry, e cache transparente.
@@ -42,15 +38,12 @@ class TrialsClient:
     """
 
     def __init__(self) -> None:
-        self._client: httpx.AsyncClient | None = None
+        super().__init__(
+            source=Source.TRIALS,
+            base_url=TRIALS_BASE_URL,
+            rate=HTTPSettings.RATE_LIMITS.get(Source.TRIALS, 50),
+        )
         self._cffi_session: Any | None = None
-        rate = HTTPSettings.RATE_LIMITS.get(Source.TRIALS, 50)
-        self._rate_limiter = RateLimiter.for_source(Source.TRIALS, rate)
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = create_client(base_url=TRIALS_BASE_URL)
-        return self._client
 
     async def search(
         self,
@@ -71,7 +64,7 @@ class TrialsClient:
         Returns:
             JSON response de /studies.
         """
-        params: dict[str, str | int | float | bool | None] = {
+        params: ParamsType = {
             "query.intr": drug,
             "query.cond": event,
             "pageSize": page_size,
@@ -96,14 +89,15 @@ class TrialsClient:
 
         return data
 
-    async def _fetch(self, params: dict[str, str | int | float | bool | None]) -> dict[str, Any]:
+    async def _fetch(self, params: ParamsType) -> dict[str, Any]:
         """Executa o request HTTP, usando curl_cffi ou httpx."""
         if _HAS_CURL_CFFI:
             return await self._fetch_cffi(params)
         return await self._fetch_httpx(params)
 
     async def _fetch_cffi(
-        self, params: dict[str, str | int | float | bool | None]
+        self,
+        params: ParamsType,
     ) -> dict[str, Any]:
         """Fetch via curl_cffi com retry básico."""
         url = f"{TRIALS_BASE_URL}{STUDIES_ENDPOINT}"
@@ -173,7 +167,8 @@ class TrialsClient:
         raise NetworkError(url, msg)
 
     async def _fetch_httpx(
-        self, params: dict[str, str | int | float | bool | None]
+        self,
+        params: ParamsType,
     ) -> dict[str, Any]:
         """Fetch via httpx (fallback — pode falhar com 403 no Cloudflare)."""
         global _WARNED_NO_CURL_CFFI
@@ -195,22 +190,11 @@ class TrialsClient:
         return self._parse_response(response)
 
     async def close(self) -> None:
-        """Fecha o client HTTP."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+        """Fecha o client HTTP e a sessão curl_cffi."""
+        await super().close()
         if self._cffi_session is not None:
             await self._cffi_session.close()
             self._cffi_session = None
-
-    @staticmethod
-    def _parse_response(response: httpx.Response) -> dict[str, Any]:
-        """Parseia JSON response httpx com tratamento de erro."""
-        try:
-            data: dict[str, Any] = response.json()
-        except Exception as exc:
-            raise ParseError(Source.TRIALS, f"Invalid JSON: {exc}") from exc
-        return data
 
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:

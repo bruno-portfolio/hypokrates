@@ -7,12 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
-from hypokrates.constants import OPENFDA_BASE_URL, HTTPSettings, Source
+from hypokrates.constants import OPENFDA_BASE_URL, Source
 from hypokrates.exceptions import ParseError, SourceUnavailableError
 from hypokrates.faers.constants import DEFAULT_COUNT_LIMIT, DEFAULT_LIMIT, DRUG_EVENT_ENDPOINT
-from hypokrates.http.rate_limiter import RateLimiter
+from hypokrates.http.base_client import BaseClient, ParamsType
 from hypokrates.http.retry import retry_request
-from hypokrates.http.settings import create_client
 
 if TYPE_CHECKING:
     import httpx
@@ -20,25 +19,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FAERSClient:
+class FAERSClient(BaseClient):
     """Client HTTP para a API OpenFDA drug/event.
 
     Gerencia rate limiting, retry, e cache transparente.
     """
 
     def __init__(self) -> None:
-        self._client: httpx.AsyncClient | None = None
         cfg = get_config()
-
-        rate = HTTPSettings.RATE_LIMITS.get(Source.FAERS, 40)
-        if cfg.openfda_api_key:
-            rate = 240
-        self._rate_limiter = RateLimiter.for_source(Source.FAERS, rate)
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = create_client(base_url=OPENFDA_BASE_URL)
-        return self._client
+        rate = 240 if cfg.openfda_api_key else 40
+        super().__init__(
+            source=Source.FAERS,
+            base_url=OPENFDA_BASE_URL,
+            rate=rate,
+        )
 
     async def fetch(
         self,
@@ -60,45 +54,7 @@ class FAERSClient:
             JSON response completo do OpenFDA.
         """
         params = self._build_params(search, limit=limit, skip=skip)
-
-        # Cache lookup
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, DRUG_EVENT_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
-        # Rate limit + request
-        await self._rate_limiter.acquire()
-        client = await self._get_client()
-        response = await retry_request(
-            client,
-            "GET",
-            DRUG_EVENT_ENDPOINT,
-            params=params,
-            source_name=Source.FAERS,
-        )
-
-        try:
-            data: dict[str, Any] = response.json()
-        except Exception as exc:
-            raise ParseError(Source.FAERS, f"Invalid JSON: {exc}") from exc
-
-        if "error" in data:
-            error_msg = data["error"].get("message", "Unknown error")
-            if "No matches found" in str(error_msg):
-                data = {"meta": {"results": {"total": 0}}, "results": []}
-            else:
-                raise SourceUnavailableError(Source.FAERS, str(error_msg))
-
-        # Cache store
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, DRUG_EVENT_ENDPOINT, params)
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.FAERS)
-
-        return data
+        return await self._cached_get(DRUG_EVENT_ENDPOINT, params, use_cache=use_cache)
 
     async def fetch_count(
         self,
@@ -120,41 +76,12 @@ class FAERSClient:
             JSON response com campo 'results' contendo contagens.
         """
         params = self._build_params(search, limit=limit, count=count_field)
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/count", params)
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                return cached
-        await self._rate_limiter.acquire()
-        client = await self._get_client()
-        response = await retry_request(
-            client,
-            "GET",
+        return await self._cached_get(
             DRUG_EVENT_ENDPOINT,
-            params=params,
-            source_name=Source.FAERS,
+            params,
+            use_cache=use_cache,
+            cache_suffix="/count",
         )
-
-        try:
-            data: dict[str, Any] = response.json()
-        except Exception as exc:
-            raise ParseError(Source.FAERS, f"Invalid JSON: {exc}") from exc
-
-        if "error" in data:
-            error_msg = data["error"].get("message", "Unknown error")
-            if "No matches found" in str(error_msg):
-                data = {"results": []}
-            else:
-                raise SourceUnavailableError(Source.FAERS, str(error_msg))
-
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/count", params)
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.FAERS)
-
-        return data
 
     async def fetch_total(
         self,
@@ -178,8 +105,11 @@ class FAERSClient:
         """
         params = self._build_params(search, limit=1)
 
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
+        should_cache = use_cache and get_config().cache_enabled
+        ep = f"{DRUG_EVENT_ENDPOINT}/total"
+        key = cache_key(Source.FAERS, ep, params) if should_cache else ""
+
+        if should_cache:
             store = CacheStore.get_instance()
             cached = await store.aget(key)
             if cached is not None:
@@ -216,18 +146,27 @@ class FAERSClient:
             except (ValueError, TypeError):
                 total = 0
 
-        if use_cache and get_config().cache_enabled:
-            key = cache_key(Source.FAERS, f"{DRUG_EVENT_ENDPOINT}/total", params)
+        if should_cache:
             store = CacheStore.get_instance()
             await store.aset(key, {"total": total}, Source.FAERS)
 
         return total
 
-    async def close(self) -> None:
-        """Fecha o client HTTP."""
-        if self._client is not None:
-            await self._client.aclose()
-            self._client = None
+    def _parse_response(self, response: httpx.Response) -> dict[str, Any]:
+        """Parseia JSON response com tratamento de 'No matches found'."""
+        try:
+            data: dict[str, Any] = response.json()
+        except Exception as exc:
+            raise ParseError(Source.FAERS, f"Invalid JSON: {exc}") from exc
+
+        if "error" in data:
+            error_msg = data["error"].get("message", "Unknown error")
+            if "No matches found" in str(error_msg):
+                data = {"meta": {"results": {"total": 0}}, "results": []}
+            else:
+                raise SourceUnavailableError(Source.FAERS, str(error_msg))
+
+        return data
 
     def _build_params(
         self,
@@ -236,9 +175,9 @@ class FAERSClient:
         limit: int = DEFAULT_LIMIT,
         skip: int = 0,
         count: str | None = None,
-    ) -> dict[str, str | int | float | bool | None]:
+    ) -> ParamsType:
         """Monta parâmetros da request."""
-        params: dict[str, str | int | float | bool | None] = {
+        params: ParamsType = {
             "search": search,
             "limit": limit,
         }

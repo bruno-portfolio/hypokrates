@@ -21,7 +21,9 @@ class TestChEMBLClient:
             request=httpx.Request("GET", "https://example.com"),
         )
         client = ChEMBLClient()
-        with patch("hypokrates.chembl.client.retry_request", new_callable=AsyncMock) as mock_retry:
+        with patch(
+            "hypokrates.http.base_client.retry_request", new_callable=AsyncMock
+        ) as mock_retry:
             mock_retry.return_value = mock_response
             result = await client.get("/molecule/search.json", {"q": "propofol"}, use_cache=False)
 
@@ -35,8 +37,9 @@ class TestChEMBLClient:
             headers={"content-type": "text/plain"},
             request=httpx.Request("GET", "https://example.com"),
         )
+        client = ChEMBLClient()
         with pytest.raises(ParseError, match="Invalid JSON"):
-            ChEMBLClient._parse_response(response)
+            client._parse_response(response)
 
     async def test_close_idempotent(self) -> None:
         client = ChEMBLClient()
