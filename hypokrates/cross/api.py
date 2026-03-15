@@ -7,16 +7,28 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from hypokrates.cross.constants import DEFAULT_EMERGING_MAX, DEFAULT_NOVEL_MAX
+from hypokrates.cross.constants import (
+    COMPARE_RATIO_EQUAL_THRESHOLD,
+    DEFAULT_COMPARE_CONCURRENCY,
+    DEFAULT_COMPARE_TOP_N,
+    DEFAULT_EMERGING_MAX,
+    DEFAULT_NOVEL_MAX,
+)
 
 if TYPE_CHECKING:
     from hypokrates.chembl.models import ChEMBLMechanism
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.opentargets.models import OTDrugSafety
-from hypokrates.cross.models import HypothesisClassification, HypothesisResult
+from hypokrates.cross.models import (
+    CompareResult,
+    CompareSignalItem,
+    HypothesisClassification,
+    HypothesisResult,
+)
 from hypokrates.evidence.builder import build_evidence
 from hypokrates.evidence.models import Limitation
+from hypokrates.faers import api as faers_api
 from hypokrates.models import MetaInfo
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.stats import api as stats_api
@@ -319,3 +331,133 @@ def _format_trials_detail(trials_result: object) -> str:
     total = getattr(trials_result, "total_count", 0)
     active = getattr(trials_result, "active_count", 0)
     return f"{total} trials found, {active} active"
+
+
+async def compare_signals(
+    drug: str,
+    control: str,
+    events: list[str] | None = None,
+    *,
+    top_n: int = DEFAULT_COMPARE_TOP_N,
+    suspect_only: bool = False,
+    use_cache: bool = True,
+) -> CompareResult:
+    """Compara sinais de desproporcionalidade entre duas drogas.
+
+    Para cada evento, roda signal() em ambas as drogas e calcula o ratio
+    de PRR. Útil para separar sinal genuíno de confounding por indicação
+    (ex: isotretinoin vs doxycycline na mesma população de acne).
+
+    Args:
+        drug: Nome da droga primária.
+        control: Nome da droga controle (mesma classe/indicação).
+        events: Lista de eventos para comparar. Se None, auto-detecta top N do drug.
+        top_n: Número de top eventos a comparar quando auto-detectando.
+        suspect_only: Se True, conta apenas reports onde a droga é suspect.
+        use_cache: Se deve usar cache.
+
+    Returns:
+        CompareResult com items ordenados por ratio descendente.
+    """
+    # 1. Auto-detectar eventos se não fornecidos
+    if events is None:
+        faers_result = await faers_api.top_events(
+            drug, suspect_only=suspect_only, limit=top_n, use_cache=use_cache
+        )
+        events = [ev.term for ev in faers_result.events]
+
+    if not events:
+        return CompareResult(
+            drug=drug,
+            control=control,
+            total_events=0,
+            meta=MetaInfo(
+                source="hypokrates/compare",
+                query={"drug": drug, "control": control},
+                total_results=0,
+                retrieved_at=datetime.now(UTC),
+            ),
+        )
+
+    # 2. Rodar signal() em paralelo para ambas as drogas
+    semaphore = asyncio.Semaphore(DEFAULT_COMPARE_CONCURRENCY)
+
+    async def _compare_one(
+        event_term: str,
+    ) -> CompareSignalItem | None:
+        async with semaphore:
+            try:
+                drug_sig, ctrl_sig = await asyncio.gather(
+                    stats_api.signal(
+                        drug,
+                        event_term,
+                        suspect_only=suspect_only,
+                        use_cache=use_cache,
+                    ),
+                    stats_api.signal(
+                        control,
+                        event_term,
+                        suspect_only=suspect_only,
+                        use_cache=use_cache,
+                    ),
+                )
+            except Exception:
+                logger.warning("Compare %s vs %s: %s FAILED", drug, control, event_term)
+                return None
+
+            d_prr = drug_sig.prr.value
+            c_prr = ctrl_sig.prr.value
+
+            if c_prr > 0:
+                ratio = d_prr / c_prr
+            elif d_prr > 0:
+                ratio = float("inf")
+            else:
+                ratio = 0.0
+
+            if ratio == float("inf") or ratio > 1.0 + COMPARE_RATIO_EQUAL_THRESHOLD:
+                stronger = "drug"
+            elif ratio < 1.0 - COMPARE_RATIO_EQUAL_THRESHOLD:
+                stronger = "control"
+            else:
+                stronger = "equal"
+
+            return CompareSignalItem(
+                event=event_term,
+                drug_prr=round(d_prr, 2),
+                control_prr=round(c_prr, 2),
+                drug_detected=drug_sig.signal_detected,
+                control_detected=ctrl_sig.signal_detected,
+                ratio=round(ratio, 2) if ratio != float("inf") else ratio,
+                stronger=stronger,
+            )
+
+    tasks = [_compare_one(ev) for ev in events]
+    results = await asyncio.gather(*tasks)
+
+    # 3. Processar resultados
+    items: list[CompareSignalItem] = [r for r in results if r is not None]
+    items.sort(key=lambda x: x.ratio if x.ratio != float("inf") else 1e9, reverse=True)
+
+    drug_unique = sum(1 for it in items if it.drug_detected and not it.control_detected)
+    control_unique = sum(1 for it in items if it.control_detected and not it.drug_detected)
+    both = sum(1 for it in items if it.drug_detected and it.control_detected)
+
+    return CompareResult(
+        drug=drug,
+        control=control,
+        items=items,
+        drug_unique_signals=drug_unique,
+        control_unique_signals=control_unique,
+        both_detected=both,
+        total_events=len(items),
+        meta=MetaInfo(
+            source="hypokrates/compare",
+            query={"drug": drug, "control": control, "events_count": len(items)},
+            total_results=len(items),
+            retrieved_at=datetime.now(UTC),
+            disclaimer="Intra-class comparison of FAERS disproportionality. "
+            "PRR ratio > 1 means drug has stronger signal than control. "
+            "Does not imply causation — confounding by indication may persist.",
+        ),
+    )

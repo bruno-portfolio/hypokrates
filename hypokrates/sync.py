@@ -82,6 +82,7 @@ class _SyncCross:
     """Wrapper síncrono para hypokrates.cross."""
 
     hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
+    compare_signals = staticmethod(_make_sync(cross_api.compare_signals))
 
 
 class _SyncScan:

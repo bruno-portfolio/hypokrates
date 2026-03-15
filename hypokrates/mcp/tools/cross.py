@@ -84,3 +84,66 @@ def register(mcp: FastMCP) -> None:
             ]
         )
         return "\n".join(lines)
+
+    @mcp.tool()
+    async def compare_signals(
+        drug: str,
+        control: str,
+        events: str = "",
+        top_n: int = 10,
+        suspect_only: bool = False,
+    ) -> str:
+        """Compare disproportionality signals between two drugs (intra-class).
+
+        Useful for separating genuine signal from confounding by indication
+        (e.g., isotretinoin vs doxycycline in the same acne population).
+
+        Args:
+            drug: Primary drug name (e.g., "isotretinoin").
+            control: Control drug from same class (e.g., "doxycycline").
+            events: Comma-separated event names. If empty, auto-detects top events.
+            top_n: Number of top events when auto-detecting.
+            suspect_only: Only count reports where drug is suspect.
+        """
+        event_list: list[str] | None = None
+        if events.strip():
+            event_list = [e.strip() for e in events.split(",")]
+
+        result = await cross_api.compare_signals(
+            drug,
+            control,
+            events=event_list,
+            top_n=top_n,
+            suspect_only=suspect_only,
+        )
+
+        lines = [
+            f"# Compare: {drug.upper()} vs {control.upper()}",
+            f"**Events compared:** {result.total_events}",
+            f"**Drug-only signals:** {result.drug_unique_signals}",
+            f"**Control-only signals:** {result.control_unique_signals}",
+            f"**Both detected:** {result.both_detected}",
+            "",
+        ]
+
+        if result.items:
+            lines.append("| Event | Drug PRR | Control PRR | Ratio | Stronger |")
+            lines.append("|-------|----------|-------------|-------|----------|")
+            for item in result.items:
+                ratio_str = f"{item.ratio:.1f}x" if item.ratio != float("inf") else "inf"
+                lines.append(
+                    f"| {item.event} | {item.drug_prr:.2f} | "
+                    f"{item.control_prr:.2f} | {ratio_str} | "
+                    f"{item.stronger} |"
+                )
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** PRR ratio > 1 means drug has stronger signal than control. "
+                "Does not imply causation.",
+            ]
+        )
+
+        return "\n".join(lines)

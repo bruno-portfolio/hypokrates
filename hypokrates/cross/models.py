@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from hypokrates.evidence.models import EvidenceBlock  # noqa: TC001 — Pydantic needs at runtime
+from hypokrates.models import MetaInfo  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.pubmed.models import PubMedArticle  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.stats.models import SignalResult  # noqa: TC001 — Pydantic needs at runtime
 
@@ -40,3 +41,30 @@ class HypothesisResult(BaseModel):
     interactions: list[str] = Field(default_factory=list)
     enzymes: list[str] = Field(default_factory=list)
     ot_llr: float | None = None
+
+
+class CompareSignalItem(BaseModel):
+    """Comparação de um evento entre duas drogas."""
+
+    event: str
+    drug_prr: float
+    control_prr: float
+    drug_detected: bool
+    control_detected: bool
+    ratio: float = Field(
+        description="drug_prr / control_prr. inf se control=0 e drug>0.",
+    )
+    stronger: str = Field(description="'drug', 'control', ou 'equal'")
+
+
+class CompareResult(BaseModel):
+    """Resultado da comparação de sinais entre duas drogas."""
+
+    drug: str
+    control: str
+    items: list[CompareSignalItem] = Field(default_factory=list)
+    drug_unique_signals: int = 0
+    control_unique_signals: int = 0
+    both_detected: int = 0
+    total_events: int = 0
+    meta: MetaInfo

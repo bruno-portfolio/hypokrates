@@ -18,6 +18,7 @@ _TOOLS = [
     {"name": "count_papers", "module": "pubmed", "description": "Count PubMed papers"},
     {"name": "search_papers", "module": "pubmed", "description": "Search PubMed papers"},
     {"name": "hypothesis", "module": "cross", "description": "Cross-reference hypothesis"},
+    {"name": "compare_signals", "module": "cross", "description": "Compare two drugs"},
     {"name": "scan_drug", "module": "scan", "description": "Scan drug adverse events"},
     {"name": "normalize_drug", "module": "vocab", "description": "Normalize drug name via RxNorm"},
     {"name": "map_to_mesh", "module": "vocab", "description": "Map term to MeSH heading"},
