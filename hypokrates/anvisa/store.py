@@ -187,8 +187,9 @@ class AnvisaStore:
                     name_rows.append([sub_norm, registro, "substancia"])
 
         if med_rows:
+            placeholders = ", ".join(["?"] * 11)
             self._conn.executemany(
-                "INSERT INTO anvisa_medicamentos VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"INSERT OR REPLACE INTO anvisa_medicamentos VALUES ({placeholders})",
                 med_rows,
             )
         if name_rows:
