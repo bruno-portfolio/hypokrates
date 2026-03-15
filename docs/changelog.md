@@ -31,6 +31,18 @@ All notable changes to this project will be documented in this file.
 - **OPERATIONAL_MEDDRA_TERMS**: +4 generic terms (GENERAL PHYSICAL HEALTH DETERIORATION, PAIN, FALL, MALAISE)
 - **New dependency**: `rapidfuzz>=3.6,<4`
 
+#### Bug Fixes (11 bugs from MCP dogfooding session)
+
+- **MedDRA expansion OpenFDA (CRITICAL)**: `_build_reaction_query()` and `_build_event_search()` used `+` (AND) instead of space (OR). All 38 MedDRA groups returned 0 via API path.
+- **MedDRA expansion FAERS Bulk (CRITICAL)**: `bulk_signal()` and `bulk_signal_timeline()` didn't expand MedDRA. SQL `= $event` → `= ANY($events)`. `four_counts()` accepts `str | list[str]`.
+- **Direction analysis (PS-PRR)**: Broken for MedDRA groups — PS-PRR=0 for canonical terms. Auto-fixed by bulk expansion.
+- **DrugBank graceful degradation**: `hypothesis(check_drugbank=True)` crashed without DrugBank XML. Now catches and continues.
+- **OpenTargets MedDRA**: `drug_safety_score()` matched literally — "anaphylaxis" → None. Now expands via MedDRA.
+- **INDICATION_TERMS**: Removed ANAPHYLAXIS, URTICARIA (AEs). Added ATRIAL FIBRILLATION, HEART FAILURE, VENTRICULAR TACHYCARDIA.
+- **OPERATIONAL_MEDDRA_TERMS**: +PRODUCT PACKAGING CONFUSION.
+- **compare_signals**: Auto-detected events now deduplicated by MedDRA canonical and filtered for operational terms.
+- **Co-admin warning**: MCP no longer shows "confounding likely" when verdict is "specific".
+
 ### Sprint 7 — Suspect-Only, Operational Filter, Over-Fetch, Co-Admin, ANVISA
 
 ### Changed

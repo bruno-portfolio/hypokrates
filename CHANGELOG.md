@@ -52,6 +52,16 @@
 - **Trials total_count**: `parse_studies()` now falls back to `len(studies)` when API returns `totalCount=0` with studies present.
 - **MedDRA `expand_event_terms()`**: Aliases now expand to full group (canonical + all aliases), not just the alias itself. Affects label matching and FAERS API reaction queries.
 - **OPERATIONAL_MEDDRA_TERMS**: Added 4 missing generic terms: `GENERAL PHYSICAL HEALTH DETERIORATION`, `PAIN`, `FALL`, `MALAISE`.
+- **MedDRA expansion OpenFDA (CRITICAL)**: `_build_reaction_query()` and `_build_event_search()` used `+` (AND in OpenFDA/Lucene) instead of space (OR). All 38 MedDRA groups returned 0 results in API path — `signal()`, `drugs_by_event()`, and `scan_drug(use_bulk=false)` missed cardiac arrest, anaphylaxis, bradycardia, etc.
+- **MedDRA expansion FAERS Bulk (CRITICAL)**: `bulk_signal()` and `bulk_signal_timeline()` passed event term literally without MedDRA expansion. SQL `WHERE pt_upper = $event` → `WHERE pt_upper = ANY($events)`. `four_counts()` now accepts `str | list[str]`.
+- **Direction analysis (PS-PRR)**: Was broken for MedDRA-grouped events because `bulk_signal()` didn't expand synonyms — PS-PRR=0 for canonical terms like "ANAPHYLAXIS". Auto-fixed by bulk MedDRA expansion.
+- **DrugBank graceful degradation**: `hypothesis(check_drugbank=True)` crashed with `ConfigurationError` when DrugBank XML not configured. Now catches exception and continues without DrugBank data.
+- **OpenTargets MedDRA expansion**: `drug_safety_score()` matched event literally — "anaphylaxis" returned None while "anaphylactic shock" returned 2375. Now expands via `expand_event_terms()` and picks highest LRT.
+- **INDICATION_TERMS cleanup**: Removed `ANAPHYLAXIS` and `URTICARIA` (adverse events, not indications). Added `ATRIAL FIBRILLATION`, `HEART FAILURE`, `VENTRICULAR TACHYCARDIA` (common cardiac indications that inflate PRR via confounding).
+- **OPERATIONAL_MEDDRA_TERMS**: Added `PRODUCT PACKAGING CONFUSION` (was appearing as novel_hypothesis in scans).
+- **compare_signals MedDRA grouping**: Auto-detected events now deduplicated by `canonical_term()` — "ANAPHYLACTIC SHOCK" and "ANAPHYLACTIC REACTION" merge into "ANAPHYLAXIS".
+- **compare_signals operational filtering**: Auto-detected events now filtered via `OPERATIONAL_MEDDRA_TERMS` — removes "DRUG INEFFECTIVE", "DEATH", etc.
+- **Co-admin verdict/warning mismatch**: MCP output showed "⚠ Co-admin confounding likely" even when verdict was "specific". Now conditionally shows appropriate message.
 
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability
