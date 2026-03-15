@@ -50,6 +50,7 @@ async def hypothesis(
     check_drugbank: bool = False,
     check_opentargets: bool = False,
     check_chembl: bool = False,
+    suspect_only: bool = False,
     _label_cache: LabelEventsResult | None = None,
     _drugbank_cache: DrugBankInfo | None = None,
     _ot_safety_cache: OTDrugSafety | None = None,
@@ -70,6 +71,7 @@ async def hypothesis(
         check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
         check_opentargets: Se deve buscar LRT score no OpenTargets.
         check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
+        suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
 
     Thresholds são heurísticas — ajuste pro domínio clínico.
 
@@ -78,7 +80,7 @@ async def hypothesis(
     """
     # 1+2. FAERS e PubMed são independentes — rodar em paralelo
     signal_result, pubmed_result = await asyncio.gather(
-        stats_api.signal(drug, event, use_cache=use_cache),
+        stats_api.signal(drug, event, suspect_only=suspect_only, use_cache=use_cache),
         pubmed_api.search_papers(
             drug,
             event,

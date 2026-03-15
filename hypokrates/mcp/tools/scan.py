@@ -27,11 +27,17 @@ def register(mcp: FastMCP) -> None:
         check_opentargets: bool = False,
         check_chembl: bool = False,
         group_events: bool = True,
+        filter_operational: bool = True,
+        suspect_only: bool = False,
     ) -> str:
         """Scan a drug's adverse events and classify each as novel/emerging/known signal.
 
         Runs hypothesis analysis for each of the top N adverse events reported in FAERS.
         This involves ~5 HTTP requests per event (4 FAERS + 1 PubMed).
+
+        Operational/regulatory MedDRA terms (e.g., OFF LABEL USE, MEDICATION ERROR,
+        DRUG INEFFECTIVE) are filtered by default to focus on biological signals.
+        Items with >2000 FAERS reports are flagged as potential reporting artifacts.
 
         NOTE: This operation takes 1-3 minutes depending on top_n and API key availability.
         With API key: ~30-60s. Without: ~2-3 minutes.
@@ -45,6 +51,8 @@ def register(mcp: FastMCP) -> None:
             check_opentargets: Check OpenTargets for LRT scores (opt-in).
             check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
             group_events: Group synonymous MedDRA terms (default True).
+            filter_operational: Filter operational/regulatory MedDRA terms (default True).
+            suspect_only: Only count reports where drug is suspect (not concomitant).
         """
         clamped_top_n = min(top_n, 20)
         start = time.monotonic()
@@ -61,6 +69,8 @@ def register(mcp: FastMCP) -> None:
             check_opentargets=check_opentargets,
             check_chembl=check_chembl,
             group_events=group_events,
+            filter_operational=filter_operational,
+            suspect_only=suspect_only,
             on_progress=_on_progress,
         )
 
@@ -89,12 +99,16 @@ def register(mcp: FastMCP) -> None:
                 grouped_info = ""
                 if item.grouped_terms and len(item.grouped_terms) > 1:
                     grouped_info = f" (grouped: {', '.join(item.grouped_terms)})"
+                vol_info = ""
+                if item.volume_flag:
+                    vol_info = " | ⚠ VOLUME"
                 lines.append(
                     f"{item.rank}. **{item.event}** — "
                     f"{item.classification.value} | "
                     f"PRR={prr_val} | "
                     f"lit={item.literature_count}"
                     f"{label_info}{trials_info}{ot_info}"
+                    f"{vol_info}"
                     f"{grouped_info}"
                 )
             lines.append("")
@@ -115,6 +129,8 @@ def register(mcp: FastMCP) -> None:
         ]
         if result.labeled_count > 0:
             summary_parts.append(f"{result.labeled_count} in label")
+        if result.filtered_operational_count > 0:
+            summary_parts.append(f"{result.filtered_operational_count} operational filtered")
         if result.groups_applied:
             summary_parts.append("MedDRA grouped")
         if result.interactions_count is not None:
@@ -122,5 +138,14 @@ def register(mcp: FastMCP) -> None:
         lines.append(", ".join(summary_parts))
         if result.failed_count > 0:
             lines.append(f"{result.failed_count} failed: {', '.join(result.skipped_events)}")
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "Clinical significance requires validation with meta-analyses and guidelines.",
+            ]
+        )
 
         return "\n".join(lines)

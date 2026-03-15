@@ -22,6 +22,7 @@ def register(mcp: FastMCP) -> None:
         check_drugbank: bool = False,
         check_opentargets: bool = False,
         check_chembl: bool = False,
+        suspect_only: bool = False,
     ) -> str:
         """Cross-reference FAERS signal with PubMed literature for a drug-event pair.
 
@@ -36,6 +37,7 @@ def register(mcp: FastMCP) -> None:
             check_drugbank: Check DrugBank for mechanism/interactions (opt-in).
             check_opentargets: Check OpenTargets for LRT score (opt-in).
             check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
+            suspect_only: Only count reports where drug is suspect (not concomitant).
         """
         result = await cross_api.hypothesis(
             drug,
@@ -45,6 +47,7 @@ def register(mcp: FastMCP) -> None:
             check_drugbank=check_drugbank,
             check_opentargets=check_opentargets,
             check_chembl=check_chembl,
+            suspect_only=suspect_only,
         )
         lines = [
             f"# Hypothesis: {drug.upper()} + {event.upper()}",
@@ -72,4 +75,12 @@ def register(mcp: FastMCP) -> None:
             lines.append("## Articles")
             for art in result.articles:
                 lines.append(f"- [{art.pmid}] {art.title}")
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "Clinical significance requires validation with meta-analyses and guidelines.",
+            ]
+        )
         return "\n".join(lines)

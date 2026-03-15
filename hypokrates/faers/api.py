@@ -7,7 +7,14 @@ from datetime import UTC, datetime
 from typing import Any
 
 from hypokrates.faers.client import FAERSClient
-from hypokrates.faers.constants import COUNT_FIELDS, DRUG_FIELD_FALLBACK, SEARCH_FIELDS, SEX_MAP
+from hypokrates.faers.constants import (
+    COUNT_FIELDS,
+    DRUG_CHARACTERIZATION_FIELD,
+    DRUG_CHARACTERIZATION_SUSPECT,
+    DRUG_FIELD_FALLBACK,
+    SEARCH_FIELDS,
+    SEX_MAP,
+)
 from hypokrates.faers.models import FAERSResult
 from hypokrates.faers.parser import parse_count_results, parse_reports
 from hypokrates.models import MetaInfo
@@ -25,6 +32,7 @@ async def adverse_events(
     age_max: int | None = None,
     sex: str | None = None,
     serious: bool | None = None,
+    suspect_only: bool = False,
     limit: int = 100,
     use_cache: bool = True,
 ) -> FAERSResult:
@@ -36,6 +44,7 @@ async def adverse_events(
         age_max: Idade máxima do paciente.
         sex: Sexo ("M", "F").
         serious: Se True, apenas reports sérios.
+        suspect_only: Se True, apenas reports onde a droga é suspect (não concomitante).
         limit: Máximo de reports retornados.
         use_cache: Se deve usar cache.
 
@@ -52,6 +61,7 @@ async def adverse_events(
             age_max=age_max,
             sex=sex,
             serious=serious,
+            suspect_only=suspect_only,
         )
         data = await client.fetch(search, limit=limit, use_cache=use_cache)
     finally:
@@ -87,6 +97,7 @@ async def adverse_events(
 async def top_events(
     drug: str,
     *,
+    suspect_only: bool = False,
     limit: int = 10,
     use_cache: bool = True,
 ) -> FAERSResult:
@@ -94,6 +105,7 @@ async def top_events(
 
     Args:
         drug: Nome genérico do medicamento.
+        suspect_only: Se True, apenas reports onde a droga é suspect.
         limit: Número de eventos retornados (top N).
         use_cache: Se deve usar cache.
 
@@ -103,7 +115,7 @@ async def top_events(
     client = FAERSClient()
     try:
         drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
-        search = _build_search(drug, drug_search=drug_search)
+        search = _build_search(drug, drug_search=drug_search, suspect_only=suspect_only)
         count_field = COUNT_FIELDS["reaction"]
         data = await client.fetch_count(search, count_field, limit=limit, use_cache=use_cache)
     finally:
@@ -225,9 +237,13 @@ def _build_search(
     age_max: int | None = None,
     sex: str | None = None,
     serious: bool | None = None,
+    suspect_only: bool = False,
 ) -> str:
     """Constrói query string para OpenFDA search."""
     parts: list[str] = [drug_search or f'{SEARCH_FIELDS["drug"]}:"{drug.upper()}"']
+
+    if suspect_only:
+        parts.append(f"{DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}")
 
     if age_min is not None and age_max is not None:
         parts.append(f"patient.patientonsetage:[{age_min} TO {age_max}]")

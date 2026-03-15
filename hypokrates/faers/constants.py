@@ -32,6 +32,7 @@ COUNT_FIELDS = {
     "sex": "patient.patientsex",
     "route": "patient.drug.drugadministrationroute",
     "indication": "patient.drug.drugindication.exact",
+    "receivedate": "receivedate",
 }
 
 # Outcome codes
@@ -50,6 +51,12 @@ DRUG_FIELD_FALLBACK: list[str] = [
     "patient.drug.openfda.brand_name.exact",
     "patient.drug.medicinalproduct",
 ]
+
+# Drug characterization codes (ROLE_COD)
+DRUG_CHARACTERIZATION_SUSPECT = "1"  # Primary + Secondary suspect
+DRUG_CHARACTERIZATION_CONCOMITANT = "2"
+DRUG_CHARACTERIZATION_INTERACTING = "3"
+DRUG_CHARACTERIZATION_FIELD = "patient.drug.drugcharacterization"
 
 # Limites da API
 MAX_SKIP = 25_000  # OpenFDA max skip value

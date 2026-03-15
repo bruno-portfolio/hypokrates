@@ -551,7 +551,7 @@ class TestMetaTools:
 
         result = await capture.tools["list_tools"]()
 
-        assert "21 tools" in result
+        assert "22 tools" in result
         assert "adverse_events" in result
         assert "scan_drug" in result
         assert "normalize_drug" in result
@@ -572,4 +572,4 @@ class TestMetaTools:
 
         assert __version__ in result
         assert "Sprint" in result
-        assert "21" in result
+        assert str(len(meta._TOOLS)) in result

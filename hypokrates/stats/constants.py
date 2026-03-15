@@ -8,6 +8,8 @@ SIGNIFICANCE_THRESHOLD_IC: float = 0.0  # IC025 > 0
 MIN_REPORT_COUNT: int = 3  # Mínimo de reports para calcular
 MIN_MEASURES_FOR_SIGNAL: int = 2  # >= 2 significantes = sinal (heurística)
 
+SPIKE_THRESHOLD_SIGMA: float = 2.0  # quarters > mean + N*std flagged as spikes
+
 SIGNAL_DISCLAIMER = (
     "signal_detected is a screening heuristic (>=2/3 measures significant), "
     "not a clinical determination. Each agency uses different criteria "

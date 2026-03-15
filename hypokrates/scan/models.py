@@ -31,6 +31,12 @@ class ScanItem(BaseModel):
     grouped_terms: list[str] = Field(default_factory=list)
     mechanism: str | None = None
     ot_llr: float | None = None
+    volume_flag: bool = Field(
+        default=False,
+        description="True se a célula a da tabela de contingência excede o limiar. "
+        "Não invalida o sinal, mas marca pares cuja interpretação exige auditoria "
+        "adicional por risco de stimulated reporting, duplicação, litigation ou notoriedade.",
+    )
 
 
 class ScanResult(BaseModel):
@@ -46,6 +52,10 @@ class ScanResult(BaseModel):
     labeled_count: int = 0
     failed_count: int = 0
     groups_applied: bool = False
+    filtered_operational_count: int = Field(
+        default=0,
+        description="Nº de eventos filtrados por serem termos MedDRA operacionais/regulatórios.",
+    )
     skipped_events: list[str] = Field(default_factory=list)
     mechanism: str | None = None
     interactions_count: int | None = None

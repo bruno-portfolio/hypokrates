@@ -14,6 +14,7 @@ _TOOLS = [
     {"name": "top_events", "module": "faers", "description": "Get top adverse events"},
     {"name": "compare_drugs", "module": "faers", "description": "Compare drugs"},
     {"name": "signal", "module": "stats", "description": "Disproportionality signal detection"},
+    {"name": "signal_timeline", "module": "stats", "description": "Temporal analysis"},
     {"name": "count_papers", "module": "pubmed", "description": "Count PubMed papers"},
     {"name": "search_papers", "module": "pubmed", "description": "Search PubMed papers"},
     {"name": "hypothesis", "module": "cross", "description": "Cross-reference hypothesis"},
@@ -40,7 +41,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_tools() -> str:
         """List all available hypokrates MCP tools."""
-        lines = [f"# hypokrates MCP Tools (Sprint 6 — {len(_TOOLS)} tools)", ""]
+        lines = [f"# hypokrates MCP Tools (Sprint 7 — {len(_TOOLS)} tools)", ""]
         for tool in _TOOLS:
             lines.append(f"- **{tool['name']}** ({tool['module']}): {tool['description']}")
         return "\n".join(lines)
@@ -50,7 +51,7 @@ def register(mcp: FastMCP) -> None:
         """Show hypokrates version and sprint info."""
         return (
             f"# hypokrates {__version__}\n"
-            f"**Sprint:** 6 (meddra + drugbank + opentargets + chembl)\n"
+            f"**Sprint:** 7 (operational filter + suspect_only + timeline)\n"
             f"**Tools:** {len(_TOOLS)}\n"
             f"**Modules:** faers, stats, pubmed, cross, scan, vocab, "
             f"dailymed, trials, drugbank, opentargets, chembl, meta\n"

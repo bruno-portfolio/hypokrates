@@ -56,3 +56,31 @@ class SignalResult(BaseModel):
     ic: DisproportionalityResult = Field(description="IC simplified (não BCPNN completo)")
     signal_detected: bool = Field(description="Heurística: >= 2 medidas significantes")
     meta: MetaInfo
+
+
+class QuarterlyCount(BaseModel):
+    """Contagem de reports em um trimestre."""
+
+    year: int
+    quarter: int  # 1-4
+    count: int
+    label: str = ""
+
+
+class TimelineResult(BaseModel):
+    """Resultado de análise temporal para um par droga-evento."""
+
+    drug: str
+    event: str
+    quarters: list[QuarterlyCount] = Field(default_factory=list)
+    total_reports: int = 0
+    peak_quarter: QuarterlyCount | None = None
+    mean_quarterly: float = 0.0
+    std_quarterly: float = 0.0
+    spike_quarters: list[QuarterlyCount] = Field(
+        default_factory=list,
+        description="Quarters > mean + 2*std, compatíveis com stimulated reporting, "
+        "litigation ou submissão em lote por fabricante.",
+    )
+    suspect_only: bool = False
+    meta: MetaInfo

@@ -522,7 +522,7 @@ async def test_scan_group_events_merges_synonyms(
 ) -> None:
     """group_events=True consolida sinônimos MedDRA."""
     mock_top_events.return_value = _make_events(
-        ["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION", "DEATH"]
+        ["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION", "BRADYCARDIA"]
     )
 
     mock_hypothesis.side_effect = [
@@ -532,16 +532,18 @@ async def test_scan_group_events_merges_synonyms(
         _make_hypothesis_result(
             "ANAPHYLACTIC REACTION", HypothesisClassification.EMERGING_SIGNAL, lit_count=2
         ),
-        _make_hypothesis_result("DEATH", HypothesisClassification.KNOWN_ASSOCIATION, lit_count=10),
+        _make_hypothesis_result(
+            "BRADYCARDIA", HypothesisClassification.KNOWN_ASSOCIATION, lit_count=10
+        ),
     ]
 
     result = await scan_drug("propofol", top_n=3, group_events=True)
 
     assert result.groups_applied is True
-    assert len(result.items) == 2  # ANAPHYLAXIS (merged) + DEATH
+    assert len(result.items) == 2  # ANAPHYLAXIS (merged) + BRADYCARDIA
     events = [item.event for item in result.items]
     assert "ANAPHYLAXIS" in events
-    assert "DEATH" in events
+    assert "BRADYCARDIA" in events
 
 
 @patch("hypokrates.scan.api.cross_api.hypothesis")
@@ -628,3 +630,198 @@ async def test_scan_check_opentargets(
     assert call_kwargs["check_opentargets"] is True
     assert call_kwargs["_ot_safety_cache"] is not None
     assert result.total_scanned == 1
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7: filter_operational, volume_flag
+# ---------------------------------------------------------------------------
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_filter_operational_removes_blocklisted_terms(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """filter_operational=True remove termos operacionais antes de rodar hypothesis."""
+    mock_top_events.return_value = _make_events(
+        ["NAUSEA", "OFF LABEL USE", "DRUG INEFFECTIVE", "DEATH", "HEADACHE"]
+    )
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION),
+        _make_hypothesis_result("HEADACHE", HypothesisClassification.KNOWN_ASSOCIATION),
+    ]
+
+    result = await scan_drug("propofol", top_n=5, filter_operational=True)
+
+    # hypothesis() chamado apenas 2x (NAUSEA + HEADACHE), operacionais filtrados
+    assert mock_hypothesis.call_count == 2
+    assert result.filtered_operational_count == 3
+    assert result.total_scanned == 2
+    events = [item.event for item in result.items]
+    assert "OFF LABEL USE" not in events
+    assert "DRUG INEFFECTIVE" not in events
+    assert "DEATH" not in events
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_filter_operational_disabled(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """filter_operational=False mantém todos os termos."""
+    mock_top_events.return_value = _make_events(["NAUSEA", "OFF LABEL USE"])
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION),
+        _make_hypothesis_result("OFF LABEL USE", HypothesisClassification.KNOWN_ASSOCIATION),
+    ]
+
+    result = await scan_drug("propofol", top_n=2, filter_operational=False)
+
+    assert mock_hypothesis.call_count == 2
+    assert result.filtered_operational_count == 0
+    events = [item.event for item in result.items]
+    assert "OFF LABEL USE" in events
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_volume_flag_set_when_above_threshold(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """volume_flag=True quando cell a >= VOLUME_ANOMALY_THRESHOLD."""
+    mock_top_events.return_value = _make_events(["NAUSEA"])
+
+    # Criar hypothesis com signal que tem a=5000 (acima do limiar de 2000)
+    hyp = _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION)
+    hyp.signal = SignalResult(
+        drug="propofol",
+        event="NAUSEA",
+        table=ContingencyTable(a=5000, b=900, c=50, d=9000),
+        prr=DisproportionalityResult(
+            measure="PRR", value=2.0, ci_lower=1.5, ci_upper=3.0, significant=True
+        ),
+        ror=DisproportionalityResult(
+            measure="ROR", value=2.1, ci_lower=1.6, ci_upper=3.1, significant=True
+        ),
+        ic=DisproportionalityResult(
+            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
+        ),
+        signal_detected=True,
+        meta=_make_meta(),
+    )
+    mock_hypothesis.return_value = hyp
+
+    result = await scan_drug("propofol", top_n=1, group_events=False)
+
+    assert len(result.items) == 1
+    assert result.items[0].volume_flag is True
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_volume_flag_false_when_below_threshold(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """volume_flag=False quando cell a < VOLUME_ANOMALY_THRESHOLD."""
+    mock_top_events.return_value = _make_events(["NAUSEA"])
+
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
+    )
+
+    result = await scan_drug("propofol", top_n=1, group_events=False)
+
+    assert len(result.items) == 1
+    assert result.items[0].volume_flag is False
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_filter_operational_case_insensitive(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """Filtro operacional funciona independente de case."""
+    mock_top_events.return_value = _make_events(["off label use", "NAUSEA"])
+
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
+    )
+
+    result = await scan_drug("propofol", top_n=2, filter_operational=True)
+
+    assert mock_hypothesis.call_count == 1
+    assert result.filtered_operational_count == 1
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_suspect_only_propagated(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """suspect_only propaga para top_events e hypothesis."""
+    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
+    )
+
+    await scan_drug("propofol", top_n=1, suspect_only=True, group_events=False)
+
+    # top_events chamado com suspect_only=True
+    call_kwargs = mock_top_events.call_args.kwargs
+    assert call_kwargs["suspect_only"] is True
+
+    # hypothesis chamado com suspect_only=True
+    hyp_kwargs = mock_hypothesis.call_args.kwargs
+    assert hyp_kwargs["suspect_only"] is True
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_overfetch_fetches_more_than_top_n(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """Over-fetch busca top_n*3 eventos mas retorna top_n por score."""
+    # Simular 9 eventos retornados (top_n=3, fetch_limit=9)
+    mock_top_events.return_value = _make_events(["A", "B", "C", "D", "E", "F", "G", "H", "I"])
+
+    mock_hypothesis.side_effect = [
+        _make_hypothesis_result("A", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=1.0),
+        _make_hypothesis_result("B", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.5),
+        _make_hypothesis_result("C", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.3),
+        _make_hypothesis_result("D", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.2),
+        _make_hypothesis_result("E", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.1),
+        # F tem PRR alto — deve aparecer no top 3 apesar de volume baixo
+        _make_hypothesis_result("F", HypothesisClassification.NOVEL_HYPOTHESIS, prr_lci=20.0),
+        _make_hypothesis_result("G", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.1),
+        _make_hypothesis_result("H", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.1),
+        _make_hypothesis_result("I", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=0.1),
+    ]
+
+    result = await scan_drug("propofol", top_n=3, group_events=False)
+
+    # top_events chamado com limit=9 (3*3)
+    call_kwargs = mock_top_events.call_args.kwargs
+    assert call_kwargs["limit"] == 9
+
+    # hypothesis chamado 9x (todos os eventos)
+    assert mock_hypothesis.call_count == 9
+
+    # Resultado truncado para 3 items
+    assert len(result.items) == 3
+
+    # F (PRR alto, novel) deve estar no resultado apesar de ser #6 por volume
+    events = [item.event for item in result.items]
+    assert "F" in events
+
+    # Ranks corretos (1-3)
+    assert result.items[0].rank == 1
+    assert result.items[2].rank == 3

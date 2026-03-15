@@ -23,7 +23,7 @@ def register(mcp: FastMCP) -> None:
     """Registra tools de stats no MCP server."""
 
     @mcp.tool()
-    async def signal(drug: str, event: str) -> str:
+    async def signal(drug: str, event: str, suspect_only: bool = False) -> str:
         """Detect disproportionality signal for a drug-event pair in FAERS.
 
         Computes PRR, ROR, and IC (simplified) from the 2x2 contingency table.
@@ -31,8 +31,9 @@ def register(mcp: FastMCP) -> None:
         Args:
             drug: Generic drug name.
             event: Adverse event term.
+            suspect_only: Only count reports where drug is suspect (not concomitant).
         """
-        result = await stats_api.signal(drug, event)
+        result = await stats_api.signal(drug, event, suspect_only=suspect_only)
         detected = "YES" if result.signal_detected else "NO"
         lines = [
             f"# Signal Detection: {drug.upper()} + {event.upper()}",
@@ -49,4 +50,45 @@ def register(mcp: FastMCP) -> None:
             f"- !drug+event: {result.table.c}",
             f"- !drug+!event: {result.table.d}",
         ]
+        return "\n".join(lines)
+
+    @mcp.tool()
+    async def signal_timeline(
+        drug: str,
+        event: str,
+        suspect_only: bool = False,
+    ) -> str:
+        """Build quarterly time series of FAERS reports for a drug-event pair.
+
+        Detects stimulated reporting, litigation spikes, and temporal patterns.
+        Quarters with count > mean + 2*std are flagged as spikes.
+
+        Args:
+            drug: Generic drug name (e.g., "propofol").
+            event: Adverse event term (e.g., "anhedonia").
+            suspect_only: Only count reports where drug is suspect (not concomitant).
+        """
+        result = await stats_api.signal_timeline(drug, event, suspect_only=suspect_only)
+        lines = [
+            f"# Timeline: {drug.upper()} + {event.upper()}",
+            f"**Total reports:** {result.total_reports}",
+            f"**Quarters:** {len(result.quarters)}",
+            f"**Mean/quarter:** {result.mean_quarterly:.1f} (std: {result.std_quarterly:.1f})",
+        ]
+        if result.peak_quarter:
+            lines.append(
+                f"**Peak:** {result.peak_quarter.label} ({result.peak_quarter.count} reports)"
+            )
+        if result.spike_quarters:
+            spike_labels = [f"{s.label} ({s.count})" for s in result.spike_quarters]
+            lines.append(f"**Spikes detected:** {', '.join(spike_labels)}")
+        else:
+            lines.append("**Spikes detected:** none")
+
+        lines.extend(["", "## Quarterly Counts", ""])
+        spike_set = {(s.year, s.quarter) for s in result.spike_quarters}
+        for q in result.quarters:
+            spike_marker = " *** SPIKE" if (q.year, q.quarter) in spike_set else ""
+            lines.append(f"  {q.label}: {q.count:>6}{spike_marker}")
+
         return "\n".join(lines)

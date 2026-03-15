@@ -17,7 +17,11 @@ from hypokrates.scan.constants import (
     DEFAULT_TOP_N,
     LABEL_IN_MULTIPLIER,
     LABEL_NOT_IN_MULTIPLIER,
+    OPERATIONAL_MEDDRA_TERMS,
+    OVERFETCH_MULTIPLIER,
+    PRR_DISCLAIMER,
     SCAN_METHODOLOGY,
+    VOLUME_ANOMALY_THRESHOLD,
 )
 from hypokrates.scan.models import ScanItem, ScanResult
 
@@ -45,6 +49,8 @@ async def scan_drug(
     check_opentargets: bool = False,
     check_chembl: bool = False,
     group_events: bool = True,
+    filter_operational: bool = True,
+    suspect_only: bool = False,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
     """Escaneia os top eventos adversos de uma droga e gera hipóteses.
@@ -68,14 +74,32 @@ async def scan_drug(
         check_opentargets: Se deve buscar LRT score no OpenTargets.
         check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
         group_events: Se deve agrupar termos MedDRA sinônimos.
+        filter_operational: Se deve filtrar termos MedDRA operacionais/regulatórios.
+        suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
         on_progress: Callback opcional (completed, total, event_term).
 
     Returns:
         ScanResult com items ordenados por score descendente.
     """
-    # 1. Obter top eventos
-    faers_result = await faers_api.top_events(drug, limit=top_n, use_cache=use_cache)
+    # 1. Obter top eventos (over-fetch para capturar sinais de PRR alto com volume baixo)
+    fetch_limit = top_n * OVERFETCH_MULTIPLIER
+    faers_result = await faers_api.top_events(
+        drug, suspect_only=suspect_only, limit=fetch_limit, use_cache=use_cache
+    )
     events = faers_result.events
+
+    # 1b. Filtrar termos operacionais/regulatórios MedDRA
+    filtered_operational_count = 0
+    if filter_operational and events:
+        original_count = len(events)
+        events = [ev for ev in events if ev.term.upper().strip() not in OPERATIONAL_MEDDRA_TERMS]
+        filtered_operational_count = original_count - len(events)
+        if filtered_operational_count > 0:
+            logger.info(
+                "Scan %s: filtered %d operational MedDRA terms",
+                drug,
+                filtered_operational_count,
+            )
 
     if not events:
         return ScanResult(
@@ -129,6 +153,7 @@ async def scan_drug(
                     drug,
                     event_term,
                     use_cache=use_cache,
+                    suspect_only=suspect_only,
                     check_label=check_labels,
                     check_trials=check_trials,
                     check_drugbank=check_drugbank,
@@ -197,6 +222,7 @@ async def scan_drug(
             continue
 
         score = _score(hyp)
+        vol_flag = hyp.signal.table.a >= VOLUME_ANOMALY_THRESHOLD
         items.append(
             ScanItem(
                 drug=drug,
@@ -213,14 +239,14 @@ async def scan_drug(
                 active_trials=hyp.active_trials,
                 mechanism=hyp.mechanism,
                 ot_llr=hyp.ot_llr,
+                volume_flag=vol_flag,
             )
         )
 
     # 4. Ordenar por score e reconstruir com ranks corretos
     items.sort(key=lambda x: x.score, reverse=True)
-    items = [item.model_copy(update={"rank": idx + 1}) for idx, item in enumerate(items)]
 
-    # 5. MedDRA grouping
+    # 5. MedDRA grouping (antes do truncate para agrupar corretamente)
     groups_applied = False
     if group_events and items:
         from hypokrates.vocab.meddra import group_scan_items
@@ -229,6 +255,10 @@ async def scan_drug(
         if len(grouped) < len(items):
             items = grouped
             groups_applied = True
+
+    # 5b. Truncar para top_n e atribuir ranks
+    items = items[:top_n]
+    items = [item.model_copy(update={"rank": idx + 1}) for idx, item in enumerate(items)]
 
     # 6. Enriquecer ScanResult com dados drug-level (DrugBank ou ChEMBL)
     scan_mechanism: str | None = None
@@ -255,6 +285,7 @@ async def scan_drug(
         labeled_count=labeled_count,
         failed_count=failed_count,
         groups_applied=groups_applied,
+        filtered_operational_count=filtered_operational_count,
         skipped_events=skipped_events,
         mechanism=scan_mechanism,
         interactions_count=scan_interactions_count,
@@ -266,7 +297,9 @@ async def scan_drug(
             retrieved_at=datetime.now(UTC),
             disclaimer="Automated scan — clinical validation required. "
             "Scoring is a heuristic for prioritization, not clinical significance. "
-            + SCAN_METHODOLOGY,
+            + SCAN_METHODOLOGY
+            + " "
+            + PRR_DISCLAIMER,
         ),
     )
 

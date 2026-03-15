@@ -6,6 +6,7 @@ from hypokrates.cross.models import HypothesisClassification
 
 DEFAULT_TOP_N = 20
 DEFAULT_CONCURRENCY = 5
+OVERFETCH_MULTIPLIER: int = 3  # busca N*3 eventos por count, retorna top N por score
 
 CLASSIFICATION_WEIGHTS: dict[HypothesisClassification, float] = {
     HypothesisClassification.NOVEL_HYPOTHESIS: 10.0,
@@ -17,10 +18,78 @@ CLASSIFICATION_WEIGHTS: dict[HypothesisClassification, float] = {
 LABEL_NOT_IN_MULTIPLIER: float = 1.5
 LABEL_IN_MULTIPLIER: float = 0.5
 
+# ---------------------------------------------------------------------------
+# Termos MedDRA operacionais/regulatórios — NÃO representam toxicidade biológica.
+# Descrevem problemas de processo, uso ou reporting, não efeitos adversos reais.
+# Filtrados por padrão no scan para evitar poluição dos resultados.
+# ---------------------------------------------------------------------------
+OPERATIONAL_MEDDRA_TERMS: frozenset[str] = frozenset(
+    {
+        # Uso / indicação
+        "OFF LABEL USE",
+        "PRODUCT USE IN UNAPPROVED INDICATION",
+        "DRUG USE FOR UNKNOWN INDICATION",
+        "INTENTIONAL PRODUCT USE ISSUE",
+        "INTENTIONAL PRODUCT MISUSE",
+        "PRODUCT USE ISSUE",
+        "DRUG INEFFECTIVE",
+        "DRUG INEFFECTIVE FOR UNAPPROVED INDICATION",
+        "THERAPEUTIC RESPONSE UNEXPECTED",
+        "NO ADVERSE EVENT",
+        # Erros de medicação / dosagem
+        "INCORRECT DOSE ADMINISTERED",
+        "EXTRA DOSE ADMINISTERED",
+        "ACCIDENTAL UNDERDOSE",
+        "ACCIDENTAL OVERDOSE",
+        "WRONG DRUG ADMINISTERED",
+        "WRONG TECHNIQUE IN PRODUCT USAGE PROCESS",
+        "PRODUCT DOSE OMISSION ISSUE",
+        "LABELLED DRUG-DRUG INTERACTION MEDICATION ERROR",
+        "MEDICATION ERROR",
+        "CONTRAINDICATED PRODUCT ADMINISTERED",
+        "INAPPROPRIATE SCHEDULE OF PRODUCT ADMINISTRATION",
+        # Qualidade do produto
+        "PRODUCT QUALITY ISSUE",
+        "PRODUCT ADHESION ISSUE",
+        "PRODUCT PACKAGING ISSUE",
+        # Genéricos demais (sem valor farmacológico)
+        "DEATH",
+        "CONDITION AGGRAVATED",
+        "UNEVALUABLE EVENT",
+        "DRUG INTERACTION",
+        "TOXICITY TO VARIOUS AGENTS",
+        "ADVERSE DRUG REACTION",
+        "TREATMENT FAILURE",
+        "DRUG INTOLERANCE",
+        # Exposição (confounding / não é efeito adverso)
+        "EXPOSURE DURING PREGNANCY",
+        "MATERNAL EXPOSURE DURING PREGNANCY",
+        "MATERNAL EXPOSURE DURING DELIVERY",
+        "FOETAL EXPOSURE DURING PREGNANCY",
+        "ACCIDENTAL EXPOSURE TO PRODUCT",
+    }
+)
+
+# ---------------------------------------------------------------------------
+# Limiar de volume anômalo — acima desse nº de reports (cell 'a' na tabela
+# de contingência), o par droga-evento recebe flag de potencial artefato de
+# reporting (ex: submissão em lote, litigation-driven, confounding reverso).
+# ---------------------------------------------------------------------------
+VOLUME_ANOMALY_THRESHOLD: int = 2000
+
 SCAN_METHODOLOGY = (
     "Automated scan of top FAERS adverse events for a drug. "
-    "Each event is cross-referenced with PubMed literature via hypothesis(). "
+    "Fetches 3x more events than requested, runs hypothesis() on all, "
+    "then returns the top N ranked by score (not raw count). "
     "Scoring combines classification weight x signal strength "
     "(average of PRR and ROR lower CI bounds). "
-    "Results are ranked by score descending."
+    "Operational/regulatory MedDRA terms are filtered by default. "
+    "Items with >2000 FAERS reports are flagged as potential reporting artifacts."
+)
+
+PRR_DISCLAIMER = (
+    "PRR (Proportional Reporting Ratio) measures disproportionality of reporting, "
+    "NOT absolute risk. A PRR of 10 means 10x more reports than background, "
+    "but if the absolute risk is 0.001%, 10x = 0.01% — clinically insignificant. "
+    "Always consult meta-analyses and clinical guidelines for risk assessment."
 )

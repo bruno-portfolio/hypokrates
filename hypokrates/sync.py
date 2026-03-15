@@ -68,6 +68,7 @@ class _SyncStats:
     """Wrapper síncrono para hypokrates.stats."""
 
     signal = staticmethod(_make_sync(stats_api.signal))
+    signal_timeline = staticmethod(_make_sync(stats_api.signal_timeline))
 
 
 class _SyncPubMed:
