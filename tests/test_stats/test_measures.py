@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from hypokrates.stats.measures import build_table, compute_ic, compute_prr, compute_ror
+from hypokrates.stats.measures import (
+    _BCPNN_ALPHA,
+    build_table,
+    compute_ic,
+    compute_prr,
+    compute_ror,
+)
 from hypokrates.stats.models import ContingencyTable
 
 GOLDEN_DATA = Path(__file__).parents[1] / "golden_data" / "stats"
@@ -108,13 +114,19 @@ class TestComputeROR:
 
 
 class TestComputeIC:
-    """Testa IC simplified (NÃO BCPNN completo com priors)."""
+    """Testa IC BCPNN (Norén et al. 2006) com prior Jeffreys."""
 
     def test_known_values(self, golden_table: ContingencyTable) -> None:
-        """IC = log2(a*N / ((a+b)*(a+c)))."""
+        """BCPNN IC = log2((a+alpha)*n* / ((a+b+2*alpha)*(a+c+2*alpha)))."""
         result = compute_ic(golden_table)
         assert result.measure == "IC"
-        expected_ic = math.log2(100 * 10000 / (1000 * 300))
+        # Compute expected BCPNN IC inline
+        alpha = 0.5
+        n_star = 10000 + 4 * alpha
+        p11 = (100 + alpha) / n_star
+        p1_dot = (1000 + 2 * alpha) / n_star
+        p_dot1 = (300 + 2 * alpha) / n_star
+        expected_ic = math.log2(p11 / (p1_dot * p_dot1))
         assert math.isclose(result.value, expected_ic, rel_tol=1e-6)
 
     def test_ic025_positive_is_signal(self, golden_table: ContingencyTable) -> None:
@@ -134,10 +146,57 @@ class TestComputeIC:
         assert result.value == 0.0
         assert result.significant is False
 
-    def test_docstring_mentions_simplified(self) -> None:
-        """Verifica que a docstring documenta ser versão simplificada."""
+    def test_docstring_mentions_bcpnn(self) -> None:
+        """Verifica que a docstring documenta BCPNN."""
         doc = compute_ic.__doc__ or ""
-        assert "simplificad" in doc.lower() or "simplified" in doc.lower()
+        assert "BCPNN" in doc
+
+    def test_bcpnn_shrinkage_small_counts(self) -> None:
+        """a=3 → BCPNN IC mais conservador (CI mais largo) que simple."""
+        table = ContingencyTable(a=3, b=97, c=1, d=899)
+        result = compute_ic(table)
+        # Simple IC para comparação
+        n = table.n
+        ab = 3 + 97
+        ac = 3 + 1
+        simple_ic = math.log2(3 * n / (ab * ac))
+        simple_se = math.sqrt(1 / (3 * math.log(2) ** 2))
+        simple_ic025 = simple_ic - 1.96 * simple_se
+        # BCPNN IC025 deve ser menor (mais conservador) que simple IC025
+        assert result.ci_lower < simple_ic025
+        # BCPNN IC value deve ser menor que simple (shrinkage)
+        assert result.value < simple_ic
+
+    def test_bcpnn_convergence_large_counts(self) -> None:
+        """a=1000 → BCPNN ~= simple (prior é irrelevante em n grande)."""
+        table = ContingencyTable(a=1000, b=9000, c=2000, d=88000)
+        result = compute_ic(table)
+        n = table.n
+        simple_ic = math.log2(1000 * n / (10000 * 3000))
+        assert math.isclose(result.value, simple_ic, rel_tol=0.01)
+
+    def test_bcpnn_prior_effect(self) -> None:
+        """a=1 → CI significativamente mais largo que simple (prior domina)."""
+        table = ContingencyTable(a=1, b=99, c=2, d=898)
+        result = compute_ic(table)
+        simple_se = math.sqrt(1 / (1 * math.log(2) ** 2))
+        simple_ci_width = 2 * 1.96 * simple_se
+        bcpnn_ci_width = result.ci_upper - result.ci_lower
+        # BCPNN CI deve ser mais largo que simple com a=1
+        assert bcpnn_ci_width > simple_ci_width
+        # E não deve ser significante com apenas 1 report
+        assert result.significant is False
+
+    def test_bcpnn_balanced_not_significant(self) -> None:
+        """Tabela balanceada com a=10 → NOT significant."""
+        table = ContingencyTable(a=10, b=990, c=10, d=990)
+        result = compute_ic(table)
+        assert result.significant is False
+        assert result.ci_lower < 0
+
+    def test_bcpnn_alpha_constant(self) -> None:
+        """Verifica que _BCPNN_ALPHA é 0.5 (Jeffreys prior)."""
+        assert _BCPNN_ALPHA == 0.5
 
 
 class TestBuildTable:

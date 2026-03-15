@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **stats:** IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior — resolves small-numbers instability
+
 ### Fixes
 
 - **DailyMed:** Fixed HTTP 406 error when fetching SPL XML — removed invalid `Accept: application/xml` header (server returns XML based on URL extension)

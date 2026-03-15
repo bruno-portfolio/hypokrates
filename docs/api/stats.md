@@ -13,7 +13,7 @@ from hypokrates.sync import stats           # sync
 
 Calculate a disproportionality signal for a drug–event pair.
 
-Fetches four counts from FAERS (drug+event, drug total, event total, N total), builds a 2x2 contingency table, and computes PRR, ROR, and IC (simplified).
+Fetches four counts from FAERS (drug+event, drug total, event total, N total), builds a 2x2 contingency table, and computes PRR, ROR, and IC (BCPNN).
 
 ```python
 result = await stats.signal("propofol", "bradycardia")
@@ -70,22 +70,24 @@ Confidence interval (Woolf's method):
 
 Signal threshold: **CI lower bound > 1.0**
 
-### IC — Information Component (Simplified)
+### IC — Information Component (BCPNN)
 
 \[
-IC = \log_2 \frac{a \times N}{(a + b)(a + c)}
+n^* = N + 4\alpha, \quad IC = \log_2 \frac{(a + \alpha) \times n^*}{(a + b + 2\alpha)(a + c + 2\alpha)}
 \]
 
-Variance and confidence interval:
+Variance (via trigamma, ψ₁) and confidence interval:
 
 \[
-V = \frac{1}{a \times (\ln 2)^2}, \quad IC_{025} = IC - 1.96 \times \sqrt{V}
+V = \frac{1}{(\ln 2)^2} \left[ \psi_1(a+\alpha) + \psi_1(a+b+2\alpha) + \psi_1(a+c+2\alpha) - 3\psi_1(n^*) \right]
+\]
+\[
+IC_{025} = IC - 1.96 \times \sqrt{V}
 \]
 
 Signal threshold: **CI lower bound > 0**
 
-!!! note
-    This is the simplified IC formula, **not** the full BCPNN (Bayesian Confidence Propagation Neural Network) with Beta priors described in Bate et al. (2002). Full BCPNN is planned for a future release.
+Uses BCPNN (Norén et al. 2006) with Jeffreys prior (α = 0.5). The Bayesian prior shrinks estimates with few reports toward zero, resolving the small-numbers instability of the simplified IC formula.
 
 ---
 
@@ -102,7 +104,7 @@ Complete signal detection result.
 | `table` | `ContingencyTable` | 2x2 contingency table |
 | `prr` | `DisproportionalityResult` | PRR with CI |
 | `ror` | `DisproportionalityResult` | ROR with CI |
-| `ic` | `DisproportionalityResult` | IC simplified with CI |
+| `ic` | `DisproportionalityResult` | IC (BCPNN) with CI |
 | `signal_detected` | `bool` | Heuristic: >= 2 significant measures |
 | `meta` | `MetaInfo` | Provenance metadata |
 

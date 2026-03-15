@@ -71,28 +71,31 @@ ROR = \frac{a \times d}{b \times c}
 
 ---
 
-## IC — Information Component (Simplified)
+## IC — Information Component (BCPNN)
 
-The IC measures the degree of "surprise" in observing the drug–event combination, using information theory.
+The IC measures the degree of "surprise" in observing the drug–event combination, using information theory. hypokrates implements the full **BCPNN** (Bayesian Confidence Propagation Neural Network) described in Norén et al. (2006), with Jeffreys prior (α = 0.5).
 
 \[
-IC = \log_2 \frac{observed}{expected} = \log_2 \frac{a \times N}{(a + b)(a + c)}
+n^* = N + 4\alpha, \quad IC = \log_2 \frac{(a + \alpha) \times n^*}{(a + b + 2\alpha)(a + c + 2\alpha)}
 \]
 
-**Interpretation:** A positive IC means the combination is observed more often than expected. IC = 1 means twice as often; IC = 2 means four times as often.
+**Interpretation:** A positive IC means the combination is observed more often than expected. IC = 1 means twice as often; IC = 2 means four times as often. The Bayesian prior shrinks estimates with few reports toward zero, preventing spurious signals from small counts.
 
-**Variance and confidence interval:**
+**Variance (via trigamma) and confidence interval:**
 
 \[
-V = \frac{1}{a \times (\ln 2)^2}, \quad IC_{025} = IC - 1.96 \times \sqrt{V}
+V = \frac{1}{(\ln 2)^2} \left[ \psi_1(a+\alpha) + \psi_1(a+b+2\alpha) + \psi_1(a+c+2\alpha) - 3\psi_1(n^*) \right]
+\]
+\[
+IC_{025} = IC - 1.96 \times \sqrt{V}
 \]
 
 **Signal threshold:** IC~025~ (CI lower bound) > 0
 
 **Used by:** Uppsala Monitoring Centre (WHO)
 
-!!! note "Simplified IC"
-    hypokrates currently implements the simplified IC formula. The full **BCPNN** (Bayesian Confidence Propagation Neural Network) described in Bate et al. (2002) uses Beta priors and shrinkage — planned for a future release.
+!!! note "BCPNN shrinkage"
+    With few reports (e.g., a < 10), the Jeffreys prior shrinks the IC toward zero and widens the confidence interval, reducing false positives. For large counts, BCPNN converges to the simplified IC formula.
 
 ---
 
@@ -102,9 +105,9 @@ V = \frac{1}{a \times (\ln 2)^2}, \quad IC_{025} = IC - 1.96 \times \sqrt{V}
 |--------|---------------|-----------|
 | **FDA** | EBGM (Empirical Bayes Geometric Mean) | EB05 > 2.0 |
 | **EMA** | PRR | PRR > 2, chi² > 4, N ≥ 3 |
-| **Uppsala/WHO** | IC (full BCPNN) | IC~025~ > 0 |
+| **Uppsala/WHO** | IC (BCPNN) | IC~025~ > 0 |
 
-hypokrates computes PRR, ROR, and IC (simplified). The `signal_detected` heuristic requires **at least 2 of 3** measures to be significant **and** at least 3 co-reports — this is a screening convenience, not a regulatory standard.
+hypokrates computes PRR, ROR, and IC (BCPNN). The `signal_detected` heuristic requires **at least 2 of 3** measures to be significant **and** at least 3 co-reports — this is a screening convenience, not a regulatory standard.
 
 ---
 

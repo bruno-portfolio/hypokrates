@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+from scipy.special import polygamma
+
 from hypokrates.stats.constants import (
     SIGNIFICANCE_THRESHOLD_IC,
     SIGNIFICANCE_THRESHOLD_PRR,
@@ -15,6 +17,9 @@ from hypokrates.stats.models import ContingencyTable, DisproportionalityResult
 _Z_95: float = 1.96
 _LN2: float = math.log(2)
 _LN2_SQ: float = _LN2**2
+
+# Prior Jeffreys — menos informativo que uniform, padrão UMC (Uppsala)
+_BCPNN_ALPHA: float = 0.5
 
 
 def compute_prr(table: ContingencyTable) -> DisproportionalityResult:
@@ -91,16 +96,21 @@ def compute_ror(table: ContingencyTable) -> DisproportionalityResult:
 
 
 def compute_ic(table: ContingencyTable) -> DisproportionalityResult:
-    """IC simplified — log2(observed/expected) com CI via aproximação normal.
+    """IC (BCPNN — Norén et al. 2006) com prior Jeffreys (alpha=0.5).
 
-    Esta é a versão simplificada do Information Component.
-    NÃO é o BCPNN completo (Bate et al. 2002) que usa priors Beta.
-    TODO: Implementar BCPNN com priors em sprint futuro.
+    Bayesian Confidence Propagation Neural Network. Usa priors Beta
+    que fazem shrinkage de estimativas com poucos reports para o centro,
+    resolvendo o problema de contagens pequenas.
 
-    Fórmula:
-        IC = log2(a * N / ((a+b) * (a+c)))
-        Variância: V = 1 / (a * ln(2)^2)
+    Formula:
+        n* = N + 4*alpha
+        IC = log2((a + alpha) * n* / ((a+b + 2*alpha) * (a+c + 2*alpha)))
+        V = (1/ln2^2) * [psi1(a+alpha) + psi1(a+b+2*alpha) + psi1(a+c+2*alpha) - 3*psi1(n*)]
         IC025 = IC - 1.96 * sqrt(V)
+
+    Referencia: Noren GN, Hopstadius J, Bate A (2006).
+    Shrinkage observation-to-expected ratios for assessment of drug safety signals.
+    Stat Methods Med Res. 15(6):565-77.
     """
     a = table.a
     n = table.n
@@ -116,9 +126,22 @@ def compute_ic(table: ContingencyTable) -> DisproportionalityResult:
             significant=False,
         )
 
-    expected = (ab * ac) / n
-    ic = math.log2(a / expected)
-    variance = 1 / (a * _LN2_SQ)
+    alpha = _BCPNN_ALPHA
+    n_star = n + 4 * alpha
+
+    p11 = (a + alpha) / n_star
+    p1_dot = (ab + 2 * alpha) / n_star
+    p_dot1 = (ac + 2 * alpha) / n_star
+
+    ic = math.log2(p11 / (p1_dot * p_dot1))
+
+    # Variância via trigamma (polygamma de ordem 1)
+    variance = (1 / _LN2_SQ) * float(
+        polygamma(1, a + alpha)
+        + polygamma(1, ab + 2 * alpha)
+        + polygamma(1, ac + 2 * alpha)
+        - 3 * polygamma(1, n_star)
+    )
     se = math.sqrt(variance)
     ci_lower = ic - _Z_95 * se
     ci_upper = ic + _Z_95 * se

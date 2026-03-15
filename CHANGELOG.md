@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability
+
 ## [0.4.0] - 2026-03-14
 
 ### Added

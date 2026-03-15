@@ -43,7 +43,7 @@ _CROSS_LIMITATIONS: list[Limitation] = [
 ]
 
 _CROSS_METHODOLOGY = (
-    "Signal detection via FAERS disproportionality (PRR/ROR/IC simplified) "
+    "Signal detection via FAERS disproportionality (PRR/ROR/IC (BCPNN)) "
     "cross-referenced with PubMed literature count. "
     "Classification thresholds are heuristics — adjust for clinical domain."
 )

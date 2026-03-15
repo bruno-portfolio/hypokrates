@@ -53,7 +53,7 @@ class SignalResult(BaseModel):
     table: ContingencyTable
     prr: DisproportionalityResult
     ror: DisproportionalityResult
-    ic: DisproportionalityResult = Field(description="IC simplified (não BCPNN completo)")
+    ic: DisproportionalityResult = Field(description="IC (BCPNN — Norén et al. 2006)")
     signal_detected: bool = Field(description="Heurística: >= 2 medidas significantes")
     meta: MetaInfo
 

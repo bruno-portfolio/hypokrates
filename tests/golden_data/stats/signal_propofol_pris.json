@@ -10,7 +10,7 @@
     "expected": {
         "prr": 4.5,
         "ror": 4.888888888888889,
-        "ic": 2.169925001442312,
+        "ic": 1.7382066452908063,
         "prr_significant": true,
         "ror_significant": true,
         "ic_significant": true,

@@ -26,7 +26,7 @@ _DEFAULT_DISCLAIMER = (
 _SIGNAL_DISCLAIMER = (
     "signal_detected is a screening heuristic (>=2/3 measures significant). "
     "Evaluate individual measures for clinical decisions. "
-    "IC uses simplified formula (not full BCPNN with Beta priors)."
+    "IC uses BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5)."
 )
 
 
