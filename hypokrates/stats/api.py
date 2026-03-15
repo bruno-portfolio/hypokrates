@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import statistics as _statistics
 from datetime import UTC, datetime
@@ -34,6 +35,10 @@ async def signal(
     *,
     suspect_only: bool = False,
     use_cache: bool = True,
+    _client: FAERSClient | None = None,
+    _drug_search: str | None = None,
+    _drug_total: int | None = None,
+    _n_total: int | None = None,
 ) -> SignalResult:
     """Calcula sinal de desproporcionalidade para um par droga-evento.
 
@@ -58,9 +63,14 @@ async def signal(
     reaction_field = SEARCH_FIELDS["reaction"]
     event_upper = event.upper()
 
-    client = FAERSClient()
+    own_client = _client is None
+    client = _client if _client is not None else FAERSClient()
     try:
-        drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
+        drug_search = (
+            _drug_search
+            if _drug_search is not None
+            else await resolve_drug_field(drug, client=client, use_cache=use_cache)
+        )
 
         char_filter = (
             f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
@@ -71,12 +81,25 @@ async def signal(
         search_drug = f"{drug_search}{char_filter}"
         search_event = f'{reaction_field}:"{event_upper}"'
 
-        drug_event_count = await client.fetch_total(search_drug_event, use_cache=use_cache)
-        drug_total = await client.fetch_total(search_drug, use_cache=use_cache)
-        event_total = await client.fetch_total(search_event, use_cache=use_cache)
-        n_total = await client.fetch_total("", use_cache=use_cache)
+        if _drug_total is not None and _n_total is not None:
+            # Scan path: apenas valores únicos por evento (paralelo)
+            drug_event_count, event_total = await asyncio.gather(
+                client.fetch_total(search_drug_event, use_cache=use_cache),
+                client.fetch_total(search_event, use_cache=use_cache),
+            )
+            drug_total = _drug_total
+            n_total = _n_total
+        else:
+            # Standalone path: todos em paralelo
+            drug_event_count, drug_total, event_total, n_total = await asyncio.gather(
+                client.fetch_total(search_drug_event, use_cache=use_cache),
+                client.fetch_total(search_drug, use_cache=use_cache),
+                client.fetch_total(search_event, use_cache=use_cache),
+                client.fetch_total("", use_cache=use_cache),
+            )
     finally:
-        await client.close()
+        if own_client:
+            await client.close()
 
     table = build_table(drug_event_count, drug_total, event_total, n_total)
 

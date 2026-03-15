@@ -60,19 +60,24 @@ def register(mcp: FastMCP) -> None:
         def _on_progress(completed: int, total: int, event: str) -> None:
             logger.info("MCP scan %s: %d/%d — %s", drug, completed, total, event)
 
-        result = await scan_api.scan_drug(
-            drug,
-            top_n=clamped_top_n,
-            check_labels=check_labels,
-            check_trials=check_trials,
-            check_drugbank=check_drugbank,
-            check_opentargets=check_opentargets,
-            check_chembl=check_chembl,
-            group_events=group_events,
-            filter_operational=filter_operational,
-            suspect_only=suspect_only,
-            on_progress=_on_progress,
-        )
+        try:
+            result = await scan_api.scan_drug(
+                drug,
+                top_n=clamped_top_n,
+                check_labels=check_labels,
+                check_trials=check_trials,
+                check_drugbank=check_drugbank,
+                check_opentargets=check_opentargets,
+                check_chembl=check_chembl,
+                group_events=group_events,
+                filter_operational=filter_operational,
+                suspect_only=suspect_only,
+                on_progress=_on_progress,
+            )
+        except Exception as exc:
+            elapsed = time.monotonic() - start
+            logger.error("MCP scan %s failed after %.0fs: %s", drug, elapsed, exc)
+            return f"# Scan: {drug.upper()}\n\nERROR after {elapsed:.0f}s: {exc}"
 
         elapsed = time.monotonic() - start
 

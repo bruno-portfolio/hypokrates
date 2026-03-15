@@ -10,6 +10,11 @@ from typing import TYPE_CHECKING
 from hypokrates.cross import api as cross_api
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.faers import api as faers_api
+from hypokrates.faers.client import FAERSClient
+from hypokrates.faers.constants import (
+    DRUG_CHARACTERIZATION_FIELD,
+    DRUG_CHARACTERIZATION_SUSPECT,
+)
 from hypokrates.models import MetaInfo
 from hypokrates.scan.constants import (
     CLASSIFICATION_WEIGHTS,
@@ -140,6 +145,32 @@ async def scan_drug(
 
         chembl_cache = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
 
+    # 2b. Pre-computar valores FAERS compartilhados (1x por droga, não por evento)
+    faers_client = FAERSClient()
+    drug_search: str | None = None
+    shared_drug_total: int | None = None
+    shared_n_total: int | None = None
+
+    try:
+        drug_search = await faers_api.resolve_drug_field(
+            drug, client=faers_client, use_cache=use_cache
+        )
+        char_filter = (
+            f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
+            if suspect_only
+            else ""
+        )
+        search_drug = f"{drug_search}{char_filter}"
+        shared_drug_total, shared_n_total = await asyncio.gather(
+            faers_client.fetch_total(search_drug, use_cache=use_cache),
+            faers_client.fetch_total("", use_cache=use_cache),
+        )
+    except Exception:
+        logger.warning(
+            "Scan %s: pre-compute shared FAERS values failed, continuing without",
+            drug,
+        )
+
     # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
     completed = 0
@@ -163,6 +194,10 @@ async def scan_drug(
                     _drugbank_cache=drugbank_cache,
                     _ot_safety_cache=ot_safety_cache,
                     _chembl_cache=chembl_cache,
+                    _faers_client=faers_client,
+                    _drug_search=drug_search,
+                    _drug_total=shared_drug_total,
+                    _n_total=shared_n_total,
                 )
             except Exception as exc:
                 completed += 1
@@ -185,7 +220,10 @@ async def scan_drug(
                 return result
 
     tasks = [_run_hypothesis(ev.term) for ev in events]
-    results = await asyncio.gather(*tasks)
+    try:
+        results = await asyncio.gather(*tasks)
+    finally:
+        await faers_client.close()
 
     # 3. Processar resultados
     items: list[ScanItem] = []

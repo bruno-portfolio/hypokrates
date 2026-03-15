@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from hypokrates.chembl.models import ChEMBLMechanism
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
+    from hypokrates.faers.client import FAERSClient
     from hypokrates.opentargets.models import OTDrugSafety
 from hypokrates.cross.models import (
     CompareResult,
@@ -67,6 +68,10 @@ async def hypothesis(
     _drugbank_cache: DrugBankInfo | None = None,
     _ot_safety_cache: OTDrugSafety | None = None,
     _chembl_cache: ChEMBLMechanism | None = None,
+    _faers_client: FAERSClient | None = None,
+    _drug_search: str | None = None,
+    _drug_total: int | None = None,
+    _n_total: int | None = None,
 ) -> HypothesisResult:
     """Cruza sinal FAERS + literatura PubMed → classificação.
 
@@ -92,7 +97,16 @@ async def hypothesis(
     """
     # 1+2. FAERS e PubMed são independentes — rodar em paralelo
     signal_result, pubmed_result = await asyncio.gather(
-        stats_api.signal(drug, event, suspect_only=suspect_only, use_cache=use_cache),
+        stats_api.signal(
+            drug,
+            event,
+            suspect_only=suspect_only,
+            use_cache=use_cache,
+            _client=_faers_client,
+            _drug_search=_drug_search,
+            _drug_total=_drug_total,
+            _n_total=_n_total,
+        ),
         pubmed_api.search_papers(
             drug,
             event,
