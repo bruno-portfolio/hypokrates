@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from hypokrates.faers.parser import parse_count_results, parse_reports
+from hypokrates.faers.parser import parse_count_results, parse_drug_count_results, parse_reports
 from hypokrates.models import Sex
 from tests.helpers import make_raw_drug, make_raw_patient, make_raw_reaction, make_raw_report
 
@@ -262,6 +262,38 @@ class TestParseCountResultsContract:
         """term não-string ignorado."""
         events = parse_count_results([{"term": 123, "count": 100}])
         assert len(events) == 0
+
+
+class TestParseDrugCountResults:
+    """Contrato de contagem reversa — evento -> drogas."""
+
+    def test_parses_drug_counts(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        drugs = parse_drug_count_results(golden_faers_drugs_by_event["results"])
+        assert len(drugs) == 10
+
+    def test_first_drug_is_propofol(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        drugs = parse_drug_count_results(golden_faers_drugs_by_event["results"])
+        assert drugs[0].name == "PROPOFOL"
+        assert drugs[0].count == 1969
+
+    def test_counts_are_integers(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        drugs = parse_drug_count_results(golden_faers_drugs_by_event["results"])
+        assert isinstance(drugs[0].count, int)
+
+    def test_handles_empty(self) -> None:
+        drugs = parse_drug_count_results([])
+        assert drugs == []
+
+    def test_skips_empty_term(self) -> None:
+        drugs = parse_drug_count_results(
+            [{"term": "", "count": 100}, {"term": "PROPOFOL", "count": 50}]
+        )
+        assert len(drugs) == 1
+        assert drugs[0].name == "PROPOFOL"
+
+    def test_skips_non_string_term(self) -> None:
+        drugs = parse_drug_count_results([{"term": 123, "count": 100}])
+        assert len(drugs) == 0
 
 
 # ---------------------------------------------------------------------------

@@ -91,6 +91,13 @@ def golden_faers_api_errors() -> dict[str, Any]:
     return json.loads(path.read_text())  # type: ignore[no-any-return]
 
 
+@pytest.fixture()
+def golden_faers_drugs_by_event() -> dict[str, Any]:
+    """Golden data de drugs by event (reverse lookup: evento -> drogas)."""
+    path = GOLDEN_DATA / "faers" / "drugs_by_event_anaphylaxis.json"
+    return json.loads(path.read_text())  # type: ignore[no-any-return]
+
+
 # ---------------------------------------------------------------------------
 # Cache temporário
 # ---------------------------------------------------------------------------

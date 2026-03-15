@@ -8,7 +8,14 @@ import httpx
 import respx
 
 from hypokrates.config import configure
-from hypokrates.faers.api import _build_search, adverse_events, compare, top_events
+from hypokrates.faers.api import (
+    _build_event_search,
+    _build_search,
+    adverse_events,
+    compare,
+    drugs_by_event,
+    top_events,
+)
 from tests.helpers import assert_meta_complete
 
 
@@ -139,6 +146,71 @@ class TestTopEvents:
         result = await top_events("propofol", limit=10, use_cache=False)
         assert result.meta.query["drug"] == "propofol"
         assert result.meta.query["count"] == "reaction"
+
+
+class TestBuildEventSearch:
+    """Construcao de queries reverse lookup (evento -> drogas)."""
+
+    def test_basic_event_search(self) -> None:
+        s = _build_event_search("ANAPHYLACTIC SHOCK")
+        assert 'patient.reaction.reactionmeddrapt.exact:"ANAPHYLACTIC SHOCK"' in s
+
+    def test_uppercases_event(self) -> None:
+        s = _build_event_search("hypotension")
+        assert "HYPOTENSION" in s
+
+    def test_with_suspect_only(self) -> None:
+        s = _build_event_search("HYPOTENSION", suspect_only=True)
+        assert "patient.drug.drugcharacterization:1" in s
+        assert " AND " in s
+
+    def test_no_suspect_no_and(self) -> None:
+        s = _build_event_search("HYPOTENSION")
+        assert " AND " not in s
+
+
+class TestDrugsByEvent:
+    """API publica: drugs_by_event (reverse lookup)."""
+
+    @respx.mock
+    async def test_returns_drugs(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
+        )
+        result = await drugs_by_event("anaphylactic shock", limit=10, use_cache=False)
+        assert len(result.drugs) == 10
+        assert result.drugs[0].name == "PROPOFOL"
+        assert result.drugs[0].count == 1969
+
+    @respx.mock
+    async def test_uppercases_event(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
+        )
+        result = await drugs_by_event("anaphylactic shock", use_cache=False)
+        assert result.event == "ANAPHYLACTIC SHOCK"
+
+    @respx.mock
+    async def test_meta_has_query_info(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
+        )
+        result = await drugs_by_event("anaphylactic shock", limit=10, use_cache=False)
+        assert result.meta.query["event"] == "anaphylactic shock"
+        assert result.meta.query["count"] == "drug"
+        assert result.meta.source == "OpenFDA/FAERS"
+
+    @respx.mock
+    async def test_empty_for_unknown_event(self, golden_faers_no_results: dict[str, Any]) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_no_results)
+        )
+        result = await drugs_by_event("XYZNOTEXIST", use_cache=False)
+        assert len(result.drugs) == 0
 
 
 class TestCompare:

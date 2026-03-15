@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from hypokrates.faers.constants import OUTCOME_MAP, SEX_MAP
-from hypokrates.faers.models import FAERSDrug, FAERSReaction, FAERSReport
+from hypokrates.faers.models import DrugCount, FAERSDrug, FAERSReaction, FAERSReport
 from hypokrates.models import AdverseEvent, PatientProfile, Sex
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,17 @@ def parse_count_results(raw_results: list[dict[str, Any]]) -> list[AdverseEvent]
         if term and isinstance(term, str):
             events.append(AdverseEvent(term=term, count=count))
     return events
+
+
+def parse_drug_count_results(raw_results: list[dict[str, Any]]) -> list[DrugCount]:
+    """Converte resultados de count query (por droga) em DrugCount."""
+    drugs: list[DrugCount] = []
+    for item in raw_results:
+        term = item.get("term", "")
+        count = item.get("count", 0)
+        if term and isinstance(term, str):
+            drugs.append(DrugCount(name=term, count=count))
+    return drugs
 
 
 def _parse_single_report(raw: dict[str, Any]) -> FAERSReport:

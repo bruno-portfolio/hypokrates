@@ -47,3 +47,18 @@ class FAERSResult(BaseModel):
     events: list[AdverseEvent] = Field(default_factory=list)
     drugs: list[Drug] = Field(default_factory=list)
     meta: MetaInfo
+
+
+class DrugCount(BaseModel):
+    """Droga com contagem de reports (reverse lookup: evento -> drogas)."""
+
+    name: str = Field(description="Nome generico do medicamento")
+    count: int = Field(default=0, description="Contagem de reports")
+
+
+class DrugsByEventResult(BaseModel):
+    """Resultado de reverse lookup: evento -> drogas mais reportadas."""
+
+    event: str = Field(description="Termo MedDRA do evento adverso")
+    drugs: list[DrugCount] = Field(default_factory=list)
+    meta: MetaInfo

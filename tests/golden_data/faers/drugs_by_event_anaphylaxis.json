@@ -1,0 +1,14 @@
+{
+  "results": [
+    {"term": "PROPOFOL", "count": 1969},
+    {"term": "ROCURONIUM BROMIDE", "count": 897},
+    {"term": "DEXAMETHASONE", "count": 810},
+    {"term": "LIDOCAINE HYDROCHLORIDE", "count": 789},
+    {"term": "SUFENTANIL", "count": 773},
+    {"term": "AMOXICILLIN", "count": 750},
+    {"term": "CARBOPLATIN", "count": 701},
+    {"term": "ACETAMINOPHEN", "count": 662},
+    {"term": "OMALIZUMAB", "count": 632},
+    {"term": "PACLITAXEL", "count": 623}
+  ]
+}

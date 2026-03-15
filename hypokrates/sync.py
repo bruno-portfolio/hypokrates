@@ -65,6 +65,7 @@ class _SyncFAERS:
     adverse_events = staticmethod(_make_sync(faers_api.adverse_events))
     top_events = staticmethod(_make_sync(faers_api.top_events))
     compare = staticmethod(_make_sync(faers_api.compare))
+    drugs_by_event = staticmethod(_make_sync(faers_api.drugs_by_event))
 
 
 class _SyncStats:

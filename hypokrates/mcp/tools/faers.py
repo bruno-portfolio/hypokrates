@@ -52,6 +52,32 @@ def register(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
+    async def drugs_by_event(event: str, limit: int = 10) -> str:
+        """Get top drugs reported for an adverse event from FAERS (reverse lookup).
+
+        Useful for finding which drugs are most associated with a specific
+        adverse event in the FDA spontaneous reporting database.
+
+        Args:
+            event: MedDRA adverse event term (e.g., "anaphylactic shock").
+            limit: Number of top drugs to return.
+        """
+        result = await faers_api.drugs_by_event(event, limit=limit)
+        if not result.drugs:
+            return f"No drugs found for event '{event}' in FAERS."
+        lines = [
+            f"# Top Drugs for: {result.event}",
+            f"**Total:** {len(result.drugs)} drugs",
+            "",
+        ]
+        for i, d in enumerate(result.drugs, 1):
+            lines.append(f"{i:2}. **{d.name}**: {d.count:,} reports")
+        lines.append("")
+        lines.append("---")
+        lines.append("*Source: OpenFDA/FAERS — voluntary reporting, counts ≠ risk*")
+        return "\n".join(lines)
+
+    @mcp.tool()
     async def compare_drugs(drugs: str, limit: int = 10) -> str:
         """Compare adverse events between multiple drugs.
 

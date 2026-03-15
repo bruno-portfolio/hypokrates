@@ -15,8 +15,8 @@ from hypokrates.faers.constants import (
     SEARCH_FIELDS,
     SEX_MAP,
 )
-from hypokrates.faers.models import FAERSResult
-from hypokrates.faers.parser import parse_count_results, parse_reports
+from hypokrates.faers.models import DrugsByEventResult, FAERSResult
+from hypokrates.faers.parser import parse_count_results, parse_drug_count_results, parse_reports
 from hypokrates.models import MetaInfo
 
 # Cache in-memory da resolução de campo por droga (vive enquanto o processo vive)
@@ -184,6 +184,47 @@ async def compare(
     return results
 
 
+async def drugs_by_event(
+    event: str,
+    *,
+    suspect_only: bool = False,
+    limit: int = 10,
+    use_cache: bool = True,
+) -> DrugsByEventResult:
+    """Retorna os medicamentos mais reportados para um evento adverso (reverse lookup).
+
+    Args:
+        event: Termo MedDRA do evento adverso (e.g., "anaphylactic shock").
+        suspect_only: Se True, apenas reports onde a droga e suspect.
+        limit: Numero de drogas retornadas (top N).
+        use_cache: Se deve usar cache.
+
+    Returns:
+        DrugsByEventResult com drogas ordenadas por contagem de reports.
+    """
+    client = FAERSClient()
+    try:
+        search = _build_event_search(event, suspect_only=suspect_only)
+        count_field = COUNT_FIELDS["drug"]
+        data = await client.fetch_count(search, count_field, limit=limit, use_cache=use_cache)
+    finally:
+        await client.close()
+
+    raw_results: list[dict[str, Any]] = data.get("results", [])
+    drugs = parse_drug_count_results(raw_results)
+
+    return DrugsByEventResult(
+        event=event.upper(),
+        drugs=drugs,
+        meta=MetaInfo(
+            source="OpenFDA/FAERS",
+            query={"event": event, "count": "drug", "limit": limit},
+            total_results=len(drugs),
+            retrieved_at=datetime.now(UTC),
+        ),
+    )
+
+
 async def resolve_drug_field(
     drug: str,
     *,
@@ -259,6 +300,18 @@ def _build_search(
     if serious is not None:
         parts.append(f"serious:{'1' if serious else '2'}")
 
+    return " AND ".join(parts)
+
+
+def _build_event_search(
+    event: str,
+    *,
+    suspect_only: bool = False,
+) -> str:
+    """Constroi query string para busca por evento adverso (reverse lookup)."""
+    parts: list[str] = [f'{SEARCH_FIELDS["reaction"]}:"{event.upper()}"']
+    if suspect_only:
+        parts.append(f"{DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}")
     return " AND ".join(parts)
 
 
