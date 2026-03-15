@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
+from hypokrates.faers.client import FAERSClient
 from hypokrates.stats import api as stats_api
 
 if TYPE_CHECKING:
@@ -51,6 +53,63 @@ def register(mcp: FastMCP) -> None:
             f"- !drug+!event: {result.table.d}",
         ]
         return "\n".join(lines)
+
+    @mcp.tool()
+    async def batch_signal(
+        pairs: list[dict[str, str]],
+        suspect_only: bool = False,
+    ) -> str:
+        """Detect disproportionality signals for MULTIPLE drug-event pairs in one call.
+
+        Much faster than calling signal() multiple times — shares HTTP client,
+        rate limiter, and fetches drug_total/n_total only once per drug.
+
+        Use this whenever you need to check 2+ drug-event pairs.
+
+        Args:
+            pairs: List of {"drug": "...", "event": "..."} dicts.
+            suspect_only: Only count reports where drug is suspect (not concomitant).
+        """
+        if not pairs:
+            return "No pairs provided."
+
+        client = FAERSClient()
+        try:
+            tasks = [
+                stats_api.signal(
+                    p["drug"],
+                    p["event"],
+                    suspect_only=suspect_only,
+                    _client=client,
+                )
+                for p in pairs
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            await client.close()
+
+        sections: list[str] = []
+        for pair, result in zip(pairs, results, strict=True):
+            drug = pair["drug"].upper()
+            event = pair["event"].upper()
+            if isinstance(result, BaseException):
+                sections.append(f"## {drug} + {event}\n**Error:** {result}")
+                continue
+            detected = "YES" if result.signal_detected else "NO"
+            sections.append(
+                f"## {drug} + {event}\n"
+                f"**Signal:** {detected} | "
+                f"PRR={getattr(result.prr, 'value', 0):.2f} "
+                f"({getattr(result.prr, 'ci_lower', 0):.2f}-"
+                f"{getattr(result.prr, 'ci_upper', 0):.2f})"
+                f"{'*' if getattr(result.prr, 'significant', False) else ''} | "
+                f"ROR={getattr(result.ror, 'value', 0):.2f} | "
+                f"IC={getattr(result.ic, 'value', 0):.2f} | "
+                f"n={result.table.a}"
+            )
+
+        header = f"# Batch Signal Detection ({len(pairs)} pairs)"
+        return "\n\n".join([header, *sections])
 
     @mcp.tool()
     async def signal_timeline(

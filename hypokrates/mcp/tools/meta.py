@@ -14,6 +14,11 @@ _TOOLS = [
     {"name": "top_events", "module": "faers", "description": "Get top adverse events"},
     {"name": "compare_drugs", "module": "faers", "description": "Compare drugs"},
     {"name": "signal", "module": "stats", "description": "Disproportionality signal detection"},
+    {
+        "name": "batch_signal",
+        "module": "stats",
+        "description": "Batch signal detection (multiple pairs)",
+    },
     {"name": "signal_timeline", "module": "stats", "description": "Temporal analysis"},
     {"name": "count_papers", "module": "pubmed", "description": "Count PubMed papers"},
     {"name": "search_papers", "module": "pubmed", "description": "Search PubMed papers"},
