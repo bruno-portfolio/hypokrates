@@ -29,9 +29,17 @@ hypokrates parses the **Adverse Reactions** section of the SPL XML (LOINC code `
 - `label_events(drug)` — Extract all adverse event terms from the drug's FDA label
 - `check_label(drug, event)` — Check if a specific event appears in the drug's label
 
+## Label Matching
+
+`match_event_in_label()` uses **case-insensitive substring matching expanded with MedDRA synonyms**. When checking if an event appears in the label, the function expands the event term to all synonyms in its MedDRA group (35 groups, ~120 aliases) via `expand_event_terms()`.
+
+For example, querying `"anaphylactic shock"` will also match `"anaphylaxis"`, `"anaphylactic reaction"`, and `"anaphylactoid reaction"` in the label text.
+
+This expansion applies both to structured terms extracted from the XML and to the raw text fallback search.
+
 ## Limitations
 
 - Not all drugs have SPL labels in DailyMed
 - Adverse reactions section varies in structure across labels
-- Current term matching uses case-insensitive substring matching (not MedDRA coding)
+- MedDRA synonym coverage is limited to 35 static groups (~120 aliases) — terms outside these groups use literal substring matching only
 - Generic drugs may have multiple labels from different manufacturers

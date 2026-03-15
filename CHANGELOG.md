@@ -3,6 +3,19 @@
 ## Unreleased
 
 ### Added
+- Bulk scan: `scan_drug()` now uses FAERS Bulk (deduplicated quarterly files) for event discovery when available
+  - `bulk_top_events(drug, role_filter, limit)` — top events from bulk store with dedup + role filter
+  - `bulk_drug_total(drug, role_filter)` — total deduplicated cases for a drug
+  - `FAERSBulkStore.top_events()`, `FAERSBulkStore.drug_total()` — new DuckDB store methods
+  - `primary_suspect_only` parameter on `scan_drug()` — PS-only role filter (requires bulk)
+  - `ScanItem.ps_only_prr`, `ScanItem.direction` fields — direction analysis results
+  - `ScanResult.bulk_mode`, `ScanResult.role_filter_used` fields — data source metadata
+- Direction analysis: `check_direction=True` on `scan_drug()` compares base PRR vs PS-only PRR per signal
+  - `"strengthens"` if PS PRR > 1.2x base (pharmacological signal)
+  - `"weakens"` if PS PRR < 0.8x base (confounding probable)
+  - `DIRECTION_STRENGTHENS_THRESHOLD=1.2`, `DIRECTION_WEAKENS_THRESHOLD=0.8`
+- MCP `scan_drug` tool gains `role_filter` param ("ps_only"/"suspect"/"all") and `check_direction`
+- MCP output shows data source (API vs Bulk), role filter, PS-PRR, and direction per item
 - Co-administration confounding detection (Layer 1 + Layer 2)
   - `co_suspect_profile(drug, event)` — analyzes co-suspect patterns in FAERS reports (median suspects/report, top co-drugs)
   - `coadmin_analysis(drug, event, profile)` — compares drug PRR vs co-administered drugs PRR to determine specificity
@@ -27,6 +40,10 @@
 - `Source.ANVISA` enum value
 - `anvisa_csv_path` configuration parameter
 - 66 new tests (88% coverage)
+
+### Fixed
+- **DailyMed label matching**: `match_event_in_label()` now expands events via MedDRA synonyms before matching. Previously, "anaphylactic shock" would not match "anaphylaxis" in the label, causing `in_label=False` and inflating scan scores 3x (1.5x boost instead of 0.5x penalty). Now uses `expand_event_terms()` for bidirectional synonym matching across 35 MedDRA groups (~120 aliases).
+- **MedDRA `expand_event_terms()`**: Aliases now expand to full group (canonical + all aliases), not just the alias itself. Affects label matching and FAERS API reaction queries.
 
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability

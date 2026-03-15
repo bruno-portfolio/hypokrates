@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from hypokrates.faers_bulk.api import bulk_signal, bulk_store_status, is_bulk_available
+from hypokrates.faers_bulk.api import (
+    bulk_drug_total,
+    bulk_signal,
+    bulk_store_status,
+    bulk_top_events,
+    is_bulk_available,
+)
 from hypokrates.faers_bulk.constants import RoleCodFilter
 from hypokrates.faers_bulk.drug_resolver import clear_cache
 from hypokrates.faers_bulk.store import FAERSBulkStore
@@ -86,6 +92,42 @@ class TestBulkSignal:
         """Droga não existente retorna zeros."""
         result = await bulk_signal("NONEXISTENT", "BRADYCARDIA")
         assert result.table.a == 0
+
+
+class TestBulkTopEvents:
+    """Testes para bulk_top_events()."""
+
+    async def test_basic_top_events(self, loaded_store: FAERSBulkStore) -> None:
+        """Retorna lista de (event, count)."""
+        events = await bulk_top_events("propofol")
+        assert len(events) > 0
+        assert all(isinstance(e, tuple) for e in events)
+        event_names = [e[0] for e in events]
+        assert "BRADYCARDIA" in event_names
+
+    async def test_top_events_ps_only(self, loaded_store: FAERSBulkStore) -> None:
+        """PS_ONLY filter retorna resultados."""
+        events = await bulk_top_events("propofol", role_filter=RoleCodFilter.PS_ONLY)
+        assert isinstance(events, list)
+
+    async def test_top_events_limit(self, loaded_store: FAERSBulkStore) -> None:
+        """Limit clamps resultado."""
+        events = await bulk_top_events("propofol", limit=1)
+        assert len(events) <= 1
+
+
+class TestBulkDrugTotal:
+    """Testes para bulk_drug_total()."""
+
+    async def test_propofol_suspect(self, loaded_store: FAERSBulkStore) -> None:
+        """PROPOFOL SUSPECT: 3 cases dedup."""
+        total = await bulk_drug_total("propofol")
+        assert total == 3
+
+    async def test_propofol_ps_only(self, loaded_store: FAERSBulkStore) -> None:
+        """PROPOFOL PS_ONLY: 2 cases dedup."""
+        total = await bulk_drug_total("propofol", role_filter=RoleCodFilter.PS_ONLY)
+        assert total == 2
 
 
 class TestBulkStoreStatus:

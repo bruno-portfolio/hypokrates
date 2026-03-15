@@ -894,3 +894,225 @@ async def test_scan_progress_on_failure(
 
     # Progress deve ter sido chamado para ambos (sucesso e falha)
     assert len(progress_calls) == 2
+
+
+# ---------------------------------------------------------------------------
+# Bulk top_events + direction analysis
+# ---------------------------------------------------------------------------
+
+
+@patch("hypokrates.scan.api._check_bulk_available", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_drug_total", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_top_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+async def test_scan_bulk_mode_uses_bulk_top_events(
+    mock_hypothesis: AsyncMock,
+    mock_bulk_top: AsyncMock,
+    mock_bulk_total: AsyncMock,
+    mock_bulk_avail: AsyncMock,
+) -> None:
+    """use_bulk=True usa bulk_top_events em vez de faers_api.top_events."""
+    mock_bulk_avail.return_value = True
+    mock_bulk_top.return_value = [("NAUSEA", 50), ("HEADACHE", 30)]
+    mock_bulk_total.return_value = 100
+
+    # Mock count_total (N total)
+    with patch("hypokrates.faers_bulk.store.FAERSBulkStore.get_instance") as mock_store:
+        mock_instance = mock_store.return_value
+        mock_instance.count_total.return_value = 1000
+
+        mock_hypothesis.side_effect = [
+            _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION),
+            _make_hypothesis_result(
+                "HEADACHE", HypothesisClassification.EMERGING_SIGNAL, lit_count=3
+            ),
+        ]
+
+        result = await scan_drug("propofol", top_n=2, use_bulk=True, group_events=False)
+
+    assert result.bulk_mode is True
+    assert result.role_filter_used == "suspect"
+    mock_bulk_top.assert_called_once()
+
+
+@patch("hypokrates.scan.api._check_bulk_available", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_drug_total", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_top_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+async def test_scan_primary_suspect_only_sets_ps_only(
+    mock_hypothesis: AsyncMock,
+    mock_bulk_top: AsyncMock,
+    mock_bulk_total: AsyncMock,
+    mock_bulk_avail: AsyncMock,
+) -> None:
+    """primary_suspect_only=True → role_filter_used='ps_only'."""
+    mock_bulk_avail.return_value = True
+    mock_bulk_top.return_value = [("NAUSEA", 50)]
+    mock_bulk_total.return_value = 100
+
+    with patch("hypokrates.faers_bulk.store.FAERSBulkStore.get_instance") as mock_store:
+        mock_instance = mock_store.return_value
+        mock_instance.count_total.return_value = 1000
+
+        mock_hypothesis.return_value = _make_hypothesis_result(
+            "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
+        )
+
+        result = await scan_drug(
+            "propofol", top_n=1, use_bulk=True, primary_suspect_only=True, group_events=False
+        )
+
+    assert result.role_filter_used == "ps_only"
+    call_kwargs = mock_bulk_top.call_args.kwargs
+    from hypokrates.faers_bulk.constants import RoleCodFilter
+
+    assert call_kwargs["role_filter"] == RoleCodFilter.PS_ONLY
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_primary_suspect_only_fallback_without_bulk(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """primary_suspect_only=True sem bulk → warning, fallback to suspect_only."""
+    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
+    )
+
+    result = await scan_drug(
+        "propofol", top_n=1, use_bulk=False, primary_suspect_only=True, group_events=False
+    )
+
+    assert result.bulk_mode is False
+    assert result.role_filter_used is None
+
+
+@patch("hypokrates.faers_bulk.api.bulk_signal", new_callable=AsyncMock)
+@patch("hypokrates.scan.api._check_bulk_available", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_drug_total", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_top_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+async def test_scan_direction_analysis_strengthens(
+    mock_hypothesis: AsyncMock,
+    mock_bulk_top: AsyncMock,
+    mock_bulk_total: AsyncMock,
+    mock_bulk_avail: AsyncMock,
+    mock_bulk_signal: AsyncMock,
+) -> None:
+    """check_direction=True + PS PRR > 1.2x base → 'strengthens'."""
+    mock_bulk_avail.return_value = True
+    mock_bulk_top.return_value = [("NAUSEA", 50)]
+    mock_bulk_total.return_value = 100
+
+    with patch("hypokrates.faers_bulk.store.FAERSBulkStore.get_instance") as mock_store:
+        mock_instance = mock_store.return_value
+        mock_instance.count_total.return_value = 1000
+
+        # Base hypothesis com PRR=2.0
+        mock_hypothesis.return_value = _make_hypothesis_result(
+            "NAUSEA", HypothesisClassification.EMERGING_SIGNAL, lit_count=3, prr_lci=1.5
+        )
+
+        # PS-only signal com PRR=3.0 (> 2.0 * 1.2 = 2.4 → strengthens)
+        mock_bulk_signal.return_value = _make_signal(prr_lci=2.5)
+        mock_bulk_signal.return_value = SignalResult(
+            drug="propofol",
+            event="NAUSEA",
+            table=ContingencyTable(a=100, b=900, c=50, d=9000),
+            prr=DisproportionalityResult(
+                measure="PRR", value=3.0, ci_lower=2.5, ci_upper=4.0, significant=True
+            ),
+            ror=DisproportionalityResult(
+                measure="ROR", value=3.1, ci_lower=2.5, ci_upper=4.0, significant=True
+            ),
+            ic=DisproportionalityResult(
+                measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
+            ),
+            signal_detected=True,
+            meta=_make_meta(),
+        )
+
+        result = await scan_drug(
+            "propofol", top_n=1, use_bulk=True, check_direction=True, group_events=False
+        )
+
+    assert len(result.items) == 1
+    item = result.items[0]
+    assert item.ps_only_prr == pytest.approx(3.0)
+    assert item.direction == "strengthens"
+
+
+@patch("hypokrates.faers_bulk.api.bulk_signal", new_callable=AsyncMock)
+@patch("hypokrates.scan.api._check_bulk_available", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_drug_total", new_callable=AsyncMock)
+@patch("hypokrates.faers_bulk.api.bulk_top_events", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+async def test_scan_direction_analysis_weakens(
+    mock_hypothesis: AsyncMock,
+    mock_bulk_top: AsyncMock,
+    mock_bulk_total: AsyncMock,
+    mock_bulk_avail: AsyncMock,
+    mock_bulk_signal: AsyncMock,
+) -> None:
+    """check_direction=True + PS PRR < 0.8x base → 'weakens'."""
+    mock_bulk_avail.return_value = True
+    mock_bulk_top.return_value = [("NAUSEA", 50)]
+    mock_bulk_total.return_value = 100
+
+    with patch("hypokrates.faers_bulk.store.FAERSBulkStore.get_instance") as mock_store:
+        mock_instance = mock_store.return_value
+        mock_instance.count_total.return_value = 1000
+
+        # Base hypothesis com PRR=2.0
+        mock_hypothesis.return_value = _make_hypothesis_result(
+            "NAUSEA", HypothesisClassification.EMERGING_SIGNAL, lit_count=3, prr_lci=1.5
+        )
+
+        # PS-only signal com PRR=1.0 (< 2.0 * 0.8 = 1.6 → weakens)
+        mock_bulk_signal.return_value = SignalResult(
+            drug="propofol",
+            event="NAUSEA",
+            table=ContingencyTable(a=100, b=900, c=50, d=9000),
+            prr=DisproportionalityResult(
+                measure="PRR", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=False
+            ),
+            ror=DisproportionalityResult(
+                measure="ROR", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=False
+            ),
+            ic=DisproportionalityResult(
+                measure="IC", value=0.5, ci_lower=0.1, ci_upper=0.9, significant=False
+            ),
+            signal_detected=True,
+            meta=_make_meta(),
+        )
+
+        result = await scan_drug(
+            "propofol", top_n=1, use_bulk=True, check_direction=True, group_events=False
+        )
+
+    assert len(result.items) == 1
+    item = result.items[0]
+    assert item.ps_only_prr == pytest.approx(1.0)
+    assert item.direction == "weakens"
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_direction_skipped_without_bulk(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """check_direction=True sem bulk → ignorado (sem PS-only sem bulk)."""
+    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "NAUSEA", HypothesisClassification.EMERGING_SIGNAL, lit_count=3
+    )
+
+    result = await scan_drug(
+        "propofol", top_n=1, use_bulk=False, check_direction=True, group_events=False
+    )
+
+    assert result.items[0].ps_only_prr is None
+    assert result.items[0].direction is None

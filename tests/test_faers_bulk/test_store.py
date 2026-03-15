@@ -168,6 +168,77 @@ class TestFourCounts:
         assert upper.drug_event == lower.drug_event == mixed.drug_event
 
 
+class TestTopEvents:
+    """Testes para top_events() — eventos mais reportados deduplicados."""
+
+    def test_top_events_suspect(self, loaded_store: FAERSBulkStore) -> None:
+        """Top events para PROPOFOL com SUSPECT (PS+SS)."""
+        events = loaded_store.top_events("propofol", role_filter=RoleCodFilter.SUSPECT)
+        assert len(events) > 0
+        # Cada item é (event_term, count)
+        assert all(isinstance(e, tuple) and len(e) == 2 for e in events)
+        # BRADYCARDIA deve estar nos resultados (3 PIDs com PROPOFOL suspect, 2 com BRADYCARDIA)
+        event_names = [e[0] for e in events]
+        assert "BRADYCARDIA" in event_names
+
+    def test_top_events_ps_only(self, loaded_store: FAERSBulkStore) -> None:
+        """Top events com PS_ONLY retorna menos resultados."""
+        suspect = loaded_store.top_events("propofol", role_filter=RoleCodFilter.SUSPECT)
+        ps_only = loaded_store.top_events("propofol", role_filter=RoleCodFilter.PS_ONLY)
+        # PS_ONLY deve ter contagens menores ou iguais
+        suspect_dict = dict(suspect)
+        ps_dict = dict(ps_only)
+        for ev in ps_dict:
+            if ev in suspect_dict:
+                assert ps_dict[ev] <= suspect_dict[ev]
+
+    def test_top_events_limit(self, loaded_store: FAERSBulkStore) -> None:
+        """Limit clamps resultado."""
+        events = loaded_store.top_events("propofol", limit=1)
+        assert len(events) <= 1
+
+    def test_top_events_ordered_by_count_desc(self, loaded_store: FAERSBulkStore) -> None:
+        """Resultados vêm ordenados por count DESC."""
+        events = loaded_store.top_events("propofol")
+        counts = [e[1] for e in events]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_top_events_nonexistent_drug(self, loaded_store: FAERSBulkStore) -> None:
+        """Droga inexistente retorna lista vazia."""
+        events = loaded_store.top_events("NONEXISTENT_DRUG")
+        assert events == []
+
+    def test_top_events_case_insensitive(self, loaded_store: FAERSBulkStore) -> None:
+        """Busca case-insensitive (mesmos eventos e contagens)."""
+        upper = loaded_store.top_events("PROPOFOL")
+        lower = loaded_store.top_events("propofol")
+        assert set(upper) == set(lower)
+
+
+class TestDrugTotal:
+    """Testes para drug_total() — total de cases dedup com a droga."""
+
+    def test_propofol_suspect(self, loaded_store: FAERSBulkStore) -> None:
+        """PROPOFOL SUSPECT (PS+SS): 3 PIDs deduped."""
+        total = loaded_store.drug_total("propofol", role_filter=RoleCodFilter.SUSPECT)
+        assert total == 3
+
+    def test_propofol_ps_only(self, loaded_store: FAERSBulkStore) -> None:
+        """PROPOFOL PS_ONLY: 2 PIDs deduped."""
+        total = loaded_store.drug_total("propofol", role_filter=RoleCodFilter.PS_ONLY)
+        assert total == 2
+
+    def test_propofol_all(self, loaded_store: FAERSBulkStore) -> None:
+        """PROPOFOL ALL: 4 PIDs deduped (PS+SS+C)."""
+        total = loaded_store.drug_total("propofol", role_filter=RoleCodFilter.ALL)
+        assert total == 4
+
+    def test_nonexistent_drug(self, loaded_store: FAERSBulkStore) -> None:
+        """Droga inexistente retorna 0."""
+        total = loaded_store.drug_total("NONEXISTENT_DRUG")
+        assert total == 0
+
+
 class TestStatus:
     """Testes de status e metadados."""
 

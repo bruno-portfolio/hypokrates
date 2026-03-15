@@ -3,7 +3,7 @@
 **Cross-reference pharmacovigilance data for medical hypothesis generation.**
 
 [![PyPI](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
-[![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1105%20passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/brunoescalhao/hypokrates/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()
@@ -61,14 +61,19 @@ It is designed for researchers, pharmacovigilance professionals, and developers 
 | Source | Status | Coverage |
 |--------|--------|----------|
 | [OpenFDA/FAERS](sources/faers.md) | Implemented | 20M+ reports (2004–present) |
+| [FAERS Bulk](sources/faers.md#faers-bulk-quarterly-files) | Implemented | Deduplicated quarterly ASCII files |
 | [NCBI/PubMed](sources/pubmed.md) | Implemented | 36M+ citations |
 | RxNorm (NLM) | Implemented | Drug name normalization |
 | NCBI/MeSH | Implemented | Medical Subject Headings |
-| DrugBank | Planned | — |
+| [DailyMed](sources/dailymed.md) | Implemented | FDA drug labels (SPL) |
+| [ClinicalTrials.gov](sources/trials.md) | Implemented | 500K+ trials |
+| [DrugBank](sources/drugbank.md) | Implemented | 16K+ drugs (XML) |
+| [OpenTargets](sources/opentargets.md) | Implemented | FAERS-based LRT scores |
+| ChEMBL | Implemented | Mechanism of action, targets |
+| [ANVISA](sources/anvisa.md) | Implemented | 46K+ Brazilian drugs |
 | WHO VigiBase | Planned | — |
 | GBD | Planned | — |
 | OpenAlex | Planned | — |
-| ClinicalTrials.gov | Planned | — |
 | DATASUS | Planned | — |
 
 ## Features

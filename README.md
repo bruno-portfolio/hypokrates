@@ -103,12 +103,18 @@ result = scan.scan_drug(
     check_trials=True,
     check_chembl=True,
     check_opentargets=True,
-    group_events=True,  # MedDRA synonym grouping (default)
+    group_events=True,       # MedDRA synonym grouping (default)
+    primary_suspect_only=True,  # PS-only role filter (bulk only)
+    check_direction=True,    # compare base PRR vs PS-only PRR
 )
 for item in result.items:
-    print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f})")
+    direction = f" ({item.direction})" if item.direction else ""
+    print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f}){direction}")
 print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
+print(f"Data source: {'Bulk (dedup)' if result.bulk_mode else 'API'}")
 ```
+
+When FAERS Bulk quarterly files are loaded, `scan_drug()` automatically uses deduplicated data with role filtering (PS-only, suspect, or all). Direction analysis compares base PRR vs PS-only PRR per signal: `"strengthens"` means the signal is pharmacological, `"weakens"` means confounding is probable.
 
 ## FDA drug labels (DailyMed)
 
@@ -247,13 +253,14 @@ python -m hypokrates.mcp
 }
 ```
 
-22 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`.
+23 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`.
 
 ## Data Sources
 
 | Source | Module | Auth | Rate Limit |
 |--------|--------|------|------------|
 | OpenFDA/FAERS | `faers` | Optional key | 40-240/min |
+| FAERS Bulk | `faers_bulk` | Local quarterly ZIPs | Offline (dedup) |
 | PubMed | `pubmed` | Optional key | 180-600/min |
 | RxNorm | `vocab` | None | 120/min |
 | MeSH | `vocab` | Shared w/ PubMed | Shared |
@@ -266,7 +273,7 @@ python -m hypokrates.mcp
 
 ## Status
 
-**Alpha** — 1046 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1105+ tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 

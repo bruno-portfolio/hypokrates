@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Sprint 8 — Bulk Scan, Label Match Fix, Direction Analysis
+
+- **faers_bulk/**: `bulk_top_events()`, `bulk_drug_total()` — event discovery via deduplicated bulk store with role filter (PS_ONLY, SUSPECT, ALL)
+- **faers_bulk/store.py**: `FAERSBulkStore.top_events()`, `FAERSBulkStore.drug_total()` — new SQL methods
+- **scan/**: `scan_drug()` now uses FAERS Bulk for event discovery when available (dual-mode: bulk vs API)
+- **scan/**: `primary_suspect_only` param — PS-only role filter for event discovery (bulk only, falls back to suspect_only without bulk)
+- **scan/**: `check_direction` param — compares base PRR vs PS-only PRR per signal
+  - `"strengthens"` if PS PRR > 1.2x base (pharmacological signal)
+  - `"weakens"` if PS PRR < 0.8x base (confounding probable)
+- **scan/models.py**: `ScanItem.ps_only_prr`, `ScanItem.direction`, `ScanResult.bulk_mode`, `ScanResult.role_filter_used`
+- **dailymed/parser.py**: `match_event_in_label()` now uses MedDRA synonyms via `expand_event_terms()` — fixes false negatives for clinically equivalent terms (e.g., "anaphylactic shock" now matches "anaphylaxis" in label)
+- **vocab/meddra.py**: `expand_event_terms()` now expands aliases to full group (canonical + all aliases)
+- **MCP**: `scan_drug` gains `role_filter` ("ps_only"/"suspect"/"all") and `check_direction` params; output shows data source, role filter, PS-PRR, and direction
+- 29 new tests (1105+ total)
+
+### Sprint 7 — Suspect-Only, Operational Filter, Over-Fetch, Co-Admin, ANVISA
+
 ### Changed
 
 - **stats:** IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior — resolves small-numbers instability

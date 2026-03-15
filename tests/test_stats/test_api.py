@@ -192,11 +192,15 @@ class TestBuildReactionQuery:
         assert result == 'patient.reaction.reactionmeddrapt.exact:"HEADACHE"'
 
     def test_alias_term(self) -> None:
-        """Alias (já é termo FAERS) gera query simples."""
+        """Alias agora expande para grupo completo (canonical + aliases)."""
         result = _build_reaction_query(
             "ELECTROCARDIOGRAM QT PROLONGED", "patient.reaction.reactionmeddrapt.exact"
         )
-        assert result == 'patient.reaction.reactionmeddrapt.exact:"ELECTROCARDIOGRAM QT PROLONGED"'
+        assert result.startswith("(")
+        assert result.endswith(")")
+        assert "QT PROLONGATION" in result
+        assert "ELECTROCARDIOGRAM QT PROLONGED" in result
+        assert "TORSADE DE POINTES" in result
 
     def test_canonical_term_expands(self) -> None:
         """Canonical expande para OR query com todos os aliases."""

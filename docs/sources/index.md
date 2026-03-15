@@ -7,6 +7,7 @@ hypokrates queries multiple public health databases. Each source has its own rat
 | Source | Module | Coverage | Rate Limit (no key) | Rate Limit (with key) |
 |--------|--------|----------|---------------------|----------------------|
 | [OpenFDA/FAERS](faers.md) | `hypokrates.faers` | 20M+ reports (2004-present) | 40 req/min | 240 req/min |
+| [FAERS Bulk](faers.md#faers-bulk-quarterly-files) | `hypokrates.faers_bulk` | Dedup quarterly ASCII | Local (offline) | - |
 | [NCBI/PubMed](pubmed.md) | `hypokrates.pubmed` | 36M+ citations | 180 req/min | 600 req/min |
 | RxNorm | `hypokrates.vocab` | Drug name normalization | 120 req/min | - |
 | MeSH | `hypokrates.vocab` | MeSH term mapping | Shared with PubMed | Shared with PubMed |

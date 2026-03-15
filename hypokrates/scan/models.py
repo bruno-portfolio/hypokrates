@@ -61,6 +61,17 @@ class ScanItem(BaseModel):
         "(e.g., 'Cardiovascular', 'Psychiatric'). "
         "Atribuído automaticamente pelo scan para facilitar interpretação.",
     )
+    ps_only_prr: float | None = Field(
+        default=None,
+        description="PRR calculado com PS-only (bulk only). "
+        "Comparado com PRR base para direction analysis.",
+    )
+    direction: str | None = Field(
+        default=None,
+        description="Resultado da direction analysis: "
+        "'strengthens' (PS PRR > base PRR → sinal farmacológico), "
+        "'weakens' (PS PRR < base PRR → confounding provável).",
+    )
 
 
 class ScanResult(BaseModel):
@@ -83,6 +94,14 @@ class ScanResult(BaseModel):
     coadmin_flagged_count: int = Field(
         default=0,
         description="Nº de eventos flaggados como potencial confounding por co-administração.",
+    )
+    bulk_mode: bool = Field(
+        default=False,
+        description="True se usou FAERS Bulk para event discovery (deduplicado).",
+    )
+    role_filter_used: str | None = Field(
+        default=None,
+        description="Role filter usado no event discovery: 'ps_only', 'suspect', 'all'.",
     )
     skipped_events: list[str] = Field(default_factory=list)
     mechanism: str | None = None

@@ -30,14 +30,19 @@ def register(mcp: FastMCP) -> None:
         check_chembl: bool = False,
         group_events: bool = True,
         filter_operational: bool = True,
-        suspect_only: bool = False,
+        role_filter: str = "suspect",
         check_coadmin: bool = False,
+        check_direction: bool = False,
         use_bulk: bool | None = None,
     ) -> str:
         """Scan a drug's adverse events and classify each as novel/emerging/known signal.
 
         Runs hypothesis analysis for each of the top N adverse events reported in FAERS.
         This involves ~5 HTTP requests per event (4 FAERS + 1 PubMed).
+
+        When bulk data is available, event discovery uses deduplicated data with role
+        filtering (PS-only, suspect, or all). Direction analysis compares base PRR vs
+        PS-only PRR: "strengthens" = pharmacological signal, "weakens" = confounding.
 
         Operational/regulatory MedDRA terms (e.g., OFF LABEL USE, MEDICATION ERROR,
         DRUG INEFFECTIVE) are filtered by default to focus on biological signals.
@@ -56,12 +61,19 @@ def register(mcp: FastMCP) -> None:
             check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
             group_events: Group synonymous MedDRA terms (default True).
             filter_operational: Filter operational/regulatory MedDRA terms (default True).
-            suspect_only: Only count reports where drug is suspect (not concomitant).
+            role_filter: Role filter for event discovery: "ps_only" (Primary Suspect),
+                "suspect" (PS+SS, default), "all" (includes concomitant).
+                ps_only requires bulk data.
             check_coadmin: Check co-administration confounding (opt-in, +1 API call/event).
+            check_direction: Compare base PRR vs PS-only PRR per signal (bulk only).
             use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
         clamped_top_n = min(top_n, 20)
         start = time.monotonic()
+
+        # Map role_filter string to boolean flags
+        _primary_suspect_only = role_filter == "ps_only"
+        _suspect_only = role_filter in ("suspect", "ps_only")
 
         def _on_progress(completed: int, total: int, event: str) -> None:
             logger.info("MCP scan %s: %d/%d — %s", drug, completed, total, event)
@@ -77,8 +89,10 @@ def register(mcp: FastMCP) -> None:
                 check_chembl=check_chembl,
                 group_events=group_events,
                 filter_operational=filter_operational,
-                suspect_only=suspect_only,
+                suspect_only=_suspect_only,
+                primary_suspect_only=_primary_suspect_only,
                 check_coadmin=check_coadmin,
+                check_direction=check_direction,
                 use_bulk=use_bulk,
                 on_progress=_on_progress,
             )
@@ -89,9 +103,13 @@ def register(mcp: FastMCP) -> None:
 
         elapsed = time.monotonic() - start
 
+        data_source = "FAERS Bulk (deduplicated)" if result.bulk_mode else "FAERS API"
+        role_info = f" | Role: {result.role_filter_used}" if result.role_filter_used else ""
+
         lines: list[str] = [
             f"# Scan: {drug.upper()}",
             f"Scanned {result.total_scanned} events in {elapsed:.0f}s",
+            f"Data source: {data_source}{role_info}",
             "",
         ]
 
@@ -121,6 +139,10 @@ def register(mcp: FastMCP) -> None:
                 coadmin_info = ""
                 if item.coadmin_flag:
                     coadmin_info = " | ⚠ CO-ADMIN"
+                direction_info = ""
+                if item.ps_only_prr is not None:
+                    dir_label = f" ({item.direction})" if item.direction else ""
+                    direction_info = f" | PS-PRR={item.ps_only_prr:.2f}{dir_label}"
                 lines.append(
                     f"{item.rank}. **{item.event}** — "
                     f"{item.classification.value} | "
@@ -128,7 +150,7 @@ def register(mcp: FastMCP) -> None:
                     f"lit={item.literature_count}"
                     f"{label_info}{trials_info}{ot_info}"
                     f"{vol_info}{indication_info}{coadmin_info}"
-                    f"{grouped_info}"
+                    f"{direction_info}{grouped_info}"
                 )
             lines.append("")
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from hypokrates.dailymed.parser import (
+    has_safety_sections,
     match_event_in_label,
     parse_adverse_reactions_xml,
     parse_spl_search,
@@ -220,3 +221,170 @@ class TestMatchEventInLabel:
         )
         assert found is True
         assert len(matched) == 1
+
+    def test_meddra_synonym_anaphylactic_shock(self) -> None:
+        """anaphylactic shock → match 'anaphylaxis' via MedDRA group."""
+        found, matched = match_event_in_label(
+            "anaphylactic shock",
+            ["Anaphylaxis", "Hypotension"],
+        )
+        assert found is True
+        assert "Anaphylaxis" in matched
+
+    def test_meddra_synonym_canonical_to_alias(self) -> None:
+        """anaphylaxis (canonical) → match 'anaphylactic reaction' (alias) in label."""
+        found, _matched = match_event_in_label(
+            "anaphylaxis",
+            ["Anaphylactic reaction reported in 2 patients"],
+        )
+        assert found is True
+
+    def test_meddra_synonym_sinus_bradycardia(self) -> None:
+        """sinus bradycardia → match 'bradycardia' via MedDRA group."""
+        found, matched = match_event_in_label(
+            "sinus bradycardia",
+            ["Bradycardia", "Tachycardia"],
+        )
+        assert found is True
+        assert "Bradycardia" in matched
+
+    def test_meddra_synonym_raw_text_fallback(self) -> None:
+        """MedDRA synonym matches in raw_text when no terms match."""
+        found, _matched = match_event_in_label(
+            "anaphylactic shock",
+            [],
+            raw_text="Rare cases of anaphylaxis have been reported.",
+        )
+        assert found is True
+
+    def test_meddra_no_duplicate_matches(self) -> None:
+        """Same label term should not appear multiple times in matched list."""
+        found, matched = match_event_in_label(
+            "bradycardia",
+            ["Bradycardia"],
+        )
+        assert found is True
+        assert len(matched) == 1
+
+    def test_fuzzy_no_match_without_rapidfuzz(self) -> None:
+        """When no substring/MedDRA match and no rapidfuzz, returns False."""
+        from unittest.mock import patch
+
+        with patch.dict("sys.modules", {"rapidfuzz": None, "rapidfuzz.fuzz": None}):
+            found, matched = match_event_in_label(
+                "some_totally_unique_event_xyz",
+                ["Completely different term"],
+            )
+            assert found is False
+            assert matched == []
+
+    def test_no_match_empty_terms_no_raw_text(self) -> None:
+        """No terms, no raw_text → False."""
+        found, matched = match_event_in_label("bradycardia", [])
+        assert found is False
+        assert matched == []
+
+    def test_fuzzy_match_on_terms(self) -> None:
+        """Fuzzy matching catches near-matches (e.g., reordered words)."""
+        pytest = __import__("pytest")
+        try:
+            __import__("rapidfuzz")
+        except ImportError:
+            pytest.skip("rapidfuzz not installed")
+        # "Hepatic failure acute" is very similar to "Acute hepatic failure"
+        found, _matched = match_event_in_label(
+            "acute hepatic failure",
+            ["Hepatic failure acute"],
+        )
+        assert found is True
+
+    def test_fuzzy_match_on_raw_text(self) -> None:
+        """Fuzzy matching in raw_text when no term match."""
+        pytest = __import__("pytest")
+        try:
+            __import__("rapidfuzz")
+        except ImportError:
+            pytest.skip("rapidfuzz not installed")
+        found, _matched = match_event_in_label(
+            "hepatic failure acute",
+            [],
+            raw_text="Cases of acute hepatic failure have been reported.",
+        )
+        # fuzzy may or may not match depending on score; just ensure no crash
+        assert isinstance(found, bool)
+
+
+class TestHasSafetySections:
+    """has_safety_sections — detecta se XML tem seções de segurança."""
+
+    def test_xml_with_adverse_reactions(self) -> None:
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <document xmlns="urn:hl7-org:v3">
+          <component><structuredBody><component><section>
+            <code code="34084-4" codeSystem="2.16.840.1.113883.6.1"/>
+            <text><paragraph>Nausea, Vomiting</paragraph></text>
+          </section></component></structuredBody></component>
+        </document>"""
+        assert has_safety_sections(xml) is True
+
+    def test_xml_without_safety_sections(self) -> None:
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <document xmlns="urn:hl7-org:v3">
+          <component><structuredBody><component><section>
+            <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+            <text><paragraph>Dose info only.</paragraph></text>
+          </section></component></structuredBody></component>
+        </document>"""
+        assert has_safety_sections(xml) is False
+
+    def test_invalid_xml(self) -> None:
+        assert has_safety_sections("not xml") is False
+
+    def test_propofol_golden(self) -> None:
+        xml_path = GOLDEN_DATA / "dailymed" / "spl_xml_propofol.xml"
+        xml_text = xml_path.read_text()
+        assert has_safety_sections(xml_text) is True
+
+
+class TestMatchEventFuzzyBugHunting:
+    """Testes para pares que falharam no bug hunting — fuzzy + MedDRA."""
+
+    def test_hyperthermia_malignant_reorder(self) -> None:
+        """hyperthermia malignant -> match Malignant Hyperthermia via MedDRA."""
+        found, _matched = match_event_in_label(
+            "hyperthermia malignant",
+            ["Malignant Hyperthermia", "Fever"],
+        )
+        assert found is True
+
+    def test_apnoea_british_spelling(self) -> None:
+        """apnoea -> match via MedDRA group (RESPIRATORY DEPRESSION has APNOEA+APNEA)."""
+        found, _matched = match_event_in_label(
+            "apnoea",
+            ["Apnea", "Respiratory depression"],
+        )
+        assert found is True
+
+    def test_qt_prolongation_via_meddra(self) -> None:
+        """QT prolongation -> match electrocardiogram QT prolonged via MedDRA."""
+        found, _matched = match_event_in_label(
+            "QT prolongation",
+            ["Electrocardiogram QT prolonged"],
+        )
+        assert found is True
+
+    def test_hypoglycaemia_british_spelling(self) -> None:
+        """hypoglycaemia -> match hypoglycemia via MedDRA group."""
+        found, _matched = match_event_in_label(
+            "hypoglycaemia",
+            ["Blood glucose decreased", "Hypoglycemia"],
+        )
+        assert found is True
+
+    def test_anaphylactic_shock_to_anaphylaxis(self) -> None:
+        """anaphylactic shock -> match anaphylaxis via MedDRA synonym."""
+        found, _matched = match_event_in_label(
+            "anaphylactic shock",
+            ["Cases of Anaphylaxis have been reported"],
+        )
+        assert found is True

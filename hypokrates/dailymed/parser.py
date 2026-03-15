@@ -62,6 +62,9 @@ def parse_adverse_reactions_xml(xml_text: str) -> tuple[list[str], str]:
     return terms, combined_text
 
 
+_FUZZY_THRESHOLD = 85  # rapidfuzz token_sort_ratio threshold
+
+
 def match_event_in_label(
     event: str,
     terms: list[str],
@@ -69,7 +72,11 @@ def match_event_in_label(
 ) -> tuple[bool, list[str]]:
     """Verifica se um evento adverso está presente nos termos da bula.
 
-    Matching case-insensitive por substring.
+    3 camadas de matching:
+    1. Substring case-insensitive (rápido, sem falsos positivos)
+    2. MedDRA synonyms — expande para canonical+aliases e retenta substring
+    3. Fuzzy — rapidfuzz token_sort_ratio >= 85 (pega ordem invertida,
+       grafias BrE/AmE como apnoea/apnea, variações menores)
 
     Args:
         event: Termo do evento adverso (e.g., "bradycardia").
@@ -79,18 +86,85 @@ def match_event_in_label(
     Returns:
         Tupla (encontrado, lista de termos matched).
     """
-    event_lower = event.lower()
+    from hypokrates.vocab.meddra import expand_event_terms
+
+    # Expandir evento para incluir sinônimos MedDRA (canonical + aliases)
+    search_terms = expand_event_terms(event)
+
     matched: list[str] = []
 
-    for term in terms:
-        if event_lower in term.lower() or term.lower() in event_lower:
-            matched.append(term)
+    # Layer 1 + 2: substring match (original + MedDRA synonyms)
+    for search_event in search_terms:
+        event_lower = search_event.lower()
+        for term in terms:
+            term_lower = term.lower()
+            is_match = event_lower in term_lower or term_lower in event_lower
+            if is_match and term not in matched:
+                matched.append(term)
 
-    # Fallback: buscar no texto raw se não encontrou nos termos
-    if not matched and raw_text and event_lower in raw_text.lower():
-        matched.append(event)
+    if matched:
+        return True, matched
+
+    # Layer 2 fallback: buscar no texto raw com todos os sinônimos
+    if raw_text:
+        raw_lower = raw_text.lower()
+        for search_event in search_terms:
+            if search_event.lower() in raw_lower:
+                matched.append(search_event)
+                return True, matched
+
+    # Layer 3: fuzzy matching com rapidfuzz
+    try:
+        from rapidfuzz.fuzz import token_sort_ratio
+    except ImportError:
+        return False, []
+
+    for search_event in search_terms:
+        for term in terms:
+            score: float = token_sort_ratio(search_event.lower(), term.lower())
+            if score >= _FUZZY_THRESHOLD and term not in matched:
+                matched.append(term)
+
+    # Fuzzy no raw_text: split em sentenças e comparar
+    if not matched and raw_text:
+        sentences = re.split(r"[.;,\n]+", raw_text)
+        for search_event in search_terms:
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if len(sentence) < 3:
+                    continue
+                score = token_sort_ratio(search_event.lower(), sentence.lower())
+                if score >= _FUZZY_THRESHOLD:
+                    matched.append(search_event)
+                    break
+            if matched:
+                break
 
     return len(matched) > 0, matched
+
+
+def has_safety_sections(xml_text: str) -> bool:
+    """Verifica se um SPL XML contém pelo menos uma seção de segurança (LOINC).
+
+    Usado para filtrar SPLs irrelevantes (ex: powder, OTC, patch) que não
+    têm seções de Adverse Reactions ou Warnings.
+
+    Args:
+        xml_text: XML completo do SPL.
+
+    Returns:
+        True se pelo menos um LOINC de segurança foi encontrado.
+    """
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return False
+
+    for loinc_code in SAFETY_LOINC_CODES:
+        section_text = _find_section_by_loinc(root, loinc_code)
+        if section_text:
+            return True
+    return False
 
 
 def _find_section_by_loinc(root: ET.Element, loinc_code: str) -> str:

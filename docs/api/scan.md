@@ -43,8 +43,21 @@ Scans the top N adverse events for a drug in FAERS and runs hypothesis classific
 | `group_events` | `bool` | `True` | Group synonymous MedDRA terms |
 | `filter_operational` | `bool` | `True` | Filter operational/regulatory MedDRA terms |
 | `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
+| `primary_suspect_only` | `bool` | `False` | PS-only role filter (bulk only; falls back to suspect_only without bulk) |
 | `check_coadmin` | `bool` | `False` | Check co-administration confounding (+1 API call/event) |
+| `check_direction` | `bool` | `False` | Compare base PRR vs PS-only PRR per signal (bulk only) |
+| `use_bulk` | `bool \| None` | `None` | `None`=auto-detect, `True`=force bulk, `False`=force API |
 | `on_progress` | `Callable` | `None` | Progress callback `(completed, total, event_term)` |
+
+### Dual-mode event source
+
+When FAERS Bulk quarterly files are loaded (`~/.cache/hypokrates/faers_bulk.duckdb`), `scan_drug()` automatically uses deduplicated data for event discovery. This provides:
+
+- **Deduplication by CASEID** — removes follow-up/correction duplicates
+- **Role filtering** — PS-only, PS+SS (suspect), or all roles
+- **Direction analysis** — compares base PRR vs PS-only PRR per signal
+
+Without bulk data, the API path is used (OpenFDA count endpoint).
 
 ### Performance
 
@@ -52,6 +65,7 @@ Each event requires ~5 HTTP requests (4 FAERS + 1 PubMed):
 
 - **Without API key** (FAERS 40/min): ~2-3 minutes for 20 events
 - **With API key** (FAERS 240/min): ~30-60 seconds for 20 events
+- **With bulk data**: event discovery is instant (local DuckDB); hypothesis still uses HTTP
 
 ### Scoring
 
@@ -91,6 +105,8 @@ Additional multipliers:
 | `coadmin_flag` | `bool` | True if co-administration confounding detected |
 | `coadmin_detail` | `str \| None` | Summary of co-admin analysis |
 | `cluster` | `str` | Semantic cluster (e.g., "Cardiovascular") |
+| `ps_only_prr` | `float \| None` | PRR with PS-only role filter (bulk only, via `check_direction`) |
+| `direction` | `str \| None` | `"strengthens"` (PS PRR > 1.2x base) or `"weakens"` (PS PRR < 0.8x base) |
 
 ### `ScanResult`
 
@@ -108,6 +124,8 @@ Additional multipliers:
 | `groups_applied` | `bool` | Whether MedDRA grouping was applied |
 | `filtered_operational_count` | `int` | Operational MedDRA terms filtered |
 | `coadmin_flagged_count` | `int` | Events flagged as co-admin confounding |
+| `bulk_mode` | `bool` | Whether FAERS Bulk was used for event discovery |
+| `role_filter_used` | `str \| None` | Role filter used: `"ps_only"`, `"suspect"`, `"all"` |
 | `skipped_events` | `list[str]` | Events that failed |
 | `mechanism` | `str \| None` | Drug mechanism of action |
 | `meta` | `MetaInfo` | Provenance metadata |

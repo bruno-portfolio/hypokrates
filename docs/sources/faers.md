@@ -59,3 +59,43 @@ When an adverse event receives media attention, reporting of that specific event
 ### Missing Data
 
 Many reports have incomplete data — patient age, sex, weight, and dose information are frequently missing. Reports with missing drug role or reaction terms are common.
+
+## FAERS Bulk (Quarterly Files)
+
+In addition to the OpenFDA API, hypokrates supports loading FAERS quarterly ASCII files directly into a local DuckDB store. This provides:
+
+- **Deduplication by CASEID** — keeps only the latest version of each case (follow-ups/corrections are collapsed)
+- **Role filtering** — query by Primary Suspect only (PS), PS+SS (suspect), or all roles (including concomitant)
+- **Direction analysis** — compare PRR across different role filters to distinguish pharmacological signals from confounding
+
+### Loading quarterly files
+
+```python
+from hypokrates.sync import faers_bulk
+
+# Load one or more quarters
+from hypokrates.faers_bulk.store import FAERSBulkStore
+store = FAERSBulkStore.get_instance()
+store.load_quarter("/path/to/faers_ascii_2024Q3.zip")
+store.load_quarter("/path/to/faers_ascii_2024Q4.zip")
+```
+
+Quarterly ASCII ZIPs can be downloaded from [FDA FAERS Downloads](https://fis.fda.gov/extensions/FPD-QDE-FAERS/FPD-QDE-FAERS.html). Each ZIP is ~300-500 MB.
+
+### Using bulk in scan
+
+When bulk data is loaded, `scan_drug()` automatically uses it for event discovery:
+
+```python
+result = scan.scan_drug(
+    "propofol",
+    primary_suspect_only=True,  # PS-only (bulk only)
+    check_direction=True,       # compare base vs PS-only PRR
+)
+print(result.bulk_mode)          # True
+print(result.role_filter_used)   # "ps_only"
+```
+
+### Storage
+
+Bulk data is stored at `~/.cache/hypokrates/faers_bulk.duckdb` (separate from the HTTP cache).

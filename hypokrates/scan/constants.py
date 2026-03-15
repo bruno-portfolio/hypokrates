@@ -21,6 +21,12 @@ INDICATION_MULTIPLIER: float = 0.3
 CO_ADMIN_MULTIPLIER: float = 0.3  # penalty para items com co-admin confounding
 
 # ---------------------------------------------------------------------------
+# Direction analysis — compara PRR ALL/SUSPECT vs PS-only
+# ---------------------------------------------------------------------------
+DIRECTION_STRENGTHENS_THRESHOLD: float = 1.2  # PS PRR > 1.2x base = fortalece sinal
+DIRECTION_WEAKENS_THRESHOLD: float = 0.8  # PS PRR < 0.8x base = enfraquece sinal
+
+# ---------------------------------------------------------------------------
 # Termos MedDRA operacionais/regulatórios — NÃO representam toxicidade biológica.
 # Descrevem problemas de processo, uso ou reporting, não efeitos adversos reais.
 # Filtrados por padrão no scan para evitar poluição dos resultados.
@@ -69,6 +75,10 @@ OPERATIONAL_MEDDRA_TERMS: frozenset[str] = frozenset(
         "ADVERSE DRUG REACTION",
         "TREATMENT FAILURE",
         "DRUG INTOLERANCE",
+        "GENERAL PHYSICAL HEALTH DETERIORATION",
+        "PAIN",  # discutível — pode ter valor em contextos específicos
+        "FALL",  # discutível — pode ter valor em contextos específicos (ex: sedativos)
+        "MALAISE",
         # Exposição (confounding / não é efeito adverso)
         "EXPOSURE DURING PREGNANCY",
         "MATERNAL EXPOSURE DURING PREGNANCY",

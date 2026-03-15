@@ -15,13 +15,15 @@ from hypokrates.faers.constants import (
     DRUG_CHARACTERIZATION_FIELD,
     DRUG_CHARACTERIZATION_SUSPECT,
 )
-from hypokrates.models import MetaInfo
+from hypokrates.models import AdverseEvent, MetaInfo
 from hypokrates.scan.clusters import get_cluster
 from hypokrates.scan.constants import (
     CLASSIFICATION_WEIGHTS,
     CO_ADMIN_MULTIPLIER,
     DEFAULT_CONCURRENCY,
     DEFAULT_TOP_N,
+    DIRECTION_STRENGTHENS_THRESHOLD,
+    DIRECTION_WEAKENS_THRESHOLD,
     INDICATION_MULTIPLIER,
     LABEL_IN_MULTIPLIER,
     LABEL_NOT_IN_MULTIPLIER,
@@ -40,6 +42,7 @@ if TYPE_CHECKING:
     from hypokrates.chembl.models import ChEMBLMechanism
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
+    from hypokrates.faers_bulk.constants import RoleCodFilter
     from hypokrates.opentargets.models import OTDrugSafety
 
 logger = logging.getLogger(__name__)
@@ -60,7 +63,9 @@ async def scan_drug(
     group_events: bool = True,
     filter_operational: bool = True,
     suspect_only: bool = False,
+    primary_suspect_only: bool = False,
     check_coadmin: bool = False,
+    check_direction: bool = False,
     use_bulk: bool | None = None,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
@@ -87,7 +92,11 @@ async def scan_drug(
         group_events: Se deve agrupar termos MedDRA sinônimos.
         filter_operational: Se deve filtrar termos MedDRA operacionais/regulatórios.
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
+        primary_suspect_only: Se True + bulk, usa PS_ONLY (apenas Primary Suspect).
+            Requer bulk; sem bulk, faz fallback para suspect_only com warning.
         check_coadmin: Se True, analisa confounding por co-administração (Layer 1).
+        check_direction: Se True + bulk, compara PRR base vs PS-only para cada sinal.
+            "strengthens" se PS PRR > 1.2x base, "weakens" se < 0.8x.
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         on_progress: Callback opcional (completed, total, event_term).
 
@@ -96,10 +105,46 @@ async def scan_drug(
     """
     # 1. Obter top eventos (over-fetch para capturar sinais de PRR alto com volume baixo)
     fetch_limit = top_n * OVERFETCH_MULTIPLIER
-    faers_result = await faers_api.top_events(
-        drug, suspect_only=suspect_only, limit=fetch_limit, use_cache=use_cache
-    )
-    events = faers_result.events
+
+    _using_bulk = use_bulk is True or (use_bulk is None and await _check_bulk_available())
+
+    # Resolve role filter para event discovery
+    role_filter_used: str | None = None
+
+    if _using_bulk:
+        from hypokrates.faers_bulk import api as bulk_api
+
+        role_filter = _resolve_role_filter(primary_suspect_only, suspect_only)
+        role_filter_used = role_filter.value
+
+        raw_events = await bulk_api.bulk_top_events(
+            drug, role_filter=role_filter, limit=fetch_limit
+        )
+        # Converter para AdverseEvent para compatibilidade
+        events = [AdverseEvent(term=ev, count=cnt) for ev, cnt in raw_events]
+
+        # Pre-fetch drug_total e n_total via bulk
+        from hypokrates.faers_bulk.store import FAERSBulkStore
+
+        store = FAERSBulkStore.get_instance()
+        shared_drug_total_val, shared_n_total_val = await asyncio.gather(
+            bulk_api.bulk_drug_total(drug, role_filter=role_filter),
+            asyncio.to_thread(store.count_total),
+        )
+        shared_drug_total = shared_drug_total_val
+        shared_n_total = shared_n_total_val
+    else:
+        if primary_suspect_only:
+            logger.warning(
+                "Scan %s: primary_suspect_only requires bulk; falling back to suspect_only",
+                drug,
+            )
+        faers_result = await faers_api.top_events(
+            drug, suspect_only=suspect_only, limit=fetch_limit, use_cache=use_cache
+        )
+        events = faers_result.events
+        shared_drug_total = None
+        shared_n_total = None
 
     # 1b. Filtrar termos operacionais/regulatórios MedDRA
     filtered_operational_count = 0
@@ -154,13 +199,9 @@ async def scan_drug(
         chembl_cache = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
 
     # 2b. Pre-computar valores FAERS compartilhados (1x por droga, não por evento)
-    # Skip quando usando bulk — signal() usará o bulk store diretamente
+    # Skip quando usando bulk — shared values já foram computados acima
     faers_client: FAERSClient | None = None
     drug_search: str | None = None
-    shared_drug_total: int | None = None
-    shared_n_total: int | None = None
-
-    _using_bulk = use_bulk is True or (use_bulk is None and await _check_bulk_available())
 
     if not _using_bulk:
         faers_client = FAERSClient()
@@ -379,7 +420,38 @@ async def scan_drug(
             if coadmin_client is not None:
                 await coadmin_client.close()
 
-    # 5c. Truncar para top_n, atribuir ranks e clusters semânticos
+    # 5c. Direction analysis — compara PRR base vs PS-only (bulk only)
+    if check_direction and _using_bulk:
+        from hypokrates.faers_bulk.api import bulk_signal as _bulk_signal
+        from hypokrates.faers_bulk.constants import RoleCodFilter as _RoleCodFilter
+
+        direction_sem = asyncio.Semaphore(concurrency)
+
+        async def _run_direction(item: ScanItem) -> ScanItem:
+            if not item.signal.signal_detected:
+                return item
+            base_prr = item.signal.prr.value
+            if base_prr <= 0:
+                return item
+            async with direction_sem:
+                try:
+                    ps_result = await _bulk_signal(
+                        drug, item.event, role_filter=_RoleCodFilter.PS_ONLY
+                    )
+                except Exception:
+                    logger.warning("Scan %s: direction failed for %s", drug, item.event)
+                    return item
+            ps_prr = ps_result.prr.value
+            direction: str | None = None
+            if ps_prr > base_prr * DIRECTION_STRENGTHENS_THRESHOLD:
+                direction = "strengthens"
+            elif ps_prr < base_prr * DIRECTION_WEAKENS_THRESHOLD:
+                direction = "weakens"
+            return item.model_copy(update={"ps_only_prr": ps_prr, "direction": direction})
+
+        items = list(await asyncio.gather(*[_run_direction(it) for it in items]))
+
+    # 5d. Truncar para top_n, atribuir ranks e clusters semânticos
     items = items[:top_n]
     items = [
         item.model_copy(update={"rank": idx + 1, "cluster": get_cluster(item.event)})
@@ -413,6 +485,8 @@ async def scan_drug(
         groups_applied=groups_applied,
         filtered_operational_count=filtered_operational_count,
         coadmin_flagged_count=coadmin_flagged_count,
+        bulk_mode=_using_bulk,
+        role_filter_used=role_filter_used,
         skipped_events=skipped_events,
         mechanism=scan_mechanism,
         interactions_count=scan_interactions_count,
@@ -429,6 +503,17 @@ async def scan_drug(
             + PRR_DISCLAIMER,
         ),
     )
+
+
+def _resolve_role_filter(primary_suspect_only: bool, suspect_only: bool) -> RoleCodFilter:
+    """Resolve flags booleanas para RoleCodFilter do bulk."""
+    from hypokrates.faers_bulk.constants import RoleCodFilter
+
+    if primary_suspect_only:
+        return RoleCodFilter.PS_ONLY
+    if suspect_only:
+        return RoleCodFilter.SUSPECT
+    return RoleCodFilter.SUSPECT  # default: PS+SS
 
 
 async def _check_bulk_available() -> bool:

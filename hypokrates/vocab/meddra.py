@@ -212,16 +212,21 @@ for _canonical, _aliases in MEDDRA_GROUPS.items():
 
 
 def expand_event_terms(event: str) -> list[str]:
-    """Expande um termo (canonical ou alias) para todos os termos FAERS equivalentes.
+    """Expande um termo (canonical ou alias) para todos os termos do grupo MedDRA.
 
-    Se o input é canonical, retorna canonical + aliases (para query OR no FAERS).
-    Se é alias ou desconhecido, retorna apenas o input.
+    Se o input é canonical, retorna canonical + aliases.
+    Se o input é alias conhecido, retorna canonical + todas as aliases do grupo.
+    Se desconhecido, retorna apenas o input.
     """
     upper = event.upper().strip()
     # É canonical? Retorna canonical + aliases
     if upper in MEDDRA_GROUPS:
         return [upper, *MEDDRA_GROUPS[upper]]
-    # É alias ou desconhecido? Retorna só ele
+    # É alias? Resolve para canonical e retorna grupo completo
+    if upper in _ALIAS_MAP:
+        canon = _ALIAS_MAP[upper]
+        return [canon, *MEDDRA_GROUPS[canon]]
+    # Desconhecido — retorna só ele
     return [upper]
 
 

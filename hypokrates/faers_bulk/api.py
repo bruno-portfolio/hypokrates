@@ -41,6 +41,50 @@ async def bulk_store_status() -> BulkStoreStatus:
     return await asyncio.to_thread(store.get_status)
 
 
+async def bulk_top_events(
+    drug: str,
+    *,
+    role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+    limit: int = 60,
+) -> list[tuple[str, int]]:
+    """Retorna top eventos adversos de uma droga via bulk store (deduplicado).
+
+    Args:
+        drug: Nome genérico do medicamento.
+        role_filter: Filtro de role (PS_ONLY, SUSPECT, ALL).
+        limit: Máximo de eventos.
+
+    Returns:
+        Lista de (event_term, count) ordenada por count DESC.
+    """
+    store = FAERSBulkStore.get_instance()
+    resolved = await resolve_bulk_drug(drug, store=store)
+    drug_name = resolved if resolved is not None else drug.strip().upper()
+    return await asyncio.to_thread(
+        store.top_events, drug_name, role_filter=role_filter, limit=limit
+    )
+
+
+async def bulk_drug_total(
+    drug: str,
+    *,
+    role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+) -> int:
+    """Total de cases deduplicados que mencionam a droga.
+
+    Args:
+        drug: Nome genérico do medicamento.
+        role_filter: Filtro de role.
+
+    Returns:
+        Contagem de cases.
+    """
+    store = FAERSBulkStore.get_instance()
+    resolved = await resolve_bulk_drug(drug, store=store)
+    drug_name = resolved if resolved is not None else drug.strip().upper()
+    return await asyncio.to_thread(store.drug_total, drug_name, role_filter=role_filter)
+
+
 async def bulk_signal(
     drug: str,
     event: str,

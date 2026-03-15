@@ -157,6 +157,8 @@ class _SyncFAERSBulk:
     is_bulk_available = staticmethod(_make_sync(faers_bulk_api.is_bulk_available))
     bulk_store_status = staticmethod(_make_sync(faers_bulk_api.bulk_store_status))
     bulk_signal = staticmethod(_make_sync(faers_bulk_api.bulk_signal))
+    bulk_top_events = staticmethod(_make_sync(faers_bulk_api.bulk_top_events))
+    bulk_drug_total = staticmethod(_make_sync(faers_bulk_api.bulk_drug_total))
 
 
 class _SyncAnvisa:

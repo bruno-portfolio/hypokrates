@@ -29,8 +29,13 @@ class TestExpandEventTerms:
         assert len(terms) == 4
 
     def test_expand_alias_term(self) -> None:
+        """Alias now expands to full group (canonical + all aliases)."""
         terms = expand_event_terms("ELECTROCARDIOGRAM QT PROLONGED")
-        assert terms == ["ELECTROCARDIOGRAM QT PROLONGED"]
+        assert "QT PROLONGATION" in terms
+        assert "ELECTROCARDIOGRAM QT PROLONGED" in terms
+        assert "LONG QT SYNDROME" in terms
+        assert "TORSADE DE POINTES" in terms
+        assert len(terms) == 4
 
     def test_expand_unknown_term(self) -> None:
         terms = expand_event_terms("headache")

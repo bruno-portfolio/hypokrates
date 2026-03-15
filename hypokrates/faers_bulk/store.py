@@ -110,6 +110,45 @@ SELECT
 """
 
 
+_TOP_EVENTS_SQL = """
+WITH deduped AS (
+    SELECT primaryid FROM faers_dedup
+),
+drug_pids AS (
+    SELECT DISTINCT d.primaryid
+    FROM faers_drug d
+    INNER JOIN deduped dd ON d.primaryid = dd.primaryid
+    WHERE d.drug_name_norm = $drug
+    AND (
+        $role = 'all'
+        OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
+        OR ($role = 'ps_only' AND d.role_cod = 'PS')
+    )
+)
+SELECT r.pt_upper AS event, COUNT(DISTINCT dp.primaryid) AS cnt
+FROM drug_pids dp
+INNER JOIN faers_reac r ON dp.primaryid = r.primaryid
+GROUP BY r.pt_upper
+ORDER BY cnt DESC
+LIMIT $limit
+"""
+
+_DRUG_TOTAL_SQL = """
+WITH deduped AS (
+    SELECT primaryid FROM faers_dedup
+)
+SELECT COUNT(DISTINCT d.primaryid)
+FROM faers_drug d
+INNER JOIN deduped dd ON d.primaryid = dd.primaryid
+WHERE d.drug_name_norm = $drug
+AND (
+    $role = 'all'
+    OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
+    OR ($role = 'ps_only' AND d.role_cod = 'PS')
+)
+"""
+
+
 class FAERSBulkStore:
     """Store DuckDB para FAERS quarterly ASCII files.
 
@@ -293,6 +332,60 @@ class FAERSBulkStore:
             event_total=result[2],
             n_total=result[3],
         )
+
+    def top_events(
+        self,
+        drug: str,
+        *,
+        role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+        limit: int = 60,
+    ) -> list[tuple[str, int]]:
+        """Retorna os eventos mais reportados para uma droga (deduplicado).
+
+        Args:
+            drug: Nome da droga (UPPER).
+            role_filter: Filtro de role.
+            limit: Máximo de eventos retornados.
+
+        Returns:
+            Lista de (event_term, count) ordenada por count DESC.
+        """
+        drug_upper = drug.strip().upper()
+        role_value = role_filter.value
+
+        with self._db_lock:
+            rows = self._conn.execute(
+                _TOP_EVENTS_SQL,
+                {"drug": drug_upper, "role": role_value, "limit": limit},
+            ).fetchall()
+
+        return [(row[0], row[1]) for row in rows]
+
+    def drug_total(
+        self,
+        drug: str,
+        *,
+        role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+    ) -> int:
+        """Total de cases deduplicados que mencionam a droga com o role dado.
+
+        Args:
+            drug: Nome da droga (UPPER).
+            role_filter: Filtro de role.
+
+        Returns:
+            Contagem de primaryids distintos.
+        """
+        drug_upper = drug.strip().upper()
+        role_value = role_filter.value
+
+        with self._db_lock:
+            result = self._conn.execute(
+                _DRUG_TOTAL_SQL,
+                {"drug": drug_upper, "role": role_value},
+            ).fetchone()
+
+        return result[0] if result else 0
 
     def count_total(self) -> int:
         """Total de cases deduplicados (N)."""

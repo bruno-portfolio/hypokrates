@@ -189,10 +189,13 @@ Automatically scan the top adverse events for a drug and classify each:
         check_trials=True,
         check_chembl=True,
         check_opentargets=True,
+        check_direction=True,  # compare base vs PS-only PRR (bulk only)
     )
     for item in result.items:
-        print(f"#{item.rank} {item.event}: {item.classification.value}")
+        direction = f" ({item.direction})" if item.direction else ""
+        print(f"#{item.rank} {item.event}: {item.classification.value}{direction}")
     print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
+    print(f"Data source: {'Bulk (dedup)' if result.bulk_mode else 'API'}")
     ```
 
 === "Sync"
@@ -204,6 +207,11 @@ Automatically scan the top adverse events for a drug and classify each:
     for item in result.items:
         print(f"#{item.rank} {item.event}: {item.classification.value}")
     ```
+
+!!! tip "FAERS Bulk for better accuracy"
+    When FAERS quarterly ASCII files are loaded, `scan_drug()` automatically uses
+    deduplicated data with role filtering. Use `primary_suspect_only=True` for
+    PS-only analysis and `check_direction=True` to compare base vs PS-only PRR.
 
 ## Step 7 — FDA Drug Label
 
