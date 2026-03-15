@@ -150,7 +150,15 @@ async def signal_timeline(
         search = f'{drug_search}{char_filter} AND {reaction_field}:"{event_upper}"'
         count_field = COUNT_FIELDS["receivedate"]
 
-        data = await client.fetch_count(search, count_field, limit=1000, use_cache=use_cache)
+        try:
+            data = await client.fetch_count(search, count_field, limit=100, use_cache=use_cache)
+        except Exception:
+            logger.warning(
+                "signal_timeline %s + %s: count query failed, returning empty",
+                drug,
+                event,
+            )
+            data = {"results": []}
     finally:
         await client.close()
 
