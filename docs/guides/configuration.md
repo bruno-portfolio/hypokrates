@@ -41,6 +41,7 @@ All parameters are optional — only set what you need. Unset fields keep their 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `drugbank_path` | `str \| Path \| None` | `None` | Path to DrugBank XML file (~175MB). Required for `drug_info()` and `drug_interactions()`. Free academic license at [go.drugbank.com](https://go.drugbank.com/releases/latest). |
+| `anvisa_csv_path` | `str \| Path \| None` | `None` | Path to ANVISA medicamentos CSV. Optional — auto-downloaded on first call if not set. |
 
 ### Cache
 

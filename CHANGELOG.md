@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added
+- `hypokrates.anvisa` module — Brazilian drug registry (ANVISA open data)
+- `buscar_medicamento()` — search by brand name or active ingredient (accent-insensitive, partial match)
+- `buscar_por_substancia()` — search by active ingredient with optional category filter (Genérico/Similar/Referência)
+- `listar_apresentacoes()` — list presentations/dosages for a drug
+- `mapear_nome()` — bidirectional PT ↔ EN drug name mapping (~95 drugs)
+- Auto-download of ANVISA CSV (~5 MB) on first call, with 30-day refresh
+- DuckDB store at `~/.cache/hypokrates/anvisa.duckdb` (separate from HTTP cache)
+- `AnvisaMedicamento`, `AnvisaSearchResult`, `AnvisaNomeMapping` models (with `image_url` field for future use)
+- MCP tools: `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`
+- Sync wrapper: `from hypokrates.sync import anvisa`
+- `Source.ANVISA` enum value
+- `anvisa_csv_path` configuration parameter
+- 66 new tests (88% coverage)
+
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability
 

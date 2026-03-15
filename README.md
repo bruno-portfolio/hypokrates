@@ -177,6 +177,26 @@ score = opentargets.drug_safety_score("sugammadex", "bradycardia")
 print(f"logLR: {score.llr}")
 ```
 
+## Brazilian drug registry (ANVISA)
+
+```python
+from hypokrates.sync import anvisa
+
+# Search by name (partial, accent-insensitive)
+result = anvisa.buscar_medicamento("dipirona")
+for med in result.medicamentos:
+    print(f"{med.nome_produto} ({', '.join(med.substancias)}) — {med.categoria}")
+
+# List generics for an active ingredient
+genericos = anvisa.buscar_por_substancia("metformina", categoria="Genérico")
+
+# Map Brazilian ↔ international drug names
+mapping = anvisa.mapear_nome("dipirona")
+print(f"{mapping.nome_pt} → {mapping.nome_en}")  # DIPIRONA → METAMIZOLE
+```
+
+> Auto-downloads ~5 MB CSV on first call. No setup required. Data: CC BY-ND 3.0, Fonte: ANVISA.
+
 ## Drug normalization (RxNorm/MeSH)
 
 ```python
@@ -227,7 +247,7 @@ python -m hypokrates.mcp
 }
 ```
 
-19 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`.
+22 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`.
 
 ## Data Sources
 
@@ -242,10 +262,11 @@ python -m hypokrates.mcp
 | DrugBank | `drugbank` | Local XML | Offline |
 | OpenTargets | `opentargets` | None | 30/min |
 | ChEMBL | `chembl` | None | 30/min |
+| ANVISA | `anvisa` | None (auto-download) | Local |
 
 ## Status
 
-**Alpha** — 704 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1046 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 
