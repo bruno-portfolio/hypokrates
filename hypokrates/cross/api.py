@@ -64,6 +64,7 @@ async def hypothesis(
     check_opentargets: bool = False,
     check_chembl: bool = False,
     suspect_only: bool = False,
+    use_bulk: bool | None = None,
     _label_cache: LabelEventsResult | None = None,
     _drugbank_cache: DrugBankInfo | None = None,
     _ot_safety_cache: OTDrugSafety | None = None,
@@ -89,6 +90,7 @@ async def hypothesis(
         check_opentargets: Se deve buscar LRT score no OpenTargets.
         check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
+        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
 
     Thresholds são heurísticas — ajuste pro domínio clínico.
 
@@ -101,6 +103,7 @@ async def hypothesis(
             drug,
             event,
             suspect_only=suspect_only,
+            use_bulk=use_bulk,
             use_cache=use_cache,
             _client=_faers_client,
             _drug_search=_drug_search,

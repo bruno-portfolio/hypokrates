@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from hypokrates.config import configure
-from hypokrates.stats.api import _aggregate_quarterly, signal, signal_timeline
+from hypokrates.faers_bulk.drug_resolver import clear_cache as clear_resolver_cache
+from hypokrates.faers_bulk.store import FAERSBulkStore
+from hypokrates.stats.api import (
+    _aggregate_quarterly,
+    _build_reaction_query,
+    signal,
+    signal_timeline,
+)
 from hypokrates.stats.models import QuarterlyCount, SignalResult, TimelineResult
 
 
@@ -175,6 +183,43 @@ class TestSignalAPI:
             assert "drugcharacterization" in c
 
 
+class TestBuildReactionQuery:
+    """Testes para _build_reaction_query()."""
+
+    def test_single_unknown_term(self) -> None:
+        """Termo desconhecido gera query simples."""
+        result = _build_reaction_query("HEADACHE", "patient.reaction.reactionmeddrapt.exact")
+        assert result == 'patient.reaction.reactionmeddrapt.exact:"HEADACHE"'
+
+    def test_alias_term(self) -> None:
+        """Alias (já é termo FAERS) gera query simples."""
+        result = _build_reaction_query(
+            "ELECTROCARDIOGRAM QT PROLONGED", "patient.reaction.reactionmeddrapt.exact"
+        )
+        assert result == 'patient.reaction.reactionmeddrapt.exact:"ELECTROCARDIOGRAM QT PROLONGED"'
+
+    def test_canonical_term_expands(self) -> None:
+        """Canonical expande para OR query com todos os aliases."""
+        result = _build_reaction_query(
+            "QT PROLONGATION", "patient.reaction.reactionmeddrapt.exact"
+        )
+        assert result.startswith("(")
+        assert result.endswith(")")
+        assert "QT PROLONGATION" in result
+        assert "ELECTROCARDIOGRAM QT PROLONGED" in result
+        assert "LONG QT SYNDROME" in result
+        assert "TORSADE DE POINTES" in result
+        assert "+" in result
+
+    def test_case_insensitive(self) -> None:
+        """Input case-insensitive é normalizado."""
+        result = _build_reaction_query(
+            "qt prolongation", "patient.reaction.reactionmeddrapt.exact"
+        )
+        assert "QT PROLONGATION" in result
+        assert "ELECTROCARDIOGRAM QT PROLONGED" in result
+
+
 class TestAggregateQuarterly:
     """Testes para _aggregate_quarterly()."""
 
@@ -305,3 +350,76 @@ class TestSignalTimeline:
         # Verificar que fetch_count foi chamado com drugcharacterization
         search_arg = instance.fetch_count.call_args[0][0]
         assert "drugcharacterization" in search_arg
+
+
+GOLDEN_ZIP_Q3 = (
+    Path(__file__).parent.parent / "golden_data" / "faers_bulk" / "faers_ascii_2024Q3.zip"
+)
+
+
+class TestSignalBulkMode:
+    """Testes para signal() com FAERS Bulk (dual-mode)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path: Path) -> None:
+        """Setup: cria store singleton com golden data."""
+        configure(cache_enabled=False)
+        db_path = tmp_path / "test_signal_bulk.duckdb"
+        store = FAERSBulkStore(db_path)
+        store.load_quarter(GOLDEN_ZIP_Q3)
+        FAERSBulkStore._instance = store
+        clear_resolver_cache()
+        yield  # type: ignore[misc]
+        FAERSBulkStore._instance = None
+
+    async def test_signal_use_bulk_true(self) -> None:
+        """use_bulk=True força uso do bulk store."""
+        result = await signal("propofol", "bradycardia", use_bulk=True)
+        assert isinstance(result, SignalResult)
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+        assert result.drug == "propofol"
+        assert result.event == "bradycardia"
+
+    async def test_signal_use_bulk_auto_detects(self) -> None:
+        """use_bulk=None auto-detecta bulk disponível."""
+        result = await signal("propofol", "bradycardia", use_bulk=None)
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+
+    @patch("hypokrates.stats.api.FAERSClient")
+    async def test_signal_use_bulk_false_forces_api(self, mock_client_cls: Any) -> None:
+        """use_bulk=False força uso da API, mesmo com bulk disponível."""
+        instance = mock_client_cls.return_value
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 100,
+                "drug_total": 1000,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
+        instance.close = AsyncMock()
+
+        result = await signal("propofol", "DEATH", use_bulk=False)
+        assert result.meta.source == "OpenFDA/FAERS"
+
+    async def test_signal_bulk_primary_suspect_only(self) -> None:
+        """primary_suspect_only=True usa PS_ONLY no bulk."""
+        result = await signal("propofol", "bradycardia", primary_suspect_only=True, use_bulk=True)
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+        assert result.meta.query["role_filter"] == "ps_only"
+
+    async def test_signal_bulk_suspect_only(self) -> None:
+        """suspect_only=True usa SUSPECT filter no bulk."""
+        result = await signal("propofol", "bradycardia", suspect_only=True, use_bulk=True)
+        assert result.meta.query["role_filter"] == "suspect"
+
+    async def test_signal_bulk_default_is_all(self) -> None:
+        """Sem suspect flags usa ALL no bulk."""
+        result = await signal("propofol", "bradycardia", use_bulk=True)
+        assert result.meta.query["role_filter"] == "all"
+
+    async def test_signal_bulk_counts_differ_from_api_path(self) -> None:
+        """Verifica que bulk retorna contagens do golden data."""
+        result = await signal("propofol", "bradycardia", use_bulk=True)
+        # ALL role: a=3 (PROPOFOL em qualquer role + BRADYCARDIA)
+        assert result.table.a == 3

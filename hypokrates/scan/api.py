@@ -59,6 +59,7 @@ async def scan_drug(
     group_events: bool = True,
     filter_operational: bool = True,
     suspect_only: bool = False,
+    use_bulk: bool | None = None,
     on_progress: Callable[[int, int, str], None] | None = None,
 ) -> ScanResult:
     """Escaneia os top eventos adversos de uma droga e gera hipóteses.
@@ -84,6 +85,7 @@ async def scan_drug(
         group_events: Se deve agrupar termos MedDRA sinônimos.
         filter_operational: Se deve filtrar termos MedDRA operacionais/regulatórios.
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
+        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         on_progress: Callback opcional (completed, total, event_term).
 
     Returns:
@@ -149,30 +151,35 @@ async def scan_drug(
         chembl_cache = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
 
     # 2b. Pre-computar valores FAERS compartilhados (1x por droga, não por evento)
-    faers_client = FAERSClient()
+    # Skip quando usando bulk — signal() usará o bulk store diretamente
+    faers_client: FAERSClient | None = None
     drug_search: str | None = None
     shared_drug_total: int | None = None
     shared_n_total: int | None = None
 
-    try:
-        drug_search = await faers_api.resolve_drug_field(
-            drug, client=faers_client, use_cache=use_cache
-        )
-        char_filter = (
-            f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
-            if suspect_only
-            else ""
-        )
-        search_drug = f"{drug_search}{char_filter}"
-        shared_drug_total, shared_n_total = await asyncio.gather(
-            faers_client.fetch_total(search_drug, use_cache=use_cache),
-            faers_client.fetch_total("", use_cache=use_cache),
-        )
-    except Exception:
-        logger.warning(
-            "Scan %s: pre-compute shared FAERS values failed, continuing without",
-            drug,
-        )
+    _using_bulk = use_bulk is True or (use_bulk is None and await _check_bulk_available())
+
+    if not _using_bulk:
+        faers_client = FAERSClient()
+        try:
+            drug_search = await faers_api.resolve_drug_field(
+                drug, client=faers_client, use_cache=use_cache
+            )
+            char_filter = (
+                f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
+                if suspect_only
+                else ""
+            )
+            search_drug = f"{drug_search}{char_filter}"
+            shared_drug_total, shared_n_total = await asyncio.gather(
+                faers_client.fetch_total(search_drug, use_cache=use_cache),
+                faers_client.fetch_total("", use_cache=use_cache),
+            )
+        except Exception:
+            logger.warning(
+                "Scan %s: pre-compute shared FAERS values failed, continuing without",
+                drug,
+            )
 
     # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
@@ -188,6 +195,7 @@ async def scan_drug(
                     event_term,
                     use_cache=use_cache,
                     suspect_only=suspect_only,
+                    use_bulk=use_bulk,
                     check_label=check_labels,
                     check_trials=check_trials,
                     check_drugbank=check_drugbank,
@@ -226,7 +234,8 @@ async def scan_drug(
     try:
         results = await asyncio.gather(*tasks)
     finally:
-        await faers_client.close()
+        if faers_client is not None:
+            await faers_client.close()
 
     # 3. Processar resultados
     items: list[ScanItem] = []
@@ -364,6 +373,16 @@ async def scan_drug(
             + PRR_DISCLAIMER,
         ),
     )
+
+
+async def _check_bulk_available() -> bool:
+    """Verifica se FAERS Bulk está disponível (para auto-detect)."""
+    try:
+        from hypokrates.faers_bulk.api import is_bulk_available
+
+        return await is_bulk_available()
+    except Exception:
+        return False
 
 
 def _score(result: HypothesisResult) -> float:

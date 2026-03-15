@@ -1,0 +1,98 @@
+"""Testes para faers_bulk/api.py — API async."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from hypokrates.faers_bulk.api import bulk_signal, bulk_store_status, is_bulk_available
+from hypokrates.faers_bulk.constants import RoleCodFilter
+from hypokrates.faers_bulk.drug_resolver import clear_cache
+from hypokrates.faers_bulk.store import FAERSBulkStore
+from hypokrates.stats.models import SignalResult
+
+GOLDEN_ZIP_Q3 = (
+    Path(__file__).parent.parent / "golden_data" / "faers_bulk" / "faers_ascii_2024Q3.zip"
+)
+
+
+@pytest.fixture()
+def loaded_store(tmp_path: Path) -> FAERSBulkStore:
+    """FAERSBulkStore com Q3 carregado — registrado como singleton."""
+    db_path = tmp_path / "test_api.duckdb"
+    store = FAERSBulkStore(db_path)
+    store.load_quarter(GOLDEN_ZIP_Q3)
+    # Registrar como singleton para que api.py use via get_instance()
+    FAERSBulkStore._instance = store
+    clear_cache()
+    yield store  # type: ignore[misc]
+    FAERSBulkStore._instance = None
+
+
+@pytest.fixture()
+def empty_store(tmp_path: Path) -> FAERSBulkStore:
+    """FAERSBulkStore vazio — registrado como singleton."""
+    db_path = tmp_path / "test_api_empty.duckdb"
+    store = FAERSBulkStore(db_path)
+    FAERSBulkStore._instance = store
+    yield store  # type: ignore[misc]
+    FAERSBulkStore._instance = None
+
+
+class TestIsAvailable:
+    """Testes para is_bulk_available()."""
+
+    async def test_available_when_loaded(self, loaded_store: FAERSBulkStore) -> None:
+        assert await is_bulk_available() is True
+
+    async def test_not_available_when_empty(self, empty_store: FAERSBulkStore) -> None:
+        assert await is_bulk_available() is False
+
+
+class TestBulkSignal:
+    """Testes para bulk_signal()."""
+
+    async def test_basic_signal(self, loaded_store: FAERSBulkStore) -> None:
+        """bulk_signal retorna SignalResult válido (default SUSPECT)."""
+        result = await bulk_signal("propofol", "bradycardia")
+        assert isinstance(result, SignalResult)
+        assert result.drug == "propofol"
+        assert result.event == "bradycardia"
+        assert result.table.a == 2  # default SUSPECT (PS+SS)
+
+    async def test_signal_suspect_filter(self, loaded_store: FAERSBulkStore) -> None:
+        """SUSPECT filter: PS + SS."""
+        result = await bulk_signal("propofol", "bradycardia", role_filter=RoleCodFilter.SUSPECT)
+        assert result.table.a == 2
+
+    async def test_signal_ps_only(self, loaded_store: FAERSBulkStore) -> None:
+        """PS_ONLY filter."""
+        result = await bulk_signal("propofol", "bradycardia", role_filter=RoleCodFilter.PS_ONLY)
+        assert result.table.a == 1
+
+    async def test_meta_source(self, loaded_store: FAERSBulkStore) -> None:
+        """Meta source indica bulk deduplicated."""
+        result = await bulk_signal("propofol", "bradycardia")
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+
+    async def test_signal_detected(self, loaded_store: FAERSBulkStore) -> None:
+        """Verifica heurística signal_detected funciona."""
+        result = await bulk_signal("propofol", "bradycardia")
+        # Com golden data pequeno, pode ou não ser detectado
+        assert isinstance(result.signal_detected, bool)
+
+    async def test_nonexistent_drug(self, loaded_store: FAERSBulkStore) -> None:
+        """Droga não existente retorna zeros."""
+        result = await bulk_signal("NONEXISTENT", "BRADYCARDIA")
+        assert result.table.a == 0
+
+
+class TestBulkStoreStatus:
+    """Testes para bulk_store_status()."""
+
+    async def test_status_loaded(self, loaded_store: FAERSBulkStore) -> None:
+        status = await bulk_store_status()
+        assert status.total_reports == 9
+        assert status.deduped_cases == 5
+        assert len(status.quarters_loaded) == 1

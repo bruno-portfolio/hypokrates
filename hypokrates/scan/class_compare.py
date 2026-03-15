@@ -49,6 +49,7 @@ async def compare_class(
     concurrency: int = DEFAULT_CLASS_CONCURRENCY,
     filter_operational: bool = True,
     suspect_only: bool = False,
+    use_bulk: bool | None = None,
     use_cache: bool = True,
 ) -> ClassCompareResult:
     """Compara sinais de eventos adversos entre N drogas da mesma classe.
@@ -64,6 +65,7 @@ async def compare_class(
         concurrency: Máximo de signal() simultâneos.
         filter_operational: Se deve filtrar termos MedDRA operacionais.
         suspect_only: Se True, conta apenas reports onde a droga é suspect.
+        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         use_cache: Se deve usar cache.
 
     Returns:
@@ -116,6 +118,7 @@ async def compare_class(
             client=client,
             concurrency=concurrency,
             suspect_only=suspect_only,
+            use_bulk=use_bulk,
             use_cache=use_cache,
         )
     finally:
@@ -220,6 +223,7 @@ async def _build_signal_matrix(
     client: FAERSClient,
     concurrency: int,
     suspect_only: bool,
+    use_bulk: bool | None = None,
     use_cache: bool,
 ) -> dict[str, dict[str, SignalResult | None]]:
     """Roda signal() para cada (drug, event) com semaphore."""
@@ -234,6 +238,7 @@ async def _build_signal_matrix(
                     drug,
                     event,
                     suspect_only=suspect_only,
+                    use_bulk=use_bulk,
                     use_cache=use_cache,
                     _client=client,
                     _drug_search=dd.drug_search if dd else None,

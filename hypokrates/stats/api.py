@@ -25,8 +25,22 @@ from hypokrates.stats.constants import (
 )
 from hypokrates.stats.measures import build_table, compute_ic, compute_prr, compute_ror
 from hypokrates.stats.models import QuarterlyCount, SignalResult, TimelineResult
+from hypokrates.vocab.meddra import expand_event_terms
 
 logger = logging.getLogger(__name__)
+
+
+def _build_reaction_query(event: str, reaction_field: str) -> str:
+    """Constrói query de reação para FAERS, expandindo termos MedDRA.
+
+    Se o evento é um canonical MedDRA (e.g., "QT PROLONGATION"), expande para
+    todos os aliases (e.g., "ELECTROCARDIOGRAM QT PROLONGED", "LONG QT SYNDROME").
+    """
+    terms = expand_event_terms(event)
+    if len(terms) == 1:
+        return f'{reaction_field}:"{terms[0]}"'
+    parts = [f'{reaction_field}:"{t}"' for t in terms]
+    return "(" + "+".join(parts) + ")"
 
 
 async def signal(
@@ -34,6 +48,8 @@ async def signal(
     event: str,
     *,
     suspect_only: bool = False,
+    primary_suspect_only: bool = False,
+    use_bulk: bool | None = None,
     use_cache: bool = True,
     _client: FAERSClient | None = None,
     _drug_search: str | None = None,
@@ -42,7 +58,10 @@ async def signal(
 ) -> SignalResult:
     """Calcula sinal de desproporcionalidade para um par droga-evento.
 
-    Busca contagens no FAERS e calcula PRR, ROR e IC (simplified).
+    Busca contagens no FAERS e calcula PRR, ROR e IC.
+
+    Dual-mode: usa FAERS Bulk (deduplicado por CASEID) quando disponível,
+    com fallback transparente para API OpenFDA.
 
     Nota: N (total geral do FAERS) é um snapshot do momento da query.
     O FAERS atualiza trimestralmente — o N muda entre updates.
@@ -55,13 +74,39 @@ async def signal(
         drug: Nome genérico do medicamento (e.g., "propofol").
         event: Termo do evento adverso MedDRA (e.g., "DEATH").
         suspect_only: Se True, conta apenas reports onde a droga é suspect.
+        primary_suspect_only: Se True, conta apenas Primary Suspect (bulk only).
+        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         use_cache: Se deve usar cache.
 
     Returns:
         SignalResult com PRR, ROR, IC e heurística signal_detected.
     """
+    # --- Bulk path ---
+    should_use_bulk = await _should_use_bulk(use_bulk)
+
+    if should_use_bulk:
+        from hypokrates.faers_bulk import api as bulk_api
+        from hypokrates.faers_bulk.constants import RoleCodFilter
+
+        if primary_suspect_only:
+            role_filter = RoleCodFilter.PS_ONLY
+        elif suspect_only:
+            role_filter = RoleCodFilter.SUSPECT
+        else:
+            role_filter = RoleCodFilter.ALL
+
+        return await bulk_api.bulk_signal(drug, event, role_filter=role_filter)
+
+    # --- API path ---
+    if primary_suspect_only:
+        logger.warning(
+            "primary_suspect_only requires bulk data; falling back to suspect_only "
+            "(OpenFDA API does not distinguish PS from SS)"
+        )
+        suspect_only = True
+
     reaction_field = SEARCH_FIELDS["reaction"]
-    event_upper = event.upper()
+    reaction_query = _build_reaction_query(event, reaction_field)
 
     own_client = _client is None
     client = _client if _client is not None else FAERSClient()
@@ -77,9 +122,9 @@ async def signal(
             if suspect_only
             else ""
         )
-        search_drug_event = f'{drug_search}{char_filter} AND {reaction_field}:"{event_upper}"'
+        search_drug_event = f"{drug_search}{char_filter} AND {reaction_query}"
         search_drug = f"{drug_search}{char_filter}"
-        search_event = f'{reaction_field}:"{event_upper}"'
+        search_event = reaction_query
 
         if _drug_total is not None and _n_total is not None:
             # Scan path: apenas valores únicos por evento (paralelo)
@@ -136,6 +181,18 @@ async def signal(
     )
 
 
+async def _should_use_bulk(use_bulk: bool | None) -> bool:
+    """Determina se deve usar bulk path."""
+    if use_bulk is False:
+        return False
+    if use_bulk is True:
+        return True
+    # Auto-detect
+    from hypokrates.faers_bulk.api import is_bulk_available
+
+    return await is_bulk_available()
+
+
 async def signal_timeline(
     drug: str,
     event: str,
@@ -159,7 +216,7 @@ async def signal_timeline(
         TimelineResult com série trimestral e detecção de spikes.
     """
     reaction_field = SEARCH_FIELDS["reaction"]
-    event_upper = event.upper()
+    reaction_query = _build_reaction_query(event, reaction_field)
 
     client = FAERSClient()
     try:
@@ -170,7 +227,7 @@ async def signal_timeline(
             if suspect_only
             else ""
         )
-        search = f'{drug_search}{char_filter} AND {reaction_field}:"{event_upper}"'
+        search = f"{drug_search}{char_filter} AND {reaction_query}"
         count_field = COUNT_FIELDS["receivedate"]
 
         try:

@@ -16,6 +16,7 @@ from hypokrates.cross import api as cross_api
 from hypokrates.dailymed import api as dailymed_api
 from hypokrates.drugbank import api as drugbank_api
 from hypokrates.faers import api as faers_api
+from hypokrates.faers_bulk import api as faers_bulk_api
 from hypokrates.opentargets import api as opentargets_api
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.scan import api as scan_api
@@ -146,6 +147,15 @@ class _SyncChEMBL:
     drug_metabolism = staticmethod(_make_sync(chembl_api.drug_metabolism))
 
 
+class _SyncFAERSBulk:
+    """Wrapper síncrono para hypokrates.faers_bulk."""
+
+    is_bulk_available = staticmethod(_make_sync(faers_bulk_api.is_bulk_available))
+    bulk_store_status = staticmethod(_make_sync(faers_bulk_api.bulk_store_status))
+    bulk_signal = staticmethod(_make_sync(faers_bulk_api.bulk_signal))
+
+
 drugbank = _SyncDrugBank()
 opentargets = _SyncOpenTargets()
 chembl = _SyncChEMBL()
+faers_bulk = _SyncFAERSBulk()
