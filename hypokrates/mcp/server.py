@@ -5,6 +5,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from hypokrates.mcp.tools import (
+    anvisa,
     chembl,
     cross,
     dailymed,
@@ -25,6 +26,7 @@ mcp = FastMCP("hypokrates")
 
 def create_server() -> FastMCP:
     """Cria e configura o MCP server com todas as tools."""
+    anvisa.register(mcp)
     faers.register(mcp)
     stats.register(mcp)
     pubmed.register(mcp)

@@ -11,6 +11,7 @@ import asyncio
 import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from hypokrates.anvisa import api as anvisa_api
 from hypokrates.chembl import api as chembl_api
 from hypokrates.cross import api as cross_api
 from hypokrates.dailymed import api as dailymed_api
@@ -155,7 +156,17 @@ class _SyncFAERSBulk:
     bulk_signal = staticmethod(_make_sync(faers_bulk_api.bulk_signal))
 
 
+class _SyncAnvisa:
+    """Wrapper sincrono para hypokrates.anvisa."""
+
+    buscar_medicamento = staticmethod(_make_sync(anvisa_api.buscar_medicamento))
+    buscar_por_substancia = staticmethod(_make_sync(anvisa_api.buscar_por_substancia))
+    listar_apresentacoes = staticmethod(_make_sync(anvisa_api.listar_apresentacoes))
+    mapear_nome = staticmethod(_make_sync(anvisa_api.mapear_nome))
+
+
 drugbank = _SyncDrugBank()
 opentargets = _SyncOpenTargets()
 chembl = _SyncChEMBL()
 faers_bulk = _SyncFAERSBulk()
+anvisa = _SyncAnvisa()

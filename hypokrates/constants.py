@@ -26,6 +26,7 @@ class Source(StrEnum):
     DAILYMED = "dailymed"
     OPENTARGETS = "opentargets"
     CHEMBL = "chembl"
+    ANVISA = "anvisa"
 
 
 # --- URLs base ---

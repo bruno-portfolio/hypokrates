@@ -32,6 +32,9 @@ class HypokratesConfig:
     # DrugBank
     drugbank_path: Path | None = None
 
+    # ANVISA
+    anvisa_csv_path: Path | None = None
+
     # FAERS Bulk (quarterly ASCII files)
     faers_bulk_dir: Path | None = None
 

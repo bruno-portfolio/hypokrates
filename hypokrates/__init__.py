@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 from hypokrates import (
+    anvisa,
     chembl,
     cross,
     dailymed,
@@ -26,6 +27,7 @@ from hypokrates import (
     trials,
     vocab,
 )
+from hypokrates.anvisa import AnvisaMedicamento, AnvisaNomeMapping, AnvisaSearchResult
 from hypokrates.chembl import ChEMBLMechanism, ChEMBLMetabolism, ChEMBLTarget
 from hypokrates.config import configure
 from hypokrates.constants import __version__
@@ -50,6 +52,9 @@ from hypokrates.trials import ClinicalTrial, TrialsResult
 from hypokrates.vocab import DrugNormResult, MeSHResult
 
 __all__ = [
+    "AnvisaMedicamento",
+    "AnvisaNomeMapping",
+    "AnvisaSearchResult",
     "CacheError",
     "ChEMBLMechanism",
     "ChEMBLMetabolism",
@@ -81,6 +86,7 @@ __all__ = [
     "TrialsResult",
     "ValidationError",
     "__version__",
+    "anvisa",
     "chembl",
     "configure",
     "cross",
