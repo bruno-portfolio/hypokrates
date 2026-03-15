@@ -37,6 +37,26 @@ _TOOLS = [
     {"name": "drug_safety_score", "module": "opentargets", "description": "OpenTargets LRT score"},
     {"name": "drug_mechanism", "module": "chembl", "description": "ChEMBL mechanism of action"},
     {"name": "drug_metabolism", "module": "chembl", "description": "ChEMBL metabolic pathways"},
+    {
+        "name": "faers_bulk_status",
+        "module": "faers_bulk",
+        "description": "FAERS Bulk store status",
+    },
+    {
+        "name": "faers_bulk_signal",
+        "module": "faers_bulk",
+        "description": "Signal via FAERS Bulk (deduplicated)",
+    },
+    {
+        "name": "faers_bulk_load",
+        "module": "faers_bulk",
+        "description": "Load FAERS quarterly ZIPs",
+    },
+    {
+        "name": "faers_bulk_timeline",
+        "module": "faers_bulk",
+        "description": "Quarterly timeline via FAERS Bulk",
+    },
     {"name": "list_tools", "module": "meta", "description": "List available tools"},
     {"name": "version", "module": "meta", "description": "Show version info"},
 ]
@@ -48,7 +68,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_tools() -> str:
         """List all available hypokrates MCP tools."""
-        lines = [f"# hypokrates MCP Tools (Sprint 7 — {len(_TOOLS)} tools)", ""]
+        lines = [f"# hypokrates MCP Tools (Sprint 8 — {len(_TOOLS)} tools)", ""]
         for tool in _TOOLS:
             lines.append(f"- **{tool['name']}** ({tool['module']}): {tool['description']}")
         return "\n".join(lines)
@@ -58,8 +78,8 @@ def register(mcp: FastMCP) -> None:
         """Show hypokrates version and sprint info."""
         return (
             f"# hypokrates {__version__}\n"
-            f"**Sprint:** 7 (operational filter + suspect_only + timeline)\n"
+            f"**Sprint:** 8 (CASEID dedup + bulk pipeline + PS-only)\n"
             f"**Tools:** {len(_TOOLS)}\n"
             f"**Modules:** faers, stats, pubmed, cross, scan, vocab, "
-            f"dailymed, trials, drugbank, opentargets, chembl, meta\n"
+            f"dailymed, trials, drugbank, opentargets, chembl, faers_bulk, meta\n"
         )

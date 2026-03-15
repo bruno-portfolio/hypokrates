@@ -25,17 +25,24 @@ def register(mcp: FastMCP) -> None:
     """Registra tools de stats no MCP server."""
 
     @mcp.tool()
-    async def signal(drug: str, event: str, suspect_only: bool = False) -> str:
+    async def signal(
+        drug: str,
+        event: str,
+        suspect_only: bool = False,
+        use_bulk: bool | None = None,
+    ) -> str:
         """Detect disproportionality signal for a drug-event pair in FAERS.
 
-        Computes PRR, ROR, and IC (simplified) from the 2x2 contingency table.
+        Computes PRR, ROR, and IC from the 2x2 contingency table.
+        Auto-detects FAERS Bulk data (deduplicated by CASEID) when available.
 
         Args:
             drug: Generic drug name.
             event: Adverse event term.
             suspect_only: Only count reports where drug is suspect (not concomitant).
+            use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
-        result = await stats_api.signal(drug, event, suspect_only=suspect_only)
+        result = await stats_api.signal(drug, event, suspect_only=suspect_only, use_bulk=use_bulk)
         detected = "YES" if result.signal_detected else "NO"
         lines = [
             f"# Signal Detection: {drug.upper()} + {event.upper()}",

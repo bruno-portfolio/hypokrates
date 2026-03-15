@@ -10,6 +10,7 @@ from hypokrates.mcp.tools import (
     dailymed,
     drugbank,
     faers,
+    faers_bulk,
     meta,
     opentargets,
     pubmed,
@@ -36,4 +37,5 @@ def create_server() -> FastMCP:
     drugbank.register(mcp)
     opentargets.register(mcp)
     chembl.register(mcp)
+    faers_bulk.register(mcp)
     return mcp

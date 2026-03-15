@@ -198,9 +198,13 @@ async def signal_timeline(
     event: str,
     *,
     suspect_only: bool = False,
+    use_bulk: bool | None = None,
     use_cache: bool = True,
 ) -> TimelineResult:
     """Série temporal trimestral de reports FAERS para um par droga-evento.
+
+    Dual-mode: usa FAERS Bulk (deduplicado por CASEID) quando disponível,
+    com fallback para API OpenFDA.
 
     Usa OpenFDA count=receivedate para obter contagens diárias e agrega
     em trimestres. Detecta spikes (> mean + 2*std) que podem indicar
@@ -210,11 +214,22 @@ async def signal_timeline(
         drug: Nome genérico do medicamento.
         event: Termo do evento adverso MedDRA.
         suspect_only: Se True, conta apenas reports onde a droga é suspect.
+        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
         use_cache: Se deve usar cache.
 
     Returns:
         TimelineResult com série trimestral e detecção de spikes.
     """
+    # --- Bulk path ---
+    should_bulk = await _should_use_bulk(use_bulk)
+    if should_bulk:
+        from hypokrates.faers_bulk.constants import RoleCodFilter
+        from hypokrates.faers_bulk.timeline import bulk_signal_timeline
+
+        role_filter = RoleCodFilter.SUSPECT if suspect_only else RoleCodFilter.ALL
+        return await bulk_signal_timeline(drug, event, role_filter=role_filter)
+
+    # --- API path ---
     reaction_field = SEARCH_FIELDS["reaction"]
     reaction_query = _build_reaction_query(event, reaction_field)
 

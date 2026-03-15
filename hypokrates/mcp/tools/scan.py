@@ -31,6 +31,7 @@ def register(mcp: FastMCP) -> None:
         group_events: bool = True,
         filter_operational: bool = True,
         suspect_only: bool = False,
+        use_bulk: bool | None = None,
     ) -> str:
         """Scan a drug's adverse events and classify each as novel/emerging/known signal.
 
@@ -55,6 +56,7 @@ def register(mcp: FastMCP) -> None:
             group_events: Group synonymous MedDRA terms (default True).
             filter_operational: Filter operational/regulatory MedDRA terms (default True).
             suspect_only: Only count reports where drug is suspect (not concomitant).
+            use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
         clamped_top_n = min(top_n, 20)
         start = time.monotonic()
@@ -74,6 +76,7 @@ def register(mcp: FastMCP) -> None:
                 group_events=group_events,
                 filter_operational=filter_operational,
                 suspect_only=suspect_only,
+                use_bulk=use_bulk,
                 on_progress=_on_progress,
             )
         except Exception as exc:
