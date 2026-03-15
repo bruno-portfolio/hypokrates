@@ -37,16 +37,16 @@ def register(mcp: FastMCP) -> None:
 
         for med in result.medicamentos:
             subs = ", ".join(med.substancias) if med.substancias else "—"
-            cat = med.categoria or "—"
             lines.append(f"### {med.nome_produto}")
             lines.append(f"- **Substancia(s):** {subs}")
-            lines.append(f"- **Categoria:** {cat}")
+            if med.categoria:
+                lines.append(f"- **Categoria:** {med.categoria}")
             if med.referencia:
                 lines.append(f"- **Referencia:** {med.referencia}")
-            if med.atc:
-                lines.append(f"- **ATC:** {med.atc}")
             if med.empresa:
                 lines.append(f"- **Fabricante:** {med.empresa}")
+            if med.atc:
+                lines.append(f"- **ATC:** {med.atc}")
             if med.apresentacoes:
                 apres = "; ".join(med.apresentacoes[:5])
                 lines.append(f"- **Apresentacoes:** {apres}")
@@ -75,8 +75,10 @@ def register(mcp: FastMCP) -> None:
         # Agrupar por categoria
         by_cat: dict[str, list[str]] = {}
         for med in result.medicamentos:
-            cat = med.categoria or "Outro"
-            by_cat.setdefault(cat, []).append(f"{med.nome_produto} ({med.empresa})")
+            cat = med.categoria or "Sem categoria"
+            by_cat.setdefault(cat, []).append(
+                f"{med.nome_produto} ({med.empresa})" if med.empresa else med.nome_produto
+            )
 
         lines = [
             f"# ANVISA: Genericos/Similares de '{substancia}'",
