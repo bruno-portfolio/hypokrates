@@ -423,3 +423,81 @@ class TestSignalBulkMode:
         result = await signal("propofol", "bradycardia", use_bulk=True)
         # ALL role: a=3 (PROPOFOL em qualquer role + BRADYCARDIA)
         assert result.table.a == 3
+
+
+class TestSignalPrimarySuspectOnly:
+    """Testes para primary_suspect_only no API path."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.stats.api.FAERSClient")
+    async def test_primary_suspect_only_falls_back_to_suspect_only(
+        self, mock_client_cls: Any
+    ) -> None:
+        """primary_suspect_only=True sem bulk → warning + fallback to suspect_only."""
+        instance = mock_client_cls.return_value
+        instance.fetch_total = _mock_fetch_total(
+            {
+                "drug_event": 50,
+                "drug_total": 500,
+                "event_total": 300,
+                "n_total": 10000,
+            }
+        )
+        instance.close = AsyncMock()
+
+        result = await signal(
+            "propofol",
+            "BRADYCARDIA",
+            primary_suspect_only=True,
+            use_bulk=False,
+        )
+
+        assert isinstance(result, SignalResult)
+        # Deve ter usado suspect_only (drugcharacterization na query)
+        calls = [str(c) for c in instance.fetch_total.call_args_list]
+        drug_calls = [c for c in calls if "generic_name" in c]
+        for c in drug_calls:
+            assert "drugcharacterization" in c
+
+
+class TestSignalTimelineBulkMode:
+    """Testes para signal_timeline() com FAERS Bulk."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path: Path) -> None:
+        """Setup: cria store singleton com golden data."""
+        configure(cache_enabled=False)
+        db_path = tmp_path / "test_timeline_bulk.duckdb"
+        store = FAERSBulkStore(db_path)
+        store.load_quarter(GOLDEN_ZIP_Q3)
+        FAERSBulkStore._instance = store
+        clear_resolver_cache()
+        yield  # type: ignore[misc]
+        FAERSBulkStore._instance = None
+
+    async def test_signal_timeline_uses_bulk_when_available(self) -> None:
+        """signal_timeline com use_bulk=None auto-detecta bulk e usa."""
+        result = await signal_timeline("propofol", "bradycardia", use_bulk=None)
+        assert isinstance(result, TimelineResult)
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+
+    async def test_signal_timeline_bulk_explicit(self) -> None:
+        """signal_timeline com use_bulk=True usa bulk."""
+        result = await signal_timeline("propofol", "bradycardia", use_bulk=True)
+        assert result.meta.source == "FAERS/bulk (deduplicated)"
+
+    @patch("hypokrates.stats.api.FAERSClient")
+    async def test_signal_timeline_fetch_count_failure(self, mock_client_cls: Any) -> None:
+        """Quando fetch_count falha, retorna timeline vazia."""
+        instance = mock_client_cls.return_value
+        instance.fetch_count = AsyncMock(side_effect=RuntimeError("FAERS down"))
+        instance.fetch_total = _mock_fetch_total({"drug_total": 100})
+        instance.close = AsyncMock()
+
+        result = await signal_timeline("propofol", "bradycardia", use_bulk=False)
+
+        assert result.total_reports == 0
+        assert result.quarters == []

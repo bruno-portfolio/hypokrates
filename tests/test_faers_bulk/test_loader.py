@@ -71,3 +71,47 @@ class TestLoadIncremental:
         # Second call should load 0
         total2 = await load_incremental(zip_dir)
         assert total2 == 0
+
+    async def test_incremental_empty_dir(self, store: FAERSBulkStore, tmp_path: Path) -> None:
+        """Diretório vazio retorna 0."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        total = await load_incremental(empty)
+        assert total == 0
+
+    async def test_incremental_progress_callback(
+        self, store: FAERSBulkStore, zip_dir: Path
+    ) -> None:
+        """Callback de progresso é chamado no incremental."""
+        progress_calls: list[tuple[int, int, str]] = []
+
+        def on_progress(completed: int, total: int, key: str) -> None:
+            progress_calls.append((completed, total, key))
+
+        await load_incremental(zip_dir, on_progress=on_progress)
+        assert len(progress_calls) == 2  # 2 ZIPs no golden data
+
+    async def test_incremental_loads_only_new(self, store: FAERSBulkStore, zip_dir: Path) -> None:
+        """Carrega primeiro, depois incremental não carrega nada."""
+        # Primeiro load
+        total1 = await load_incremental(zip_dir)
+        assert total1 > 0
+
+        # Incremental: tudo já carregado
+        total2 = await load_incremental(zip_dir)
+        assert total2 == 0
+
+
+class TestLoadAllQuartersErrorHandling:
+    """Testes de tratamento de erro no load_all_quarters."""
+
+    async def test_corrupted_zip_skipped(self, store: FAERSBulkStore, tmp_path: Path) -> None:
+        """ZIP corrompido é pulado, não quebra o processo."""
+        zips_dir = tmp_path / "zips"
+        zips_dir.mkdir()
+        # Criar ZIP inválido
+        bad_zip = zips_dir / "faers_ascii_2099Q1.zip"
+        bad_zip.write_bytes(b"not a zip file")
+
+        total = await load_all_quarters(zips_dir)
+        assert total == 0  # falhou mas não crashou

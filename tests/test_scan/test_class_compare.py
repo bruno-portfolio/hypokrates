@@ -320,3 +320,158 @@ async def test_validation_min_drugs() -> None:
 
     with pytest.raises(ValidationError, match="at least 2"):
         await compare_class([])
+
+
+@patch("hypokrates.scan.class_compare.stats_api.signal")
+@patch("hypokrates.scan.class_compare.faers_api.resolve_drug_field")
+@patch("hypokrates.scan.class_compare.FAERSClient")
+@patch("hypokrates.scan.class_compare.faers_api.top_events")
+async def test_precompute_resolve_failure(
+    mock_top: AsyncMock,
+    mock_client_cls: AsyncMock,
+    mock_resolve: AsyncMock,
+    mock_signal: AsyncMock,
+) -> None:
+    """resolve_drug_field falhando para uma droga → _DrugData com None, signal ainda funciona."""
+    drugs = ["drug_a", "drug_b"]
+
+    mock_top.side_effect = [
+        _make_events(["NAUSEA"]),
+        _make_events(["NAUSEA"]),
+    ]
+
+    client_instance = AsyncMock()
+    client_instance.fetch_total = AsyncMock(return_value=10000)
+    client_instance.close = AsyncMock()
+    mock_client_cls.return_value = client_instance
+
+    # Primeira resolve falha, segunda ok
+    mock_resolve.side_effect = [
+        RuntimeError("RxNorm down"),
+        'patient.drug.openfda.generic_name.exact:"drug_b"',
+    ]
+
+    async def _signal_side_effect(drug: str, event: str, **kwargs: object) -> SignalResult:
+        return _make_signal(drug, event, prr=2.0, detected=True)
+
+    mock_signal.side_effect = _signal_side_effect
+
+    result = await compare_class(drugs, top_n=5)
+
+    # Deve completar mesmo com falha de pre-compute de uma droga
+    assert result.total_events >= 1
+
+
+@patch("hypokrates.scan.class_compare.stats_api.signal")
+@patch("hypokrates.scan.class_compare.faers_api.resolve_drug_field")
+@patch("hypokrates.scan.class_compare.FAERSClient")
+@patch("hypokrates.scan.class_compare.faers_api.top_events")
+async def test_n_total_fetch_failure(
+    mock_top: AsyncMock,
+    mock_client_cls: AsyncMock,
+    mock_resolve: AsyncMock,
+    mock_signal: AsyncMock,
+) -> None:
+    """fetch_total('') falhando → n_total=None, signal ainda funciona."""
+    drugs = ["drug_a", "drug_b"]
+
+    mock_top.side_effect = [
+        _make_events(["NAUSEA"]),
+        _make_events(["NAUSEA"]),
+    ]
+
+    client_instance = AsyncMock()
+
+    # fetch_total falha quando chamado com "" (n_total), funciona para droga
+    async def _fetch_total_side_effect(search: str, *, use_cache: bool = True) -> int:
+        if search == "":
+            raise RuntimeError("FAERS n_total failed")
+        return 1000
+
+    client_instance.fetch_total = AsyncMock(side_effect=_fetch_total_side_effect)
+    client_instance.close = AsyncMock()
+    mock_client_cls.return_value = client_instance
+    mock_resolve.return_value = 'patient.drug.openfda.generic_name.exact:"drug_a"'
+
+    async def _signal_side_effect(drug: str, event: str, **kwargs: object) -> SignalResult:
+        return _make_signal(drug, event, prr=2.0, detected=True)
+
+    mock_signal.side_effect = _signal_side_effect
+
+    result = await compare_class(drugs, top_n=5)
+
+    # Deve completar mesmo com n_total=None
+    assert result.total_events >= 1
+
+
+@patch("hypokrates.scan.class_compare.stats_api.signal")
+@patch("hypokrates.scan.class_compare.faers_api.resolve_drug_field")
+@patch("hypokrates.scan.class_compare.FAERSClient")
+@patch("hypokrates.scan.class_compare.faers_api.top_events")
+async def test_signal_failure_in_matrix(
+    mock_top: AsyncMock,
+    mock_client_cls: AsyncMock,
+    mock_resolve: AsyncMock,
+    mock_signal: AsyncMock,
+) -> None:
+    """signal() falhando para um par → None na matrix, não quebra classificação."""
+    drugs = ["drug_a", "drug_b"]
+
+    mock_top.side_effect = [
+        _make_events(["NAUSEA"]),
+        _make_events(["NAUSEA"]),
+    ]
+
+    client_instance = AsyncMock()
+    client_instance.fetch_total = AsyncMock(return_value=10000)
+    client_instance.close = AsyncMock()
+    mock_client_cls.return_value = client_instance
+    mock_resolve.return_value = 'patient.drug.openfda.generic_name.exact:"drug_a"'
+
+    async def _signal_side_effect(drug: str, event: str, **kwargs: object) -> SignalResult:
+        if drug == "drug_a":
+            raise RuntimeError("API timeout")
+        return _make_signal(drug, event, prr=2.0, detected=True)
+
+    mock_signal.side_effect = _signal_side_effect
+
+    result = await compare_class(drugs, top_n=5)
+
+    # drug_a falhou → signal_detected apenas para drug_b → drug_specific
+    if result.items:
+        assert result.items[0].classification == EventClassification.DRUG_SPECIFIC
+
+
+@patch("hypokrates.scan.class_compare.stats_api.signal")
+@patch("hypokrates.scan.class_compare.faers_api.resolve_drug_field")
+@patch("hypokrates.scan.class_compare.FAERSClient")
+@patch("hypokrates.scan.class_compare.faers_api.top_events")
+async def test_no_signal_detected_skips_event(
+    mock_top: AsyncMock,
+    mock_client_cls: AsyncMock,
+    mock_resolve: AsyncMock,
+    mock_signal: AsyncMock,
+) -> None:
+    """Evento onde nenhuma droga tem signal_detected é ignorado."""
+    drugs = ["drug_a", "drug_b"]
+
+    mock_top.side_effect = [
+        _make_events(["HEADACHE"]),
+        _make_events(["HEADACHE"]),
+    ]
+
+    client_instance = AsyncMock()
+    client_instance.fetch_total = AsyncMock(return_value=10000)
+    client_instance.close = AsyncMock()
+    mock_client_cls.return_value = client_instance
+    mock_resolve.return_value = 'patient.drug.openfda.generic_name.exact:"drug_a"'
+
+    async def _signal_side_effect(drug: str, event: str, **kwargs: object) -> SignalResult:
+        return _make_signal(drug, event, prr=0.5, detected=False)
+
+    mock_signal.side_effect = _signal_side_effect
+
+    result = await compare_class(drugs, top_n=5)
+
+    # Sem signal_detected para ninguém → evento skipped (count=0)
+    assert result.total_events == 0

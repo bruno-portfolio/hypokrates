@@ -825,3 +825,72 @@ async def test_scan_overfetch_fetches_more_than_top_n(
     # Ranks corretos (1-3)
     assert result.items[0].rank == 1
     assert result.items[2].rank == 3
+
+
+# ---------------------------------------------------------------------------
+# Sprint 8: check_chembl enrichment, progress on failure
+# ---------------------------------------------------------------------------
+
+
+@patch("hypokrates.chembl.api.drug_mechanism", new_callable=AsyncMock)
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_check_chembl_enrichment(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+    mock_chembl: AsyncMock,
+) -> None:
+    """check_chembl → ScanResult tem mechanism e cyp_enzymes do ChEMBL."""
+    from hypokrates.chembl.models import ChEMBLMechanism, ChEMBLTarget
+
+    mock_top_events.return_value = _make_events(["A"])
+    mock_hypothesis.return_value = _make_hypothesis_result(
+        "A", HypothesisClassification.NOVEL_HYPOTHESIS
+    )
+    mock_chembl.return_value = ChEMBLMechanism(
+        chembl_id="CHEMBL526",
+        drug_name="Propofol",
+        mechanism_of_action="GABA-A receptor positive allosteric modulator",
+        targets=[
+            ChEMBLTarget(
+                target_chembl_id="CHEMBL2093872",
+                name="GABA-A receptor",
+                gene_names=["GABRA1", "GABRA2"],
+            ),
+        ],
+        meta=MetaInfo(source="test", retrieved_at=datetime.now(UTC)),
+    )
+
+    result = await scan_drug("propofol", top_n=1, check_chembl=True, group_events=False)
+
+    assert result.mechanism == "GABA-A receptor positive allosteric modulator"
+    assert "GABRA1" in result.cyp_enzymes
+    assert "GABRA2" in result.cyp_enzymes
+    # Verifica que _chembl_cache foi passado para hypothesis
+    call_kwargs = mock_hypothesis.call_args.kwargs
+    assert call_kwargs["check_chembl"] is True
+
+
+@patch("hypokrates.scan.api.cross_api.hypothesis")
+@patch("hypokrates.scan.api.faers_api.top_events")
+async def test_scan_progress_on_failure(
+    mock_top_events: AsyncMock,
+    mock_hypothesis: AsyncMock,
+) -> None:
+    """on_progress é chamado mesmo quando hypothesis falha."""
+    mock_top_events.return_value = _make_events(["A", "B"])
+
+    mock_hypothesis.side_effect = [
+        RuntimeError("API error"),
+        _make_hypothesis_result("B", HypothesisClassification.KNOWN_ASSOCIATION, lit_count=10),
+    ]
+
+    progress_calls: list[tuple[int, int, str]] = []
+
+    def on_progress(completed: int, total: int, event: str) -> None:
+        progress_calls.append((completed, total, event))
+
+    await scan_drug("propofol", top_n=2, on_progress=on_progress)
+
+    # Progress deve ter sido chamado para ambos (sucesso e falha)
+    assert len(progress_calls) == 2
