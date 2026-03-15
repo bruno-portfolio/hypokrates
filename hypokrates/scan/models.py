@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 from hypokrates.cross.models import (
@@ -72,4 +74,47 @@ class ScanResult(BaseModel):
     mechanism: str | None = None
     interactions_count: int | None = None
     cyp_enzymes: list[str] = Field(default_factory=list)
+    meta: MetaInfo
+
+
+# ---------------------------------------------------------------------------
+# compare_class models
+# ---------------------------------------------------------------------------
+
+
+class EventClassification(StrEnum):
+    """Classificação de evento em comparação intra-classe."""
+
+    CLASS_EFFECT = "class_effect"
+    DRUG_SPECIFIC = "drug_specific"
+    DIFFERENTIAL = "differential"
+
+
+class ClassEventItem(BaseModel):
+    """Evento classificado na comparação intra-classe."""
+
+    event: str
+    classification: EventClassification
+    signals: dict[str, SignalResult]
+    drugs_with_signal: list[str]
+    drugs_without_signal: list[str]
+    strongest_drug: str | None = None
+    prr_values: dict[str, float]
+    max_prr: float
+    median_prr: float
+    outlier_drug: str | None = None
+    outlier_factor: float | None = None
+
+
+class ClassCompareResult(BaseModel):
+    """Resultado completo de comparação intra-classe."""
+
+    drugs: list[str]
+    items: list[ClassEventItem] = Field(default_factory=list)
+    class_effect_count: int = 0
+    drug_specific_count: int = 0
+    differential_count: int = 0
+    total_events: int = 0
+    class_threshold_used: float
+    outlier_factor_used: float
     meta: MetaInfo

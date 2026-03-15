@@ -94,6 +94,14 @@ SCAN_METHODOLOGY = (
     "Items with >2000 FAERS reports are flagged as potential reporting artifacts."
 )
 
+# ---------------------------------------------------------------------------
+# compare_class — comparação intra-classe automatizada
+# ---------------------------------------------------------------------------
+DEFAULT_CLASS_TOP_N: int = 30
+DEFAULT_CLASS_CONCURRENCY: int = 5
+CLASS_EFFECT_THRESHOLD: float = 0.75  # >=75% das drogas com sinal = class effect
+OUTLIER_FACTOR: float = 3.0  # PRR > 3x mediana = outlier
+
 PRR_DISCLAIMER = (
     "PRR (Proportional Reporting Ratio) measures disproportionality of reporting, "
     "NOT absolute risk. A PRR of 10 means 10x more reports than background, "

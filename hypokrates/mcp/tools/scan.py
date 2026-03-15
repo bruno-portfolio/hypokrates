@@ -7,6 +7,8 @@ import time
 from typing import TYPE_CHECKING
 
 from hypokrates.scan import api as scan_api
+from hypokrates.scan import class_compare as class_compare_api
+from hypokrates.scan.models import EventClassification
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -161,6 +163,118 @@ def register(mcp: FastMCP) -> None:
         lines.append(", ".join(summary_parts))
         if result.failed_count > 0:
             lines.append(f"{result.failed_count} failed: {', '.join(result.skipped_events)}")
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "Clinical significance requires validation with meta-analyses and guidelines.",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    @mcp.tool()
+    async def compare_class(
+        drugs: str,
+        top_n: int = 30,
+        suspect_only: bool = False,
+    ) -> str:
+        """Compare adverse event signals across drugs of the same therapeutic class.
+
+        Classifies events as class_effect (>=75% drugs), drug_specific (1 drug),
+        or differential (PRR outlier). Useful for separating class effects from
+        drug-specific toxicity (e.g., prednisone vs dexamethasone vs methylprednisolone).
+
+        Args:
+            drugs: Comma-separated drug names (e.g., "prednisone,dexamethasone").
+            top_n: Number of top events per drug to include in the union.
+            suspect_only: Only count reports where drug is suspect (not concomitant).
+        """
+        drug_list = [d.strip() for d in drugs.split(",") if d.strip()]
+        if len(drug_list) < 2:
+            return "ERROR: At least 2 drugs required (comma-separated)."
+
+        start = time.monotonic()
+        try:
+            result = await class_compare_api.compare_class(
+                drug_list,
+                top_n=top_n,
+                suspect_only=suspect_only,
+            )
+        except Exception as exc:
+            elapsed = time.monotonic() - start
+            logger.error("MCP compare_class failed after %.0fs: %s", elapsed, exc)
+            return f"# Compare Class\n\nERROR after {elapsed:.0f}s: {exc}"
+
+        elapsed = time.monotonic() - start
+        drug_header = ", ".join(d.upper() for d in drug_list)
+
+        lines: list[str] = [
+            f"# Class Comparison: {drug_header}",
+            f"Compared {result.total_events} events across "
+            f"{len(drug_list)} drugs in {elapsed:.0f}s",
+            "",
+        ]
+
+        # Class Effects
+        class_items = [
+            it for it in result.items if it.classification == EventClassification.CLASS_EFFECT
+        ]
+        if class_items:
+            lines.append(f"## Class Effects ({len(class_items)})")
+            lines.append("")
+            header = "| Event |" + "|".join(f" {d.upper()} " for d in drug_list) + "|"
+            sep = "|-------|" + "|".join("------:" for _ in drug_list) + "|"
+            lines.extend([header, sep])
+            for item in class_items:
+                prr_cols = "|".join(f" {item.prr_values.get(d, 0.0):.1f} " for d in drug_list)
+                lines.append(f"| {item.event} |{prr_cols}|")
+            lines.append("")
+
+        # Drug-Specific
+        specific_items = [
+            it for it in result.items if it.classification == EventClassification.DRUG_SPECIFIC
+        ]
+        if specific_items:
+            lines.append(f"## Drug-Specific ({len(specific_items)})")
+            lines.append("")
+            for item in specific_items:
+                drug_name = item.drugs_with_signal[0] if item.drugs_with_signal else "?"
+                lines.append(
+                    f"- **{item.event}** — {drug_name.upper()} only (PRR={item.max_prr:.1f})"
+                )
+            lines.append("")
+
+        # Differential
+        diff_items = [
+            it for it in result.items if it.classification == EventClassification.DIFFERENTIAL
+        ]
+        if diff_items:
+            lines.append(f"## Differential ({len(diff_items)})")
+            lines.append("")
+            header = "| Event |" + "|".join(f" {d.upper()} " for d in drug_list) + "| Note |"
+            sep = "|-------|" + "|".join("------:" for _ in drug_list) + "|------|"
+            lines.extend([header, sep])
+            for item in diff_items:
+                prr_cols = "|".join(f" {item.prr_values.get(d, 0.0):.1f} " for d in drug_list)
+                note = ""
+                if item.outlier_drug:
+                    note = f"{item.outlier_drug.upper()} {item.outlier_factor:.1f}x median"
+                else:
+                    with_str = ", ".join(d.upper() for d in item.drugs_with_signal)
+                    note = f"signal in: {with_str}"
+                lines.append(f"| {item.event} |{prr_cols}| {note} |")
+            lines.append("")
+
+        # Summary
+        lines.append("## Summary")
+        lines.append(
+            f"{result.class_effect_count} class effects, "
+            f"{result.drug_specific_count} drug-specific, "
+            f"{result.differential_count} differential"
+        )
 
         lines.extend(
             [

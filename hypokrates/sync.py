@@ -19,6 +19,7 @@ from hypokrates.faers import api as faers_api
 from hypokrates.opentargets import api as opentargets_api
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.scan import api as scan_api
+from hypokrates.scan import class_compare as class_compare_api
 from hypokrates.stats import api as stats_api
 from hypokrates.trials import api as trials_api
 from hypokrates.vocab import api as vocab_api
@@ -89,6 +90,7 @@ class _SyncScan:
     """Wrapper síncrono para hypokrates.scan."""
 
     scan_drug = staticmethod(_make_sync(scan_api.scan_drug))
+    compare_class = staticmethod(_make_sync(class_compare_api.compare_class))
 
 
 class _SyncVocab:

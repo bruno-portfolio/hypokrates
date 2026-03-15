@@ -25,6 +25,7 @@ _TOOLS = [
     {"name": "hypothesis", "module": "cross", "description": "Cross-reference hypothesis"},
     {"name": "compare_signals", "module": "cross", "description": "Compare two drugs"},
     {"name": "scan_drug", "module": "scan", "description": "Scan drug adverse events"},
+    {"name": "compare_class", "module": "scan", "description": "Compare intra-class AE signals"},
     {"name": "normalize_drug", "module": "vocab", "description": "Normalize drug name via RxNorm"},
     {"name": "map_to_mesh", "module": "vocab", "description": "Map term to MeSH heading"},
     {"name": "label_events", "module": "dailymed", "description": "FDA label adverse reactions"},
