@@ -99,7 +99,7 @@ event_pids AS (
     SELECT DISTINCT r.primaryid
     FROM faers_reac r
     INNER JOIN deduped dd ON r.primaryid = dd.primaryid
-    WHERE r.pt_upper = $event
+    WHERE r.pt_upper = ANY($events)
 )
 SELECT
     (SELECT COUNT(*) FROM drug_pids dp
@@ -299,7 +299,7 @@ class FAERSBulkStore:
     def four_counts(
         self,
         drug: str,
-        event: str,
+        event: str | list[str],
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
     ) -> BulkCountResult:
@@ -307,20 +307,23 @@ class FAERSBulkStore:
 
         Args:
             drug: Nome da droga (matched por UPPER contra drug_name_norm).
-            event: Preferred term do evento (matched por UPPER contra pt_upper).
+            event: Preferred term ou lista de termos MedDRA expandidos.
             role_filter: Filtro de role (PS_ONLY, SUSPECT, ALL).
 
         Returns:
             BulkCountResult com as 4 contagens.
         """
         drug_upper = drug.strip().upper()
-        event_upper = event.strip().upper()
+        if isinstance(event, list):
+            events_list = [e.strip().upper() for e in event]
+        else:
+            events_list = [event.strip().upper()]
         role_value = role_filter.value
 
         with self._db_lock:
             result = self._conn.execute(
                 _FOUR_COUNTS_SQL,
-                {"drug": drug_upper, "event": event_upper, "role": role_value},
+                {"drug": drug_upper, "events": events_list, "role": role_value},
             ).fetchone()
 
         if result is None:

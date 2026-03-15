@@ -279,7 +279,15 @@ async def hypothesis(
         if _drugbank_cache is not None:
             db_info = _drugbank_cache
         else:
-            db_info = await drugbank_api.drug_info(drug, _store=None)
+            try:
+                db_info = await drugbank_api.drug_info(drug, _store=None)
+            except Exception:
+                logger.warning(
+                    "hypothesis %s + %s: DrugBank unavailable, continuing without",
+                    drug,
+                    event,
+                )
+                db_info = None
 
         if db_info is not None:
             mechanism = db_info.mechanism_of_action or None
@@ -515,9 +523,25 @@ async def compare_signals(
     # 1. Auto-detectar eventos se não fornecidos
     if events is None:
         faers_result = await faers_api.top_events(
-            drug, suspect_only=suspect_only, limit=top_n, use_cache=use_cache
+            drug, suspect_only=suspect_only, limit=top_n * 2, use_cache=use_cache
         )
-        events = [ev.term for ev in faers_result.events]
+        raw_events = [ev.term for ev in faers_result.events]
+
+        # Dedup por canonical MedDRA e filtrar operacionais
+        from hypokrates.scan.constants import OPERATIONAL_MEDDRA_TERMS
+        from hypokrates.vocab.meddra import canonical_term
+
+        seen: set[str] = set()
+        events = []
+        for ev in raw_events:
+            if ev.upper().strip() in OPERATIONAL_MEDDRA_TERMS:
+                continue
+            canon = canonical_term(ev)
+            if canon not in seen:
+                seen.add(canon)
+                events.append(canon)
+            if len(events) >= top_n:
+                break
 
     if not events:
         return CompareResult(

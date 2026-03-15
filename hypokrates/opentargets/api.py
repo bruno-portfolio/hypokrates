@@ -113,10 +113,15 @@ async def drug_safety_score(
     if not safety.adverse_events:
         return None
 
-    # Match case-insensitive
-    event_upper = event.upper().strip()
-    for ae in safety.adverse_events:
-        if ae.name.upper().strip() == event_upper:
-            return ae.log_lr
+    # Match case-insensitive, com expansão MedDRA
+    from hypokrates.vocab.meddra import expand_event_terms
 
-    return None
+    event_terms = {t.upper().strip() for t in expand_event_terms(event)}
+    best_score: float | None = None
+    for ae in safety.adverse_events:
+        if ae.name.upper().strip() in event_terms and (
+            best_score is None or ae.log_lr > best_score
+        ):
+            best_score = ae.log_lr
+
+    return best_score

@@ -40,7 +40,7 @@ def _build_reaction_query(event: str, reaction_field: str) -> str:
     if len(terms) == 1:
         return f'{reaction_field}:"{terms[0]}"'
     parts = [f'{reaction_field}:"{t}"' for t in terms]
-    return "(" + "+".join(parts) + ")"
+    return "(" + " ".join(parts) + ")"
 
 
 async def signal(

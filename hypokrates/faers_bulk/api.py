@@ -107,8 +107,15 @@ async def bulk_signal(
     resolved = await resolve_bulk_drug(drug, store=store)
     drug_name = resolved if resolved is not None else drug.strip().upper()
 
+    # Expandir sinônimos MedDRA para o evento
+    from hypokrates.vocab.meddra import expand_event_terms
+
+    event_terms = expand_event_terms(event)
+
     # Query bulk store (thread para não bloquear event loop)
-    counts = await asyncio.to_thread(store.four_counts, drug_name, event, role_filter=role_filter)
+    counts = await asyncio.to_thread(
+        store.four_counts, drug_name, event_terms, role_filter=role_filter
+    )
 
     # Construir sinal com mesma lógica do API path
     table = build_table(counts.drug_event, counts.drug_total, counts.event_total, counts.n_total)

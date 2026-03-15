@@ -92,12 +92,19 @@ def register(mcp: FastMCP) -> None:
                 for cs in result.coadmin.co_signals:
                     sig_str = "YES" if cs.signal_detected else "NO"
                     lines.append(f"| {cs.drug} | {cs.prr:.2f} | {sig_str} |")
-            if result.coadmin.profile.co_admin_flag:
+            if result.coadmin.profile.co_admin_flag and result.coadmin.verdict != "specific":
                 lines.extend(
                     [
                         "",
                         "**⚠ Co-admin confounding likely.** PRR may be inflated by "
                         "procedural co-administration, not causality.",
+                    ]
+                )
+            elif result.coadmin.profile.co_admin_flag and result.coadmin.verdict == "specific":
+                lines.extend(
+                    [
+                        "",
+                        "**Co-admin detected but signal appears specific to this drug.**",
                     ]
                 )
         if result.articles:

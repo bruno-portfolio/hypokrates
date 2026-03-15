@@ -213,7 +213,9 @@ class TestBuildReactionQuery:
         assert "ELECTROCARDIOGRAM QT PROLONGED" in result
         assert "LONG QT SYNDROME" in result
         assert "TORSADE DE POINTES" in result
-        assert "+" in result
+        # Espaço = OR no OpenFDA (não +, que seria AND)
+        assert "+" not in result
+        assert '" ' in result
 
     def test_case_insensitive(self) -> None:
         """Input case-insensitive é normalizado."""

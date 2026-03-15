@@ -435,7 +435,7 @@ def _build_event_search(
         reaction_query = f'{reaction_field}:"{terms[0]}"'
     else:
         reaction_parts = [f'{reaction_field}:"{t}"' for t in terms]
-        reaction_query = "(" + "+".join(reaction_parts) + ")"
+        reaction_query = "(" + " ".join(reaction_parts) + ")"
 
     parts: list[str] = [reaction_query]
     if suspect_only:

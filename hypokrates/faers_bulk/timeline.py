@@ -36,7 +36,7 @@ event_pids AS (
     SELECT DISTINCT r.primaryid
     FROM faers_reac r
     INNER JOIN deduped dd ON r.primaryid = dd.primaryid
-    WHERE r.pt_upper = $event
+    WHERE r.pt_upper = ANY($events)
 ),
 pair_pids AS (
     SELECT dp.primaryid
@@ -72,10 +72,14 @@ async def bulk_signal_timeline(
     # Resolve drug name
     resolved = await resolve_bulk_drug(drug, store=store)
     drug_name = resolved if resolved is not None else drug.strip().upper()
-    event_upper = event.strip().upper()
+
+    # Expandir sinônimos MedDRA para o evento
+    from hypokrates.vocab.meddra import expand_event_terms
+
+    event_terms = expand_event_terms(event)
 
     # Query no bulk store (thread)
-    rows = await asyncio.to_thread(_query_quarterly, store, drug_name, event_upper, role_filter)
+    rows = await asyncio.to_thread(_query_quarterly, store, drug_name, event_terms, role_filter)
 
     # Converter para QuarterlyCount
     quarters: list[QuarterlyCount] = []
@@ -138,13 +142,13 @@ async def bulk_signal_timeline(
 def _query_quarterly(
     store: FAERSBulkStore,
     drug: str,
-    event: str,
+    events: list[str],
     role_filter: RoleCodFilter,
 ) -> list[tuple[str, int]]:
     """Query DuckDB para contagens trimestrais (sync, chamado via to_thread)."""
     with store._db_lock:
         rows = store._conn.execute(
             _QUARTERLY_COUNTS_SQL,
-            {"drug": drug, "event": event, "role": role_filter.value},
+            {"drug": drug, "events": events, "role": role_filter.value},
         ).fetchall()
     return [(str(row[0]), int(row[1])) for row in rows]

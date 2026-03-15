@@ -72,11 +72,13 @@ INDICATION_TERMS: frozenset[str] = frozenset(
         "MULTIPLE SCLEROSIS",
         # Allergic
         "ALLERGIC RHINITIS",
-        "URTICARIA",
-        "ANAPHYLAXIS",
         # Infectious context (not the drug's fault)
         "COVID-19",
         "SARS-COV-2 TEST POSITIVE",
+        # Cardiac indications
+        "ATRIAL FIBRILLATION",
+        "HEART FAILURE",
+        "VENTRICULAR TACHYCARDIA",
         # Other common indications
         "ADRENAL INSUFFICIENCY",
         "ADDISON'S DISEASE",
