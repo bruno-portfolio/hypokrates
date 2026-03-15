@@ -32,6 +32,7 @@ async def test_normalize_drug_not_found(mock_client_cls: AsyncMock) -> None:
     golden = load_golden("vocab", "rxnorm_drugs_not_found.json")
     instance = AsyncMock()
     instance.search.return_value = golden
+    instance.search_by_name.return_value = {"idGroup": {}}
     mock_client_cls.return_value = instance
 
     result = await normalize_drug("xyz123")
@@ -92,3 +93,60 @@ async def test_map_to_mesh_with_tree_numbers(mock_client_cls: AsyncMock) -> None
     assert len(result.tree_numbers) == 2
     assert "D02.455.426.559.389.657.109" in result.tree_numbers
     assert "D09.698.629.200" in result.tree_numbers
+
+
+@patch("hypokrates.vocab.api.RxNormClient")
+async def test_normalize_drug_rxcui_fallback(mock_client_cls: AsyncMock) -> None:
+    """'Diprivan' → generic_name='propofol' via rxcui/allrelated fallback."""
+    golden_drugs = load_golden("vocab", "rxnorm_drugs_not_found.json")
+    golden_rxcui = load_golden("vocab", "rxnorm_rxcui_diprivan.json")
+    golden_allrelated = load_golden("vocab", "rxnorm_allrelated_203220.json")
+
+    instance = AsyncMock()
+    instance.search.return_value = golden_drugs
+    instance.search_by_name.return_value = golden_rxcui
+    instance.fetch_allrelated.return_value = golden_allrelated
+    mock_client_cls.return_value = instance
+
+    result = await normalize_drug("Diprivan")
+
+    assert result.original == "Diprivan"
+    assert result.generic_name == "propofol"
+    assert result.rxcui == "8782"
+    instance.close.assert_called_once()
+
+
+@patch("hypokrates.vocab.api.RxNormClient")
+async def test_normalize_drug_pt_en_fallback(mock_client_cls: AsyncMock) -> None:
+    """'dipirona' → generic_name via NOME_PT_EN (metamizole)."""
+    golden_not_found = load_golden("vocab", "rxnorm_drugs_not_found.json")
+    # Step 1 and Step 2 fail, Step 3 tries NOME_PT_EN
+    instance = AsyncMock()
+    instance.search.side_effect = [golden_not_found, golden_not_found]
+    instance.search_by_name.return_value = {"idGroup": {}}
+    mock_client_cls.return_value = instance
+
+    result = await normalize_drug("dipirona")
+
+    assert result.original == "dipirona"
+    # Should resolve via NOME_PT_EN: DIPIRONA -> METAMIZOLE
+    assert result.generic_name is not None
+    assert "metamizole" in result.generic_name.lower()
+    instance.close.assert_called_once()
+
+
+@patch("hypokrates.vocab.api.RxNormClient")
+async def test_normalize_drug_paracetamol_pt_en(mock_client_cls: AsyncMock) -> None:
+    """'paracetamol' → generic_name via NOME_PT_EN (acetaminophen)."""
+    golden_not_found = load_golden("vocab", "rxnorm_drugs_not_found.json")
+    instance = AsyncMock()
+    instance.search.side_effect = [golden_not_found, golden_not_found]
+    instance.search_by_name.return_value = {"idGroup": {}}
+    mock_client_cls.return_value = instance
+
+    result = await normalize_drug("paracetamol")
+
+    assert result.original == "paracetamol"
+    assert result.generic_name is not None
+    assert "acetaminophen" in result.generic_name.lower()
+    instance.close.assert_called_once()

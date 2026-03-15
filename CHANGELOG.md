@@ -43,7 +43,15 @@
 
 ### Fixed
 - **DailyMed label matching**: `match_event_in_label()` now expands events via MedDRA synonyms before matching. Previously, "anaphylactic shock" would not match "anaphylaxis" in the label, causing `in_label=False` and inflating scan scores 3x (1.5x boost instead of 0.5x penalty). Now uses `expand_event_terms()` for bidirectional synonym matching across 35 MedDRA groups (~120 aliases).
+- **DailyMed label matching (fuzzy)**: Added `rapidfuzz` layer 3 matching (`token_sort_ratio >= 85`) — catches reordered words ("hyperthermia malignant" → "malignant hyperthermia"), BrE/AmE spellings (apnoea/apnea), and minor variations (QT/QTc).
+- **DailyMed SPL selection**: `label_events()` now fetches up to 10 SPLs and selects the first with safety sections (LOINC codes 34084-4, 34066-1, 34071-1, 43685-7). Previously picked the first SPL which could be a powder/OTC/patch without adverse reactions. Fixes gabapentin, lidocaine, acetaminophen returning 0 events.
+- **RxNorm normalization**: `normalize_drug()` now has 3-step fallback: (1) /drugs.json, (2) /rxcui.json + /allrelated.json (resolves SBD → IN), (3) NOME_PT_EN mapping (dipirona→metamizole, paracetamol→acetaminophen). Fixes Diprivan→propofol, Ozempic→semaglutide.
+- **FAERS brand→generic**: `resolve_drug_field()` now calls `normalize_drug()` as fallback when no FAERS field matches. Fixes Diprivan (16→236 reports), Ozempic, and other brand names returning near-zero results.
+- **FAERS drugs_by_event MedDRA**: `_build_event_search()` now expands events via `expand_event_terms()` — "malignant hyperthermia" also searches "hyperthermia malignant" (and other MedDRA synonyms).
+- **signal_timeline limit**: Changed `limit=100` to `limit=1000` in `signal_timeline()` — recovers 2016-2019 data that was being truncated.
+- **Trials total_count**: `parse_studies()` now falls back to `len(studies)` when API returns `totalCount=0` with studies present.
 - **MedDRA `expand_event_terms()`**: Aliases now expand to full group (canonical + all aliases), not just the alias itself. Affects label matching and FAERS API reaction queries.
+- **OPERATIONAL_MEDDRA_TERMS**: Added 4 missing generic terms: `GENERAL PHYSICAL HEALTH DETERIORATION`, `PAIN`, `FALL`, `MALAISE`.
 
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability

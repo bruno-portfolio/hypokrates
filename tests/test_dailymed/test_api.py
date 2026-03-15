@@ -95,3 +95,66 @@ async def test_check_label_drug_not_found(mock_client_cls: AsyncMock) -> None:
 
     assert result.in_label is False
     assert result.set_id is None
+
+
+@patch("hypokrates.dailymed.api.DailyMedClient")
+async def test_label_events_skips_spl_without_safety(mock_client_cls: AsyncMock) -> None:
+    """Bug 3: SPL sem safety sections (powder) deve ser ignorado."""
+    golden_spls = load_golden("dailymed", "spls_gabapentin_multi.json")
+    golden_xml_real = (GOLDEN_DATA / "dailymed" / "spl_xml_propofol.xml").read_text()
+
+    # XML sem safety sections (powder SPL)
+    powder_xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <document xmlns="urn:hl7-org:v3">
+      <component><structuredBody><component><section>
+        <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+        <text><paragraph>Dosage info only.</paragraph></text>
+      </section></component></structuredBody></component>
+    </document>"""
+
+    instance = AsyncMock()
+    instance.search_spls.return_value = golden_spls
+    # First SPL (powder) has no safety sections, second has
+    instance.fetch_spl_xml.side_effect = [powder_xml, golden_xml_real]
+    mock_client_cls.return_value = instance
+
+    result = await label_events("gabapentin")
+
+    assert result.drug == "gabapentin"
+    # Should use second SPL (with safety sections), not the powder
+    assert result.set_id == "bbbb-capsule-with-safety"
+    assert len(result.events) > 0
+    instance.close.assert_called_once()
+
+
+@patch("hypokrates.dailymed.api.DailyMedClient")
+async def test_label_events_fallback_when_no_safety(mock_client_cls: AsyncMock) -> None:
+    """Quando nenhum SPL tem safety sections, usa o primeiro (fallback)."""
+    golden_spls = {
+        "data": [
+            {"setid": "aaa-no-safety", "title": "Test Drug Powder"},
+            {"setid": "bbb-no-safety", "title": "Test Drug OTC"},
+        ],
+        "metadata": {"total_elements": 2},
+    }
+
+    no_safety_xml = """<?xml version="1.0" encoding="UTF-8"?>
+    <document xmlns="urn:hl7-org:v3">
+      <component><structuredBody><component><section>
+        <code code="34068-7" codeSystem="2.16.840.1.113883.6.1"/>
+        <text><paragraph>Dosage info only.</paragraph></text>
+      </section></component></structuredBody></component>
+    </document>"""
+
+    instance = AsyncMock()
+    instance.search_spls.return_value = golden_spls
+    # All SPLs lack safety sections; fallback re-fetches first
+    instance.fetch_spl_xml.return_value = no_safety_xml
+    mock_client_cls.return_value = instance
+
+    result = await label_events("testdrug")
+
+    assert result.drug == "testdrug"
+    assert result.set_id == "aaa-no-safety"
+    assert result.events == []
+    instance.close.assert_called_once()

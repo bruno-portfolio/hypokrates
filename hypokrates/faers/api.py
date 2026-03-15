@@ -318,6 +318,7 @@ async def resolve_drug_field(
     """Resolve qual campo OpenFDA tem dados para uma droga.
 
     Tenta generic_name.exact → brand_name.exact → medicinalproduct.
+    Se não encontrar, tenta normalizar brand→generic via RxNorm e retenta.
     Resultado cacheado em memória por droga.
 
     Args:
@@ -343,6 +344,35 @@ async def resolve_drug_field(
                 _drug_field_cache[drug_upper] = search
                 logger.info("Resolved %s -> %s (%d reports)", drug, field, total)
                 return search
+
+        # Fallback: normalizar brand→generic via RxNorm e retenta
+        try:
+            from hypokrates.vocab.api import normalize_drug
+
+            norm = await normalize_drug(drug, use_cache=use_cache)
+            if norm.generic_name and norm.generic_name.upper() != drug_upper:
+                generic_upper = norm.generic_name.upper()
+                # Checar se o generic_name já está no cache
+                if generic_upper in _drug_field_cache:
+                    result = _drug_field_cache[generic_upper]
+                    _drug_field_cache[drug_upper] = result
+                    logger.info("Resolved %s -> %s (via normalize_drug)", drug, norm.generic_name)
+                    return result
+                # Tentar generic_name no FAERS
+                generic_search = f'{SEARCH_FIELDS["drug"]}:"{generic_upper}"'
+                total = await resolved_client.fetch_total(generic_search, use_cache=use_cache)
+                if total > 0:
+                    _drug_field_cache[drug_upper] = generic_search
+                    _drug_field_cache[generic_upper] = generic_search
+                    logger.info(
+                        "Resolved %s -> generic_name %s (%d reports)",
+                        drug,
+                        norm.generic_name,
+                        total,
+                    )
+                    return generic_search
+        except Exception:
+            logger.debug("normalize_drug fallback failed for %s", drug)
     finally:
         if own_client:
             await resolved_client.close()
@@ -392,8 +422,22 @@ def _build_event_search(
     *,
     suspect_only: bool = False,
 ) -> str:
-    """Constroi query string para busca por evento adverso (reverse lookup)."""
-    parts: list[str] = [f'{SEARCH_FIELDS["reaction"]}:"{event.upper()}"']
+    """Constroi query string para busca por evento adverso (reverse lookup).
+
+    Expande o evento via MedDRA para incluir sinônimos (ex: "malignant hyperthermia"
+    também busca "hyperthermia malignant").
+    """
+    from hypokrates.vocab.meddra import expand_event_terms
+
+    reaction_field = SEARCH_FIELDS["reaction"]
+    terms = expand_event_terms(event)
+    if len(terms) == 1:
+        reaction_query = f'{reaction_field}:"{terms[0]}"'
+    else:
+        reaction_parts = [f'{reaction_field}:"{t}"' for t in terms]
+        reaction_query = "(" + "+".join(reaction_parts) + ")"
+
+    parts: list[str] = [reaction_query]
     if suspect_only:
         parts.append(f"{DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}")
     return " AND ".join(parts)

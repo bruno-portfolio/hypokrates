@@ -246,7 +246,7 @@ async def signal_timeline(
         count_field = COUNT_FIELDS["receivedate"]
 
         try:
-            data = await client.fetch_count(search, count_field, limit=100, use_cache=use_cache)
+            data = await client.fetch_count(search, count_field, limit=1000, use_cache=use_cache)
         except Exception:
             logger.warning(
                 "signal_timeline %s + %s: count query failed, returning empty",

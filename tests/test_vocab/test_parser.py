@@ -129,3 +129,59 @@ class TestParseMeSHDescriptor:
 
         assert mesh_id is None
         assert mesh_term is None
+
+
+class TestParseRxCuiResponse:
+    """Testes para parse_rxcui_response."""
+
+    def test_found(self) -> None:
+        from hypokrates.vocab.parser import parse_rxcui_response
+
+        data = load_golden("vocab", "rxnorm_rxcui_diprivan.json")
+        rxcui = parse_rxcui_response(data)
+        assert rxcui == "203220"
+
+    def test_not_found(self) -> None:
+        from hypokrates.vocab.parser import parse_rxcui_response
+
+        rxcui = parse_rxcui_response({"idGroup": {}})
+        assert rxcui is None
+
+    def test_empty_id_list(self) -> None:
+        from hypokrates.vocab.parser import parse_rxcui_response
+
+        rxcui = parse_rxcui_response({"idGroup": {"rxnormId": []}})
+        assert rxcui is None
+
+
+class TestParseAllrelatedIngredient:
+    """Testes para parse_allrelated_ingredient."""
+
+    def test_found(self) -> None:
+        from hypokrates.vocab.parser import parse_allrelated_ingredient
+
+        data = load_golden("vocab", "rxnorm_allrelated_203220.json")
+        name, rxcui = parse_allrelated_ingredient(data)
+        assert name == "propofol"
+        assert rxcui == "8782"
+
+    def test_no_ingredient(self) -> None:
+        from hypokrates.vocab.parser import parse_allrelated_ingredient
+
+        data = {
+            "allRelatedGroup": {
+                "conceptGroup": [
+                    {"tty": "BN", "conceptProperties": [{"name": "Diprivan", "rxcui": "1"}]},
+                ]
+            }
+        }
+        name, rxcui = parse_allrelated_ingredient(data)
+        assert name is None
+        assert rxcui is None
+
+    def test_empty_response(self) -> None:
+        from hypokrates.vocab.parser import parse_allrelated_ingredient
+
+        name, rxcui = parse_allrelated_ingredient({})
+        assert name is None
+        assert rxcui is None

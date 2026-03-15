@@ -38,6 +38,7 @@ dependencies = [
     "duckdb>=1.0,<2",
     "pydantic>=2.7,<3",
     "scipy>=1.13,<2",
+    "rapidfuzz>=3.6,<4",
 ]
 
 [project.optional-dependencies]
@@ -136,6 +137,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "typer.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "rapidfuzz.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

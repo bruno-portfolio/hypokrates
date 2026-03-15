@@ -17,7 +17,19 @@ All notable changes to this project will be documented in this file.
 - **dailymed/parser.py**: `match_event_in_label()` now uses MedDRA synonyms via `expand_event_terms()` — fixes false negatives for clinically equivalent terms (e.g., "anaphylactic shock" now matches "anaphylaxis" in label)
 - **vocab/meddra.py**: `expand_event_terms()` now expands aliases to full group (canonical + all aliases)
 - **MCP**: `scan_drug` gains `role_filter` ("ps_only"/"suspect"/"all") and `check_direction` params; output shows data source, role filter, PS-PRR, and direction
-- 29 new tests (1105+ total)
+- 50+ new tests (1132 total)
+
+#### Bug Fixes (10 bugs from bug hunting session)
+
+- **DailyMed label matching (fuzzy)**: Added `rapidfuzz` layer 3 matching (`token_sort_ratio >= 85`) — catches reordered words, BrE/AmE spellings (apnoea/apnea), and minor variations
+- **DailyMed SPL selection**: `label_events()` now fetches 10 SPLs and picks first with safety sections — fixes powder/OTC/patch SPLs returning 0 events
+- **RxNorm normalization**: 3-step fallback: /drugs.json → /rxcui+allrelated (SBD→IN) → NOME_PT_EN (dipirona→metamizole)
+- **FAERS brand→generic**: `resolve_drug_field()` tries `normalize_drug()` as fallback for brand names
+- **FAERS drugs_by_event**: `_build_event_search()` now expands MedDRA synonyms
+- **signal_timeline**: `limit=100` → `limit=1000` (recovers 2016-2019 data)
+- **Trials total_count**: Fallback to `len(studies)` when API returns `totalCount=0`
+- **OPERATIONAL_MEDDRA_TERMS**: +4 generic terms (GENERAL PHYSICAL HEALTH DETERIORATION, PAIN, FALL, MALAISE)
+- **New dependency**: `rapidfuzz>=3.6,<4`
 
 ### Sprint 7 — Suspect-Only, Operational Filter, Over-Fetch, Co-Admin, ANVISA
 

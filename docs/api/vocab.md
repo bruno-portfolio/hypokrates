@@ -4,17 +4,22 @@ Drug name normalization (RxNorm) and medical term mapping (MeSH).
 
 ## `normalize_drug()`
 
-Normalizes a drug name to its generic equivalent via RxNorm.
+Normalizes a drug name to its generic equivalent via a 3-step fallback chain:
+
+1. **RxNorm /drugs.json** — resolves common generics and brands (e.g., "advil" → "ibuprofen")
+2. **RxNorm /rxcui + /allrelated** — resolves SBD/SCD entries to their ingredient (e.g., "Diprivan" → "propofol", "Ozempic" → "semaglutide")
+3. **NOME_PT_EN mapping** — resolves international/Portuguese names via ANVISA mapping (e.g., "dipirona" → "metamizole", "paracetamol" → "acetaminophen")
 
 === "Async"
 
     ```python
     from hypokrates.vocab import api as vocab
 
-    result = await vocab.normalize_drug("advil")
-    print(result.generic_name)  # "ibuprofen"
-    print(result.brand_names)   # ["Advil", "Motrin"]
-    print(result.rxcui)         # "5640"
+    result = await vocab.normalize_drug("Diprivan")
+    print(result.generic_name)  # "propofol"
+
+    result = await vocab.normalize_drug("dipirona")
+    print(result.generic_name)  # "metamizole"
     ```
 
 === "Sync"
@@ -22,8 +27,8 @@ Normalizes a drug name to its generic equivalent via RxNorm.
     ```python
     from hypokrates.sync import vocab
 
-    result = vocab.normalize_drug("advil")
-    print(result.generic_name)  # "ibuprofen"
+    result = vocab.normalize_drug("Diprivan")
+    print(result.generic_name)  # "propofol"
     ```
 
 ### Parameters

@@ -208,9 +208,12 @@ print(f"{mapping.nome_pt} → {mapping.nome_en}")  # DIPIRONA → METAMIZOLE
 ```python
 from hypokrates.sync import vocab
 
-# Brand -> generic
-norm = vocab.normalize_drug("advil")
-print(f"{norm.original} -> {norm.generic_name}")  # advil -> ibuprofen
+# Brand -> generic (3-step fallback: /drugs → /rxcui+allrelated → PT↔EN mapping)
+norm = vocab.normalize_drug("Diprivan")
+print(f"{norm.original} -> {norm.generic_name}")  # Diprivan -> propofol
+
+norm = vocab.normalize_drug("dipirona")
+print(f"{norm.original} -> {norm.generic_name}")  # dipirona -> metamizole
 
 # MeSH mapping
 mesh = vocab.map_to_mesh("aspirin")
@@ -273,7 +276,7 @@ python -m hypokrates.mcp
 
 ## Status
 
-**Alpha** — 1105+ tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1132 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 

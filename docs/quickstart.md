@@ -321,15 +321,19 @@ Get FAERS-based LRT scores from OpenTargets:
 
 ## Step 11 — Normalize Drug Names
 
-Resolve brand names to generic names and map to MeSH:
+Resolve brand names to generic names and map to MeSH. Uses a 3-step fallback:
+RxNorm /drugs.json → /rxcui + /allrelated (resolves SBD → IN) → PT↔EN mapping (dipirona→metamizole).
 
 === "Async"
 
     ```python
     from hypokrates.vocab import api as vocab
 
-    norm = await vocab.normalize_drug("advil")
-    print(f"{norm.original} -> {norm.generic_name}")  # advil -> ibuprofen
+    norm = await vocab.normalize_drug("Diprivan")
+    print(f"{norm.original} -> {norm.generic_name}")  # Diprivan -> propofol
+
+    norm = await vocab.normalize_drug("dipirona")
+    print(f"{norm.original} -> {norm.generic_name}")  # dipirona -> metamizole
 
     mesh = await vocab.map_to_mesh("aspirin")
     print(f"{mesh.query} -> {mesh.mesh_term} ({mesh.mesh_id})")
@@ -340,8 +344,8 @@ Resolve brand names to generic names and map to MeSH:
     ```python
     from hypokrates.sync import vocab
 
-    norm = vocab.normalize_drug("advil")
-    print(f"{norm.original} -> {norm.generic_name}")
+    norm = vocab.normalize_drug("Diprivan")
+    print(f"{norm.original} -> {norm.generic_name}")  # Diprivan -> propofol
     ```
 
 ## Step 12 — Evidence Provenance

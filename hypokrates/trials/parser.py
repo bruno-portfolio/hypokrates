@@ -20,14 +20,18 @@ def parse_studies(data: dict[str, Any]) -> tuple[int, list[ClinicalTrial]]:
     Returns:
         Tupla (total_count, lista de ClinicalTrial).
     """
-    total_count = data.get("totalCount", 0)
-    studies = data.get("studies", [])
+    total_count: int = data.get("totalCount", 0)
+    studies: list[dict[str, Any]] = data.get("studies", [])
 
     trials: list[ClinicalTrial] = []
     for study in studies:
         trial = build_trial(study)
         if trial is not None:
             trials.append(trial)
+
+    # Fallback: se totalCount=0 mas temos studies, usar len(studies)
+    if total_count == 0 and trials:
+        total_count = len(trials)
 
     return total_count, trials
 

@@ -1,0 +1,34 @@
+{
+  "allRelatedGroup": {
+    "rxcui": "203220",
+    "conceptGroup": [
+      {
+        "tty": "SBD",
+        "conceptProperties": [
+          {
+            "rxcui": "203220",
+            "name": "Diprivan 10 MG/ML Injectable Emulsion"
+          }
+        ]
+      },
+      {
+        "tty": "IN",
+        "conceptProperties": [
+          {
+            "rxcui": "8782",
+            "name": "propofol"
+          }
+        ]
+      },
+      {
+        "tty": "BN",
+        "conceptProperties": [
+          {
+            "rxcui": "203218",
+            "name": "Diprivan"
+          }
+        ]
+      }
+    ]
+  }
+}

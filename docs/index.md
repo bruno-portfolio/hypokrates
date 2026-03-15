@@ -3,7 +3,7 @@
 **Cross-reference pharmacovigilance data for medical hypothesis generation.**
 
 [![PyPI](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
-[![Tests](https://img.shields.io/badge/tests-1105%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1132%20passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://github.com/brunoescalhao/hypokrates/blob/main/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)]()

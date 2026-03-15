@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from hypokrates.dailymed.client import DailyMedClient
 from hypokrates.dailymed.models import LabelCheckResult, LabelEventsResult
 from hypokrates.dailymed.parser import (
+    has_safety_sections,
     match_event_in_label,
     parse_adverse_reactions_xml,
     parse_spl_search,
@@ -49,9 +50,20 @@ async def label_events(
                 ),
             )
 
-        # 2. Fetch XML da primeira bula
+        # 2. Fetch XML — escolher SPL que tenha seções de segurança
         set_id = set_ids[0]
-        xml_text = await client.fetch_spl_xml(set_id, use_cache=use_cache)
+        xml_text = ""
+        for candidate_id in set_ids:
+            candidate_xml = await client.fetch_spl_xml(candidate_id, use_cache=use_cache)
+            if has_safety_sections(candidate_xml):
+                set_id = candidate_id
+                xml_text = candidate_xml
+                break
+
+        # Fallback: usar primeiro SPL se nenhum tem seções de segurança
+        if not xml_text:
+            xml_text = await client.fetch_spl_xml(set_ids[0], use_cache=use_cache)
+            set_id = set_ids[0]
 
         # 3. Parsear adverse reactions
         terms, raw_text = parse_adverse_reactions_xml(xml_text)

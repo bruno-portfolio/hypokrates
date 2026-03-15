@@ -85,3 +85,58 @@ class TestCountActive:
 
     def test_empty(self) -> None:
         assert count_active([]) == 0
+
+
+class TestParseStudiesTotalCountFallback:
+    """Bug 9: totalCount=0 com studies presentes."""
+
+    def test_zero_total_count_with_studies(self) -> None:
+        """totalCount=0 but studies present → use len(studies)."""
+        data = {
+            "totalCount": 0,
+            "studies": [
+                {
+                    "protocolSection": {
+                        "identificationModule": {
+                            "nctId": "NCT001",
+                            "briefTitle": "Test Trial 1",
+                        },
+                        "statusModule": {"overallStatus": "RECRUITING"},
+                    }
+                },
+                {
+                    "protocolSection": {
+                        "identificationModule": {
+                            "nctId": "NCT002",
+                            "briefTitle": "Test Trial 2",
+                        },
+                        "statusModule": {"overallStatus": "COMPLETED"},
+                    }
+                },
+                {
+                    "protocolSection": {
+                        "identificationModule": {
+                            "nctId": "NCT003",
+                            "briefTitle": "Test Trial 3",
+                        },
+                        "statusModule": {"overallStatus": "ACTIVE_NOT_RECRUITING"},
+                    }
+                },
+            ],
+        }
+        total_count, trials = parse_studies(data)
+        assert total_count == 3
+        assert len(trials) == 3
+
+    def test_zero_total_count_zero_studies(self) -> None:
+        """totalCount=0 and no studies → remain 0."""
+        total_count, trials = parse_studies({"totalCount": 0, "studies": []})
+        assert total_count == 0
+        assert trials == []
+
+    def test_nonzero_total_count_preserved(self) -> None:
+        """When totalCount is provided and > 0, use it as-is."""
+        data = load_golden("trials", "studies_propofol_hypotension.json")
+        total_count, trials = parse_studies(data)
+        assert total_count == 3
+        assert len(trials) == 3

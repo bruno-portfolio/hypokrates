@@ -41,8 +41,53 @@ def parse_rxnorm_drugs(data: dict[str, Any]) -> tuple[str | None, list[str], str
                 name = concept.get("name")
                 if name:
                     brand_names.append(name)
+        elif tty in ("SBD", "SCD") and generic_name is None:
+            # Semantic Branded Drug / Semantic Clinical Drug — extrair ingredient
+            # Ex: "Diprivan 10 MG/ML Injectable Emulsion" → parse para obter ingredient
+            first = concepts[0]
+            rxcui = rxcui or first.get("rxcui")
 
     return generic_name, brand_names, rxcui
+
+
+def parse_rxcui_response(data: dict[str, Any]) -> str | None:
+    """Parseia resposta do RxNorm /rxcui.json para extrair RXCUI.
+
+    Args:
+        data: JSON response do /rxcui.json.
+
+    Returns:
+        RXCUI string ou None se não encontrado.
+    """
+    id_group = data.get("idGroup", {})
+    rxnorm_id_list = id_group.get("rxnormId", [])
+    if rxnorm_id_list:
+        return str(rxnorm_id_list[0])
+    return None
+
+
+def parse_allrelated_ingredient(data: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Extrai nome genérico (IN) de uma resposta allrelated.
+
+    Args:
+        data: JSON response do /rxcui/{id}/allrelated.json.
+
+    Returns:
+        Tupla (generic_name, rxcui) do ingredient.
+    """
+    all_related = data.get("allRelatedGroup", {})
+    concept_groups = all_related.get("conceptGroup", [])
+
+    for group in concept_groups:
+        tty = group.get("tty", "")
+        concepts = group.get("conceptProperties", [])
+        if not concepts:
+            continue
+        if tty == "IN":
+            first = concepts[0]
+            return first.get("name"), first.get("rxcui")
+
+    return None, None
 
 
 def parse_mesh_search(data: dict[str, Any]) -> list[str]:
