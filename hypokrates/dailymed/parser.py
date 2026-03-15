@@ -115,7 +115,7 @@ def match_event_in_label(
 
     # Layer 3: fuzzy matching com rapidfuzz
     try:
-        from rapidfuzz.fuzz import token_sort_ratio
+        from rapidfuzz.fuzz import token_sort_ratio  # type: ignore[import-not-found,unused-ignore]
     except ImportError:
         return False, []
 
