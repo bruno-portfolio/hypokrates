@@ -24,7 +24,7 @@ _PATH_FIELDS = {"drugbank_path", "onsides_path", "canada_bulk_path", "faers_bulk
 
 def _configure_from_env() -> None:
     """Lê env vars e aplica configure() automaticamente."""
-    kwargs: dict[str, object] = {}
+    kwargs: dict[str, Path | str] = {}
     for env_var, config_field in _ENV_MAP.items():
         value = os.environ.get(env_var)
         if value:

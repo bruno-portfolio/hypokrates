@@ -26,7 +26,7 @@ class EvidenceBlock(BaseModel):
 
     source: str = Field(description="Fonte de dados (e.g., 'OpenFDA/FAERS')")
     source_version: str | None = None
-    query: dict[str, object] = Field(default_factory=dict)
+    query: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
     retrieved_at: datetime
     cached: bool = False
     data: dict[str, object] = Field(default_factory=dict)

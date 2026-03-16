@@ -55,7 +55,7 @@ class TestDrugInfo:
 
     async def test_without_store_and_no_config_raises(self) -> None:
         DrugBankStore.reset()
-        with pytest.raises(ConfigurationError, match="DrugBank XML path not configured"):
+        with pytest.raises(ConfigurationError, match="drugbank_path"):
             await drug_info("propofol")
 
 

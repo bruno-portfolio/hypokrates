@@ -72,8 +72,9 @@ async def compare_class(
         ClassCompareResult com eventos classificados.
     """
     if len(drugs) < _MIN_DRUGS:
-        msg = f"compare_class requires at least {_MIN_DRUGS} drugs, got {len(drugs)}"
-        raise ValidationError(msg)
+        raise ValidationError(
+            "drugs", f"compare_class requires at least {_MIN_DRUGS}, got {len(drugs)}"
+        )
 
     # 1. Fetch top events per drug (paralelo)
     top_results = await asyncio.gather(
@@ -144,7 +145,7 @@ async def compare_class(
         outlier_factor_used=outlier_factor,
         meta=MetaInfo(
             source="hypokrates/compare_class",
-            query={"drugs": drugs, "top_n": top_n},
+            query={"drugs": ",".join(drugs), "top_n": top_n},
             total_results=len(items),
             retrieved_at=datetime.now(UTC),
             disclaimer="Intra-class comparison of FAERS disproportionality signals. "
@@ -357,7 +358,7 @@ def _empty_result(
         outlier_factor_used=outlier_factor_val,
         meta=MetaInfo(
             source="hypokrates/compare_class",
-            query={"drugs": drugs},
+            query={"drugs": ",".join(drugs)},
             total_results=0,
             retrieved_at=datetime.now(UTC),
             disclaimer="No events found for comparison.",

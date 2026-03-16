@@ -7,6 +7,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from hypokrates.constants import __version__
+
 
 class Sex(StrEnum):
     """Sexo biológico."""
@@ -49,11 +51,17 @@ class MetaInfo(BaseModel):
     """Metadados de proveniência de uma resposta."""
 
     source: str = Field(description="Fonte de dados (e.g., 'OpenFDA/FAERS')")
-    query: dict[str, object] = Field(default_factory=dict, description="Parâmetros da consulta")
+    query: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict, description="Parâmetros da consulta"
+    )
     total_results: int = Field(default=0)
+    records_count: int = Field(default=0, description="Registros retornados nesta resposta")
     cached: bool = Field(default=False)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    fetch_duration_ms: int = Field(default=0, description="Duração do fetch HTTP em ms")
+    parse_duration_ms: int = Field(default=0, description="Duração do parsing em ms")
     api_version: str | None = None
+    hypokrates_version: str = Field(default=__version__)
     disclaimer: str = Field(
         default="This data is from voluntary reports and may contain errors. "
         "Signal does not imply causation."

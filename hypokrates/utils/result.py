@@ -9,7 +9,7 @@ from hypokrates.models import MetaInfo
 
 def build_source_meta(
     source: str,
-    query: dict[str, object],
+    query: dict[str, str | int | float | bool | None],
     total: int = 0,
     cached: bool = False,
 ) -> MetaInfo:

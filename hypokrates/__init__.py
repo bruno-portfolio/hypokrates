@@ -49,6 +49,7 @@ from hypokrates.exceptions import (
     SourceUnavailableError,
     ValidationError,
 )
+from hypokrates.models import AdverseEvent, Drug, MetaInfo, PatientProfile, Sex
 from hypokrates.onsides import OnSIDESEvent, OnSIDESResult
 from hypokrates.opentargets import OTAdverseEvent, OTDrugSafety
 from hypokrates.pharmgkb import PharmGKBAnnotation, PharmGKBGuideline, PharmGKBResult
@@ -58,6 +59,7 @@ from hypokrates.trials import ClinicalTrial, TrialsResult
 from hypokrates.vocab import DrugNormResult, MeSHResult
 
 __all__ = [
+    "AdverseEvent",
     "AnvisaMedicamento",
     "AnvisaNomeMapping",
     "AnvisaSearchResult",
@@ -69,6 +71,7 @@ __all__ = [
     "ChEMBLTarget",
     "ClinicalTrial",
     "ConfigurationError",
+    "Drug",
     "DrugBankInfo",
     "DrugInteraction",
     "DrugNormResult",
@@ -81,12 +84,14 @@ __all__ = [
     "LabelEventsResult",
     "Limitation",
     "MeSHResult",
+    "MetaInfo",
     "NetworkError",
     "OTAdverseEvent",
     "OTDrugSafety",
     "OnSIDESEvent",
     "OnSIDESResult",
     "ParseError",
+    "PatientProfile",
     "PharmGKBAnnotation",
     "PharmGKBGuideline",
     "PharmGKBResult",
@@ -95,6 +100,7 @@ __all__ = [
     "RateLimitError",
     "ScanItem",
     "ScanResult",
+    "Sex",
     "SourceUnavailableError",
     "TrialsResult",
     "ValidationError",

@@ -19,8 +19,6 @@ class TestGetConfig:
     def test_returns_default_config(self) -> None:
         cfg = get_config()
         assert cfg.cache_enabled is True
-        assert cfg.http_timeout == 30.0
-        assert cfg.http_max_retries == 3
         assert cfg.openfda_api_key is None
         assert cfg.debug is False
 
@@ -39,10 +37,10 @@ class TestConfigure:
     """Atualização e validação de configuração."""
 
     def test_updates_config_values(self) -> None:
-        configure(debug=True, http_timeout=60.0)
+        configure(debug=True, openfda_api_key="test-key-123")
         cfg = get_config()
         assert cfg.debug is True
-        assert cfg.http_timeout == 60.0
+        assert cfg.openfda_api_key == "test-key-123"
 
     def test_rejects_unknown_keys(self) -> None:
         with pytest.raises(TypeError, match="Configuração desconhecida"):
@@ -63,17 +61,12 @@ class TestConfigure:
         cfg = get_config()
         assert cfg.cache_enabled is False
 
-    def test_updates_max_retries(self) -> None:
-        configure(http_max_retries=5)
-        cfg = get_config()
-        assert cfg.http_max_retries == 5
-
     def test_multiple_updates_accumulate(self) -> None:
         configure(debug=True)
-        configure(http_timeout=60.0)
+        configure(ncbi_email="test@example.com")
         cfg = get_config()
         assert cfg.debug is True
-        assert cfg.http_timeout == 60.0
+        assert cfg.ncbi_email == "test@example.com"
 
 
 class TestResetConfig:
@@ -94,15 +87,13 @@ class TestResetConfig:
     def test_reset_returns_to_defaults(self) -> None:
         configure(
             debug=True,
-            http_timeout=99.0,
-            http_max_retries=10,
+            openfda_api_key="temp-key",
             cache_enabled=False,
         )
         reset_config()
         cfg = get_config()
         assert cfg.debug is False
-        assert cfg.http_timeout == 30.0
-        assert cfg.http_max_retries == 3
+        assert cfg.openfda_api_key is None
         assert cfg.cache_enabled is True
 
 

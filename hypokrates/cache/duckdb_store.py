@@ -109,7 +109,7 @@ class CacheStore:
                     [key, source, json_data, expires_at],
                 )
             except duckdb.Error as exc:
-                raise CacheError(f"Cache write error for key={key}: {exc}") from exc
+                raise CacheError("write", f"key={key}: {exc}") from exc
 
     async def aset(self, key: str, data: dict[str, object], source: str) -> None:
         """Armazena valor no cache (async-safe, offloaded to thread pool)."""

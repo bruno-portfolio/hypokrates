@@ -16,11 +16,7 @@ class Source(StrEnum):
     FAERS = "faers"
     DRUGBANK = "drugbank"
     PUBMED = "pubmed"
-    OPENALEX = "openalex"
     TRIALS = "trials"
-    WHO = "who"
-    GBD = "gbd"
-    DATASUS = "datasus"
     RXNORM = "rxnorm"
     MESH = "mesh"
     DAILYMED = "dailymed"
@@ -62,7 +58,10 @@ class CacheSettings:
     CHEMBL_TTL: int = 604_800  # 7 dias (releases trimestrais)
     PHARMGKB_TTL: int = 604_800  # 7 dias
     DEFAULT_TTL: int = 86_400  # 24h
-    SCHEMA_VERSION: int = 1
+
+
+# Versão do schema de cache (incrementar invalida todo o cache)
+CACHE_SCHEMA_VERSION: int = 1
 
 
 # --- HTTP settings ---
@@ -85,5 +84,6 @@ class HTTPSettings:
         Source.DAILYMED: 60,  # conservador (nao documentado)
         Source.TRIALS: 50,  # documentado
         Source.OPENTARGETS: 30,  # conservador (nao documentado)
+        Source.CHEMBL: 60,  # conservador (nao documentado)
         Source.PHARMGKB: 60,  # conservador (nao documentado)
     }

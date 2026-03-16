@@ -18,10 +18,6 @@ class HypokratesConfig:
     cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "hypokrates")
     cache_enabled: bool = True
 
-    # HTTP
-    http_timeout: float = 30.0
-    http_max_retries: int = 3
-
     # OpenFDA
     openfda_api_key: str | None = None
 
@@ -62,7 +58,7 @@ def get_config() -> HypokratesConfig:
     return _config
 
 
-def configure(**kwargs: object) -> HypokratesConfig:
+def configure(**kwargs: Path | str | bool | None) -> HypokratesConfig:
     """Atualiza a configuração global.
 
     Aceita os mesmos campos de ``HypokratesConfig``.

@@ -32,11 +32,10 @@ async def _ensure_loaded(
 
     config = get_config()
     if config.onsides_path is None:
-        msg = (
-            "OnSIDES data path not configured. "
-            "Use configure(onsides_path='/path/to/onsides/csvs/') first."
+        raise ConfigurationError(
+            "onsides_path",
+            "Use configure(onsides_path='/path/to/onsides/csvs/') first.",
         )
-        raise ConfigurationError(msg)
 
     csv_dir = str(config.onsides_path)
     logger.info("OnSIDES store not loaded — loading CSVs: %s", csv_dir)

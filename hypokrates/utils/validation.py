@@ -21,12 +21,13 @@ def validate_drug_name(name: str) -> str:
     """
     name = name.strip()
     if not name:
-        raise ValidationError("Drug name cannot be empty")
+        raise ValidationError("drug_name", "cannot be empty")
     if len(name) > _MAX_DRUG_NAME_LENGTH:
-        raise ValidationError(f"Drug name too long (max {_MAX_DRUG_NAME_LENGTH} chars)")
+        raise ValidationError("drug_name", f"too long (max {_MAX_DRUG_NAME_LENGTH} chars)")
     if not _DRUG_NAME_PATTERN.match(name):
         raise ValidationError(
+            "drug_name",
             f"Invalid drug name: {name!r}. "
-            "Only letters, numbers, spaces, hyphens, and dots are allowed."
+            "Only letters, numbers, spaces, hyphens, and dots are allowed.",
         )
     return name

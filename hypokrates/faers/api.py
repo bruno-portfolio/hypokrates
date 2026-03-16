@@ -73,7 +73,7 @@ async def adverse_events(
     finally:
         await client.close()
 
-    query_params: dict[str, object] = {"drug": drug}
+    query_params: dict[str, str | int | float | bool | None] = {"drug": drug}
     if age_min is not None:
         query_params["age_min"] = age_min
     if age_max is not None:

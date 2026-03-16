@@ -58,10 +58,34 @@ class ParseError(HypokratesError):
 class ValidationError(HypokratesError):
     """Erro de validação de input do usuário."""
 
+    def __init__(self, field: str, detail: str = "") -> None:
+        self.field = field
+        self.detail = detail
+        msg = f"Validação falhou: {field}"
+        if detail:
+            msg += f" — {detail}"
+        super().__init__(msg)
+
 
 class CacheError(HypokratesError):
     """Erro na camada de cache."""
 
+    def __init__(self, operation: str, detail: str = "") -> None:
+        self.operation = operation
+        self.detail = detail
+        msg = f"Erro de cache: {operation}"
+        if detail:
+            msg += f" — {detail}"
+        super().__init__(msg)
+
 
 class ConfigurationError(HypokratesError):
     """Erro de configuração."""
+
+    def __init__(self, field: str, detail: str = "") -> None:
+        self.field = field
+        self.detail = detail
+        msg = f"Configuração inválida: {field}"
+        if detail:
+            msg += f" — {detail}"
+        super().__init__(msg)

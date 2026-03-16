@@ -24,11 +24,10 @@ async def _ensure_loaded() -> DrugBankStore:
 
     config = get_config()
     if config.drugbank_path is None:
-        msg = (
-            "DrugBank XML path not configured. "
-            "Use configure(drugbank_path='/path/to/drugbank.xml') first."
+        raise ConfigurationError(
+            "drugbank_path",
+            "Use configure(drugbank_path='/path/to/drugbank.xml') first.",
         )
-        raise ConfigurationError(msg)
 
     xml_path = str(config.drugbank_path)
     logger.info("DrugBank store not loaded — parsing XML: %s", xml_path)

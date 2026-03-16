@@ -32,11 +32,10 @@ async def _ensure_loaded(
 
     config = get_config()
     if config.canada_bulk_path is None:
-        msg = (
-            "Canada Vigilance data path not configured. "
-            "Use configure(canada_bulk_path='/path/to/extracted/') first."
+        raise ConfigurationError(
+            "canada_bulk_path",
+            "Use configure(canada_bulk_path='/path/to/extracted/') first.",
         )
-        raise ConfigurationError(msg)
 
     csv_dir = str(config.canada_bulk_path)
     logger.info("Canada Vigilance store not loaded — loading: %s", csv_dir)

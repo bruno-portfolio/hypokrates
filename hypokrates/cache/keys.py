@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from hypokrates.constants import CacheSettings
+from hypokrates.constants import CACHE_SCHEMA_VERSION
 
 
 def cache_key(
@@ -18,7 +18,7 @@ def cache_key(
     Parâmetros são ordenados e hasheados para garantir determinismo.
     """
     params_hash = _hash_params(params) if params else "none"
-    return f"{source}:{endpoint}|{params_hash}|v{CacheSettings.SCHEMA_VERSION}"
+    return f"{source}:{endpoint}|{params_hash}|v{CACHE_SCHEMA_VERSION}"
 
 
 def _hash_params(params: dict[str, str | int | float | bool | None]) -> str:
