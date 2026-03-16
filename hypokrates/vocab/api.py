@@ -138,6 +138,10 @@ async def map_to_mesh(
                 m_id, m_term, m_trees = parse_mesh_descriptor(desc_data)
                 if m_term:
                     score = _mesh_similarity(query_lower, m_term.lower())
+                    # Boost for shallower (more general) MeSH headings
+                    if m_trees:
+                        depth = min(len(m_trees[0].split(".")), 5)
+                        score += max(0, (5 - depth) * 3)
                     candidates.append((m_id, m_term, m_trees, score))
 
             if candidates:

@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
 - **stats/api.py**: sets `no_data=True` when `drug_event_count == 0`
 - **mcp/tools/stats.py**: signal tool shows "NO DATA" + warning when term absent from FAERS
 - **scan/constants.py**: `CLASSIFICATION_WEIGHTS[PROTECTIVE_SIGNAL] = 3.0`
+- **vocab/api.py**: `map_to_mesh()` depth bonus for shallower MeSH headings (fixes arrhythmia → "Arrhythmias, Cardiac")
+- **dailymed/parser.py**: combo penalty -30 → -50 (fixes acetaminophen picking codeine combo)
+- **dailymed/parser.py**: `match_event_in_label()` Layer 2.5 — all-words-present in full raw_text (fixes cisplatin + febrile neutropenia)
 
 ### Sprint 8 — Bulk Scan, Label Match Fix, Direction Analysis
 

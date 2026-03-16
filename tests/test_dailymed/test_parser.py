@@ -141,8 +141,8 @@ class TestScoreSplCandidate:
                 "spl_version": 10,
             }
         )
-        # min(10,5) + 25 (tablet) - 30 (combination " AND ") = 0
-        assert score == 0
+        # min(10,5) + 25 (tablet) - 50 (combination " AND ") = -20
+        assert score == -20
 
 
 class TestParseAdverseReactionsXml:

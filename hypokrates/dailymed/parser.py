@@ -87,7 +87,7 @@ def _score_spl_candidate(candidate: SPLCandidate) -> int:
     # Penalty para combinações (múltiplos ingredientes ativos)
     for pattern in _COMBINATION_MARKERS:
         if pattern in title_upper:
-            score -= 30
+            score -= 50
             break
 
     # Bonus para formas prescription/sistêmicas
@@ -229,6 +229,17 @@ def match_event_in_label(
         raw_lower = raw_text.lower()
         for search_event in search_terms:
             if search_event.lower() in raw_lower:
+                matched.append(search_event)
+                return True, matched
+
+    # Layer 2.5: all-words-present in full raw_text (cross-section)
+    # Catches multi-word events where words appear in different sections
+    # (e.g., "febrile" in one paragraph, "neutropenia" in another)
+    if raw_text:
+        raw_lower = raw_text.lower()
+        for search_event in search_terms:
+            event_words = set(search_event.lower().split())
+            if len(event_words) >= 2 and all(w in raw_lower for w in event_words):
                 matched.append(search_event)
                 return True, matched
 
