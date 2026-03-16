@@ -8,20 +8,12 @@ from typing import TYPE_CHECKING
 from hypokrates.faers_bulk import api as bulk_api
 from hypokrates.faers_bulk.constants import RoleCodFilter
 from hypokrates.faers_bulk.timeline import bulk_signal_timeline
+from hypokrates.mcp.tools._shared import format_measure as _format_measure
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
 logger = logging.getLogger(__name__)
-
-
-def _format_measure(name: str, m: object) -> str:
-    """Formata uma medida de desproporcionalidade."""
-    val = getattr(m, "value", 0.0)
-    lo = getattr(m, "ci_lower", 0.0)
-    hi = getattr(m, "ci_upper", 0.0)
-    sig = "*" if getattr(m, "significant", False) else ""
-    return f"- {name}: {val:.2f} (95% CI: {lo:.2f}-{hi:.2f}) {sig}"
 
 
 def register(mcp: FastMCP) -> None:

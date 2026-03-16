@@ -6,19 +6,11 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from hypokrates.faers.client import FAERSClient
+from hypokrates.mcp.tools._shared import format_measure as _format_measure
 from hypokrates.stats import api as stats_api
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
-
-
-def _format_measure(name: str, m: object) -> str:
-    """Formata uma medida de desproporcionalidade."""
-    val = getattr(m, "value", 0.0)
-    lo = getattr(m, "ci_lower", 0.0)
-    hi = getattr(m, "ci_upper", 0.0)
-    sig = "*" if getattr(m, "significant", False) else ""
-    return f"- {name}: {val:.2f} (95% CI: {lo:.2f}-{hi:.2f}) {sig}"
 
 
 def register(mcp: FastMCP) -> None:
