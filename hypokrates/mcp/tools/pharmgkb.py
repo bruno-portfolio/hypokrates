@@ -69,6 +69,51 @@ def register(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
+    async def pgx_guidelines(drug: str) -> str:
+        """Get pharmacogenomic dosing guidelines (CPIC, DPWG) for a drug.
+
+        Returns clinical dosing guidelines with gene-drug recommendations
+        from organizations like CPIC and DPWG.
+
+        Args:
+            drug: Generic drug name (e.g., "warfarin", "codeine").
+        """
+        try:
+            guidelines = await pharmgkb_api.pgx_guidelines(drug)
+        except Exception as exc:
+            return f"PharmGKB error: {exc}"
+
+        if not guidelines:
+            return f"No dosing guidelines found for '{drug}' in PharmGKB."
+
+        lines = [
+            f"# PharmGKB Dosing Guidelines: {drug.upper()}",
+            f"**Total:** {len(guidelines)}",
+            "",
+        ]
+
+        for gl in guidelines:
+            genes_str = ", ".join(gl.genes) if gl.genes else "N/A"
+            rec = "Yes" if gl.recommendation else "No"
+            lines.append(f"### {gl.name}")
+            lines.append(f"- **Source:** {gl.source}")
+            lines.append(f"- **Genes:** {genes_str}")
+            lines.append(f"- **Has recommendation:** {rec}")
+            if gl.summary:
+                lines.append(f"- **Summary:** {gl.summary[:300]}")
+            lines.append("")
+
+        lines.extend(
+            [
+                "---",
+                "**Note:** Guidelines require validated genotyping before "
+                "clinical implementation. See PharmGKB for full text.",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    @mcp.tool()
     async def pgx_annotations(drug: str, min_level: str = "3") -> str:
         """Get clinical pharmacogenomic annotations for a drug.
 

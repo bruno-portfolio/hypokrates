@@ -74,6 +74,46 @@ _TOOLS = [
         "module": "anvisa",
         "description": "Map PT↔EN drug names",
     },
+    {
+        "name": "onsides_events",
+        "module": "onsides",
+        "description": "International label AEs via OnSIDES (NLP)",
+    },
+    {
+        "name": "onsides_check_event",
+        "module": "onsides",
+        "description": "Check event in international labels",
+    },
+    {
+        "name": "pgx_drug_info",
+        "module": "pharmgkb",
+        "description": "PharmGKB pharmacogenomic info",
+    },
+    {
+        "name": "pgx_annotations",
+        "module": "pharmgkb",
+        "description": "PharmGKB clinical annotations",
+    },
+    {
+        "name": "pgx_guidelines",
+        "module": "pharmgkb",
+        "description": "PharmGKB dosing guidelines (CPIC/DPWG)",
+    },
+    {
+        "name": "canada_signal",
+        "module": "canada",
+        "description": "PRR signal in Canada Vigilance",
+    },
+    {
+        "name": "canada_top_events",
+        "module": "canada",
+        "description": "Top AEs in Canada Vigilance",
+    },
+    {
+        "name": "canada_bulk_status",
+        "module": "canada",
+        "description": "Canada Vigilance store status",
+    },
     {"name": "list_tools", "module": "meta", "description": "List available tools"},
     {"name": "version", "module": "meta", "description": "Show version info"},
 ]
@@ -85,7 +125,7 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool()
     async def list_tools() -> str:
         """List all available hypokrates MCP tools."""
-        lines = [f"# hypokrates MCP Tools (Sprint 8 — {len(_TOOLS)} tools)", ""]
+        lines = [f"# hypokrates MCP Tools (Sprint 10 — {len(_TOOLS)} tools)", ""]
         for tool in _TOOLS:
             lines.append(f"- **{tool['name']}** ({tool['module']}): {tool['description']}")
         return "\n".join(lines)
@@ -95,8 +135,9 @@ def register(mcp: FastMCP) -> None:
         """Show hypokrates version and sprint info."""
         return (
             f"# hypokrates {__version__}\n"
-            f"**Sprint:** 8 (CASEID dedup + bulk pipeline + PS-only)\n"
+            f"**Sprint:** 10 (OnSIDES + PharmGKB + Canada Vigilance)\n"
             f"**Tools:** {len(_TOOLS)}\n"
             f"**Modules:** faers, stats, pubmed, cross, scan, vocab, "
-            f"dailymed, trials, drugbank, opentargets, chembl, faers_bulk, anvisa, meta\n"
+            f"dailymed, trials, drugbank, opentargets, chembl, faers_bulk, "
+            f"anvisa, onsides, pharmgkb, canada, meta\n"
         )
