@@ -729,6 +729,8 @@ async def compare_signals(
 
             d_prr = drug_sig.prr.value
             c_prr = ctrl_sig.prr.value
+            d_ebgm = drug_sig.ebgm.value
+            c_ebgm = ctrl_sig.ebgm.value
 
             if c_prr > 0:
                 ratio = d_prr / c_prr
@@ -748,6 +750,8 @@ async def compare_signals(
                 event=event_term,
                 drug_prr=round(d_prr, 2),
                 control_prr=round(c_prr, 2),
+                drug_ebgm=round(d_ebgm, 2),
+                control_ebgm=round(c_ebgm, 2),
                 drug_detected=drug_sig.signal_detected,
                 control_detected=ctrl_sig.signal_detected,
                 ratio=round(ratio, 2) if ratio != float("inf") else ratio,

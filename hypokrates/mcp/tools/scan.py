@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from hypokrates.scan import api as scan_api
 from hypokrates.scan import class_compare as class_compare_api
-from hypokrates.scan.models import EventClassification
+from hypokrates.scan.models import ClassEventItem, EventClassification
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -127,6 +127,7 @@ def register(mcp: FastMCP) -> None:
             lines.append("")
             for item in result.items:
                 prr_val = f"{item.signal.prr.value:.2f}"
+                ebgm_val = f"{item.signal.ebgm.value:.2f}"
                 label_info = ""
                 if item.in_label is not None:
                     label_info = f" | label={'YES' if item.in_label else 'NO'}"
@@ -155,7 +156,7 @@ def register(mcp: FastMCP) -> None:
                 lines.append(
                     f"{item.rank}. **{item.event}** — "
                     f"{item.classification.value} | "
-                    f"PRR={prr_val} | "
+                    f"PRR={prr_val} | EBGM={ebgm_val} | "
                     f"lit={item.literature_count}"
                     f"{label_info}{trials_info}{ot_info}"
                     f"{vol_info}{indication_info}{coadmin_info}"
@@ -169,7 +170,10 @@ def register(mcp: FastMCP) -> None:
                 cluster = item.cluster or "Other"
                 if cluster not in clustered:
                     clustered[cluster] = []
-                clustered[cluster].append(f"{item.event} (PRR={item.signal.prr.value:.1f})")
+                clustered[cluster].append(
+                    f"{item.event} (PRR={item.signal.prr.value:.1f}"
+                    f"/EBGM={item.signal.ebgm.value:.1f})"
+                )
 
             if len(clustered) > 1 or (len(clustered) == 1 and "Other" not in clustered):
                 lines.append("## By Clinical System")
@@ -210,7 +214,7 @@ def register(mcp: FastMCP) -> None:
             [
                 "",
                 "---",
-                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "**Note:** PRR/EBGM measure disproportionality of reporting, NOT absolute risk. "
                 "Clinical significance requires validation with meta-analyses and guidelines.",
             ]
         )
@@ -260,19 +264,27 @@ def register(mcp: FastMCP) -> None:
             "",
         ]
 
+        def _cell(item: ClassEventItem, drug: str) -> str:
+            """Formata célula PRR/EBGM para um drug-event."""
+            prr = item.prr_values.get(drug, 0.0)
+            sig = item.signals.get(drug)
+            ebgm = sig.ebgm.value if sig else 0.0
+            return f" {prr:.1f}/{ebgm:.1f} "
+
         # Class Effects
         class_items = [
             it for it in result.items if it.classification == EventClassification.CLASS_EFFECT
         ]
         if class_items:
             lines.append(f"## Class Effects ({len(class_items)})")
+            lines.append("*(values: PRR/EBGM)*")
             lines.append("")
             header = "| Event |" + "|".join(f" {d.upper()} " for d in drug_list) + "|"
             sep = "|-------|" + "|".join("------:" for _ in drug_list) + "|"
             lines.extend([header, sep])
             for item in class_items:
-                prr_cols = "|".join(f" {item.prr_values.get(d, 0.0):.1f} " for d in drug_list)
-                lines.append(f"| {item.event} |{prr_cols}|")
+                cols = "|".join(_cell(item, d) for d in drug_list)
+                lines.append(f"| {item.event} |{cols}|")
             lines.append("")
 
         # Drug-Specific
@@ -284,8 +296,11 @@ def register(mcp: FastMCP) -> None:
             lines.append("")
             for item in specific_items:
                 drug_name = item.drugs_with_signal[0] if item.drugs_with_signal else "?"
+                sig = item.signals.get(drug_name)
+                ebgm = sig.ebgm.value if sig else 0.0
                 lines.append(
-                    f"- **{item.event}** — {drug_name.upper()} only (PRR={item.max_prr:.1f})"
+                    f"- **{item.event}** — {drug_name.upper()} only "
+                    f"(PRR={item.max_prr:.1f}, EBGM={ebgm:.1f})"
                 )
             lines.append("")
 
@@ -295,19 +310,20 @@ def register(mcp: FastMCP) -> None:
         ]
         if diff_items:
             lines.append(f"## Differential ({len(diff_items)})")
+            lines.append("*(values: PRR/EBGM)*")
             lines.append("")
             header = "| Event |" + "|".join(f" {d.upper()} " for d in drug_list) + "| Note |"
             sep = "|-------|" + "|".join("------:" for _ in drug_list) + "|------|"
             lines.extend([header, sep])
             for item in diff_items:
-                prr_cols = "|".join(f" {item.prr_values.get(d, 0.0):.1f} " for d in drug_list)
+                cols = "|".join(_cell(item, d) for d in drug_list)
                 note = ""
                 if item.outlier_drug:
                     note = f"{item.outlier_drug.upper()} {item.outlier_factor:.1f}x median"
                 else:
                     with_str = ", ".join(d.upper() for d in item.drugs_with_signal)
                     note = f"signal in: {with_str}"
-                lines.append(f"| {item.event} |{prr_cols}| {note} |")
+                lines.append(f"| {item.event} |{cols}| {note} |")
             lines.append("")
 
         # Summary
@@ -322,7 +338,7 @@ def register(mcp: FastMCP) -> None:
             [
                 "",
                 "---",
-                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "**Note:** PRR/EBGM measure disproportionality of reporting, NOT absolute risk. "
                 "Clinical significance requires validation with meta-analyses and guidelines.",
             ]
         )

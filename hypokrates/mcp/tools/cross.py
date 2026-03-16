@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hypokrates.cross import api as cross_api
+from hypokrates.mcp.tools._shared import format_measure
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -66,6 +67,12 @@ def register(mcp: FastMCP) -> None:
             f"**Classification:** {result.classification.value}",
             f"**Signal detected:** {'YES' if result.signal.signal_detected else 'NO'}",
             f"**Literature count:** {result.literature_count}",
+            "",
+            "## Disproportionality Measures",
+            format_measure("PRR", result.signal.prr),
+            format_measure("ROR", result.signal.ror),
+            format_measure("IC ", result.signal.ic),
+            format_measure("EBGM", result.signal.ebgm),
         ]
         if result.in_label is not None:
             lines.append(f"**In FDA label:** {'YES' if result.in_label else 'NO'}")
@@ -149,7 +156,7 @@ def register(mcp: FastMCP) -> None:
             [
                 "",
                 "---",
-                "**Note:** PRR measures disproportionality of reporting, NOT absolute risk. "
+                "**Note:** PRR/EBGM measure disproportionality of reporting, NOT absolute risk. "
                 "Clinical significance requires validation with meta-analyses and guidelines.",
             ]
         )
@@ -197,21 +204,25 @@ def register(mcp: FastMCP) -> None:
         ]
 
         if result.items:
-            lines.append("| Event | Drug PRR | Control PRR | Ratio | Stronger |")
-            lines.append("|-------|----------|-------------|-------|----------|")
+            lines.append(
+                "| Event | Drug PRR | Drug EBGM | Ctrl PRR | Ctrl EBGM | Ratio | Stronger |"
+            )
+            lines.append(
+                "|-------|----------|-----------|----------|----------|-------|----------|"
+            )
             for item in result.items:
                 ratio_str = f"{item.ratio:.1f}x" if item.ratio != float("inf") else "inf"
                 lines.append(
-                    f"| {item.event} | {item.drug_prr:.2f} | "
-                    f"{item.control_prr:.2f} | {ratio_str} | "
-                    f"{item.stronger} |"
+                    f"| {item.event} | {item.drug_prr:.2f} | {item.drug_ebgm:.2f} | "
+                    f"{item.control_prr:.2f} | {item.control_ebgm:.2f} | "
+                    f"{ratio_str} | {item.stronger} |"
                 )
 
         lines.extend(
             [
                 "",
                 "---",
-                "**Note:** PRR ratio > 1 means drug has stronger signal than control. "
+                "**Note:** PRR/EBGM ratio > 1 means drug has stronger signal than control. "
                 "Does not imply causation.",
             ]
         )

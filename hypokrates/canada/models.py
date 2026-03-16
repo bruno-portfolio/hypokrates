@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from hypokrates.models import MetaInfo  # noqa: TC001 — Pydantic needs at runtime
+from hypokrates.stats.models import ContingencyTable  # noqa: TC001 — Pydantic needs at runtime
 
 
 class CanadaBulkStatus(BaseModel):
@@ -43,8 +44,24 @@ class CanadaSignalResult(BaseModel):
         default=0.0,
         description="PRR calculado no Canada Vigilance.",
     )
+    ror: float = Field(
+        default=0.0,
+        description="ROR calculado no Canada Vigilance.",
+    )
+    ic: float = Field(
+        default=0.0,
+        description="IC (Information Component) calculado no Canada Vigilance.",
+    )
+    ebgm: float = Field(
+        default=0.0,
+        description="EBGM (GPS/DuMouchel 1999) calculado no Canada Vigilance.",
+    )
     signal_detected: bool = Field(
         default=False,
-        description="Se PRR >= 2 e a >= 3.",
+        description="Heurística: >= 2 medidas significantes (PRR/ROR/IC).",
+    )
+    table: ContingencyTable | None = Field(
+        default=None,
+        description="Tabela de contingência 2x2 para cálculos adicionais.",
     )
     meta: MetaInfo

@@ -11,6 +11,8 @@ from hypokrates.canada.store import CanadaVigilanceStore
 from hypokrates.config import get_config
 from hypokrates.exceptions import ConfigurationError
 from hypokrates.models import MetaInfo
+from hypokrates.stats.measures import compute_ebgm, compute_ic, compute_ror
+from hypokrates.stats.models import ContingencyTable
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +68,24 @@ async def canada_signal(
     store = await _ensure_loaded(_store)
     a, b, c, n = await asyncio.to_thread(store.four_counts, drug, event, suspect_only=suspect_only)
 
-    # PRR = (a/(a+b)) / (c/(c+d)) onde d = n - a - b - c
+    # Tabela de contingência 2x2
     d = n - a - b - c
+    table = ContingencyTable(a=a, b=b, c=c, d=d)
+
+    # PRR = (a/(a+b)) / (c/(c+d))
     prr = 0.0
     if a > 0 and (a + b) > 0 and (c + d) > 0 and c > 0:
         prr = (a / (a + b)) / (c / (c + d))
 
-    signal_detected = a >= _MIN_REPORTS and prr >= _MIN_PRR
+    # Computar todas as medidas de desproporcionalidade
+    ror_result = compute_ror(table)
+    ic_result = compute_ic(table)
+    ebgm_result = compute_ebgm(table)
+
+    # Heurística: >= 2 de 3 medidas significantes (PRR/ROR/IC)
+    prr_sig = a >= _MIN_REPORTS and prr >= _MIN_PRR
+    sig_count = sum([prr_sig, ror_result.significant, ic_result.significant])
+    signal_detected = sig_count >= 2
 
     return CanadaSignalResult(
         drug=drug,
@@ -82,7 +95,11 @@ async def canada_signal(
         event_total=a + c,
         total_reports=n,
         prr=round(prr, 2),
+        ror=round(ror_result.value, 2),
+        ic=round(ic_result.value, 2),
+        ebgm=round(ebgm_result.value, 2),
         signal_detected=signal_detected,
+        table=table,
         meta=MetaInfo(
             source="Canada Vigilance",
             query={"drug": drug, "event": event, "suspect_only": suspect_only},

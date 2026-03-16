@@ -93,6 +93,8 @@ class CompareSignalItem(BaseModel):
     event: str
     drug_prr: float
     control_prr: float
+    drug_ebgm: float = Field(default=0.0, description="EBGM da droga-índice")
+    control_ebgm: float = Field(default=0.0, description="EBGM da droga-controle")
     drug_detected: bool
     control_detected: bool
     ratio: float = Field(
