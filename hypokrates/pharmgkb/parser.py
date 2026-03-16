@@ -67,7 +67,7 @@ def parse_annotations(data: dict[str, Any]) -> list[PharmGKBAnnotation]:
 
         annotations.append(
             PharmGKBAnnotation(
-                accession_id=item.get("id", ""),
+                accession_id=str(item.get("id", "")),
                 gene_symbol=gene_symbol,
                 level_of_evidence=level,
                 annotation_types=ann_types,
@@ -113,7 +113,7 @@ def parse_guidelines(data: dict[str, Any]) -> list[PharmGKBGuideline]:
 
         guidelines.append(
             PharmGKBGuideline(
-                guideline_id=item.get("id", ""),
+                guideline_id=str(item.get("id", "")),
                 name=name,
                 source=source,
                 genes=genes,

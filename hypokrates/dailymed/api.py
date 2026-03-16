@@ -35,11 +35,12 @@ async def label_events(
     """
     client = DailyMedClient()
     try:
-        # 1. Buscar SPLs
+        # 1. Buscar SPLs — separados em singles e combos
         search_data = await client.search_spls(drug, use_cache=use_cache)
-        set_ids = parse_spl_search(search_data)
+        single_ids, combo_ids = parse_spl_search(search_data)
+        all_ids = single_ids + combo_ids
 
-        if not set_ids:
+        if not all_ids:
             return LabelEventsResult(
                 drug=drug,
                 meta=MetaInfo(
@@ -51,24 +52,51 @@ async def label_events(
                 ),
             )
 
-        # 2. Fetch XML — seleção em duas passadas (candidatos já rankeados)
-        #    Pass 1: SPL com seção Adverse Reactions (34084-4) — exclui OTC/vet
-        #    Pass 2: SPL com qualquer seção de segurança — fallback
-        set_id = set_ids[0]
+        # 2. Fetch XML — seleção em 4 passadas
+        #    Prioriza single-ingredient sobre combos para evitar
+        #    ex: acetaminophen+codeine quando buscando acetaminophen.
+        #    Pass 1: single com AR section (34084-4)
+        #    Pass 2: single com qualquer seção de segurança
+        #    Pass 3: combo com AR section
+        #    Pass 4: combo com qualquer seção de segurança
+        set_id = all_ids[0]
         xml_text = ""
         fetched_xmls: dict[str, str] = {}
 
-        for candidate_id in set_ids:
-            candidate_xml = await client.fetch_spl_xml(candidate_id, use_cache=use_cache)
-            fetched_xmls[candidate_id] = candidate_xml
+        async def _fetch(cid: str) -> str:
+            if cid in fetched_xmls:
+                return fetched_xmls[cid]
+            xml = await client.fetch_spl_xml(cid, use_cache=use_cache)
+            fetched_xmls[cid] = xml
+            return xml
+
+        # Pass 1+2: singles first
+        for candidate_id in single_ids:
+            candidate_xml = await _fetch(candidate_id)
             if has_adverse_reactions_section(candidate_xml):
                 set_id = candidate_id
                 xml_text = candidate_xml
                 break
 
-        # Pass 2: qualquer seção de segurança (reusar XMLs já fetched)
         if not xml_text:
-            for candidate_id in set_ids:
+            for candidate_id in single_ids:
+                candidate_xml = fetched_xmls.get(candidate_id, "")
+                if candidate_xml and has_safety_sections(candidate_xml):
+                    set_id = candidate_id
+                    xml_text = candidate_xml
+                    break
+
+        # Pass 3+4: combos fallback
+        if not xml_text:
+            for candidate_id in combo_ids:
+                candidate_xml = await _fetch(candidate_id)
+                if has_adverse_reactions_section(candidate_xml):
+                    set_id = candidate_id
+                    xml_text = candidate_xml
+                    break
+
+        if not xml_text:
+            for candidate_id in combo_ids:
                 candidate_xml = fetched_xmls.get(candidate_id, "")
                 if candidate_xml and has_safety_sections(candidate_xml):
                     set_id = candidate_id
@@ -77,10 +105,10 @@ async def label_events(
 
         # Fallback: usar primeiro SPL se nenhum tem seções de segurança
         if not xml_text:
-            xml_text = fetched_xmls.get(set_ids[0], "")
+            xml_text = fetched_xmls.get(all_ids[0], "")
             if not xml_text:
-                xml_text = await client.fetch_spl_xml(set_ids[0], use_cache=use_cache)
-            set_id = set_ids[0]
+                xml_text = await client.fetch_spl_xml(all_ids[0], use_cache=use_cache)
+            set_id = all_ids[0]
 
         # 3. Parsear adverse reactions
         terms, raw_text = parse_adverse_reactions_xml(xml_text)

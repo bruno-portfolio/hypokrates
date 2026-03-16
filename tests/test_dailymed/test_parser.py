@@ -21,21 +21,25 @@ class TestParseSplSearch:
 
     def test_propofol(self) -> None:
         data = load_golden("dailymed", "spls_propofol.json")
-        set_ids = parse_spl_search(data)
-        assert len(set_ids) == 1
-        assert set_ids[0] == "b169a494-5042-4577-a5e2-f6b48b4c7e21"
+        singles, combos = parse_spl_search(data)
+        all_ids = singles + combos
+        assert len(all_ids) == 1
+        assert all_ids[0] == "b169a494-5042-4577-a5e2-f6b48b4c7e21"
 
     def test_empty_results(self) -> None:
-        set_ids = parse_spl_search({"data": []})
-        assert set_ids == []
+        singles, combos = parse_spl_search({"data": []})
+        assert singles == []
+        assert combos == []
 
     def test_missing_data_key(self) -> None:
-        set_ids = parse_spl_search({})
-        assert set_ids == []
+        singles, combos = parse_spl_search({})
+        assert singles == []
+        assert combos == []
 
     def test_missing_setid(self) -> None:
-        set_ids = parse_spl_search({"data": [{"title": "test"}]})
-        assert set_ids == []
+        singles, combos = parse_spl_search({"data": [{"title": "test"}]})
+        assert singles == []
+        assert combos == []
 
     def test_ranks_injection_over_patch(self) -> None:
         """Bug #22: lidocaine injection deve vir antes de patch OTC."""
@@ -53,8 +57,9 @@ class TestParseSplSearch:
                 },
             ],
         }
-        set_ids = parse_spl_search(data)
-        assert set_ids[0] == "injection-rx"
+        singles, combos = parse_spl_search(data)
+        assert singles[0] == "injection-rx"
+        assert combos == []
 
     def test_filters_veterinary_labels(self) -> None:
         """Bug #23: ketamine vet deve ficar atrás de human."""
@@ -77,10 +82,11 @@ class TestParseSplSearch:
                 },
             ],
         }
-        set_ids = parse_spl_search(data)
-        assert set_ids[0] == "human-ketalar"
+        singles, combos = parse_spl_search(data)
+        assert singles[0] == "human-ketalar"
         # Vet labels no final
-        assert set_ids[-1] in {"vet-covetrus", "vet-dechra"}
+        assert singles[-1] in {"vet-covetrus", "vet-dechra"}
+        assert combos == []
 
     def test_ranks_by_spl_version_within_same_form(self) -> None:
         """SPLs com mesma forma farmacêutica: spl_version maior primeiro."""
@@ -98,8 +104,34 @@ class TestParseSplSearch:
                 },
             ],
         }
-        set_ids = parse_spl_search(data)
-        assert set_ids[0] == "new"
+        singles, combos = parse_spl_search(data)
+        assert singles[0] == "new"
+        assert combos == []
+
+    def test_separates_combos_from_singles(self) -> None:
+        """Combo SPLs devem ficar em lista separada."""
+        data = {
+            "data": [
+                {
+                    "setid": "combo-1",
+                    "spl_version": "10",
+                    "title": "ACETAMINOPHEN AND CODEINE PHOSPHATE TABLET",
+                },
+                {
+                    "setid": "single-1",
+                    "spl_version": "5",
+                    "title": "ACETAMINOPHEN TABLET",
+                },
+                {
+                    "setid": "combo-2",
+                    "spl_version": "8",
+                    "title": "ACETAMINOPHEN WITH CAFFEINE CAPSULE",
+                },
+            ],
+        }
+        singles, combos = parse_spl_search(data)
+        assert singles == ["single-1"]
+        assert set(combos) == {"combo-1", "combo-2"}
 
 
 class TestScoreSplCandidate:

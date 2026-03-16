@@ -4,6 +4,10 @@
 
 ### Sprint 10 — Three New Data Sources (OnSIDES, PharmGKB, Canada Vigilance)
 
+### Fixed
+- **PharmGKB parser**: `accession_id` e `guideline_id` vinham como `int` da API mas o Pydantic model esperava `str` — adicionado `str()` no parser
+- **DailyMed SPL selection**: `label_events("acetaminophen")` selecionava combo acetaminophen+codeine em vez de standalone — `parse_spl_search()` agora retorna `(singles, combos)` separados e `label_events` tenta singles first (4-pass: single AR → single safety → combo AR → combo safety)
+
 ### Added
 - **onsides/** module: `onsides_events()`, `onsides_check_event()` — NLP-extracted drug-ADE pairs from 51,460 labels across 4 countries (US/EU/UK/JP) via PubMedBERT (F1=0.935)
   - DuckDB store at `~/.cache/hypokrates/onsides.duckdb` (same pattern as DrugBank/ANVISA)

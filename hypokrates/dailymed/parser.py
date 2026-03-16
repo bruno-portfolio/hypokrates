@@ -105,16 +105,25 @@ def _score_spl_candidate(candidate: SPLCandidate) -> int:
     return score
 
 
-def parse_spl_search(data: dict[str, Any]) -> list[str]:
+def _is_combination_title(title: str) -> bool:
+    """Verifica se o título indica produto combinado (múltiplos ingredientes)."""
+    title_upper = title.upper()
+    return any(marker in title_upper for marker in _COMBINATION_MARKERS)
+
+
+def parse_spl_search(data: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Extrai SET IDs de uma resposta de busca DailyMed, rankeados.
 
     Prioriza labels prescription sobre OTC e filtra veterinários.
+    Separa single-ingredient de combos para que o caller possa
+    tentar singles primeiro (evita selecionar acetaminophen+codeine
+    quando buscando acetaminophen).
 
     Args:
         data: JSON response de /spls.json.
 
     Returns:
-        Lista de set_id strings (ordenada por relevância decrescente).
+        Tupla (single_ids, combo_ids), ambas ordenadas por relevância.
     """
     results = data.get("data", [])
     candidates: list[SPLCandidate] = []
@@ -134,7 +143,15 @@ def parse_spl_search(data: dict[str, Any]) -> list[str]:
     # Ordenar por score decrescente
     candidates.sort(key=_score_spl_candidate, reverse=True)
 
-    return [c["setid"] for c in candidates]
+    singles: list[str] = []
+    combos: list[str] = []
+    for c in candidates:
+        if _is_combination_title(c["title"]):
+            combos.append(c["setid"])
+        else:
+            singles.append(c["setid"])
+
+    return singles, combos
 
 
 def parse_adverse_reactions_xml(xml_text: str) -> tuple[list[str], str]:
