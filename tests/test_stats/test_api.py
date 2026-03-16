@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from hypokrates.config import configure
+from hypokrates.exceptions import HypokratesError
 from hypokrates.faers_bulk.drug_resolver import clear_cache as clear_resolver_cache
 from hypokrates.faers_bulk.store import FAERSBulkStore
 from hypokrates.stats.api import (
@@ -35,6 +36,12 @@ def _mock_fetch_total(totals: dict[str, int]) -> AsyncMock:
         return 0
 
     return AsyncMock(side_effect=_side_effect)
+
+
+def _mock_client(mock_cls: Any, instance: Any) -> None:
+    """Configura mock para suportar async with (context manager)."""
+    instance.__aenter__ = AsyncMock(return_value=instance)
+    mock_cls.return_value = instance
 
 
 class TestSignalAPI:
@@ -274,7 +281,7 @@ class TestSignalTimeline:
     @patch("hypokrates.stats.api.FAERSClient")
     async def test_timeline_basic(self, mock_client_cls: Any) -> None:
         """Timeline retorna quarters com estatísticas."""
-        instance = mock_client_cls.return_value
+        instance = AsyncMock()
         instance.fetch_count = AsyncMock(
             return_value={
                 "results": [
@@ -286,7 +293,7 @@ class TestSignalTimeline:
             }
         )
         instance.fetch_total = _mock_fetch_total({"drug_total": 100})
-        instance.close = AsyncMock()
+        _mock_client(mock_client_cls, instance)
 
         result = await signal_timeline("propofol", "bradycardia")
 
@@ -301,7 +308,7 @@ class TestSignalTimeline:
     @patch("hypokrates.stats.api.FAERSClient")
     async def test_timeline_spike_detection(self, mock_client_cls: Any) -> None:
         """Quarters com count > mean+2*std são flagados como spikes."""
-        instance = mock_client_cls.return_value
+        instance = AsyncMock()
         # 8 quarters normais (~1 cada), 1 spike (100) — spike claro
         instance.fetch_count = AsyncMock(
             return_value={
@@ -319,7 +326,7 @@ class TestSignalTimeline:
             }
         )
         instance.fetch_total = _mock_fetch_total({"drug_total": 100})
-        instance.close = AsyncMock()
+        _mock_client(mock_client_cls, instance)
 
         result = await signal_timeline("drug", "event")
 
@@ -330,10 +337,10 @@ class TestSignalTimeline:
     @patch("hypokrates.stats.api.FAERSClient")
     async def test_timeline_empty(self, mock_client_cls: Any) -> None:
         """Sem resultados retorna timeline vazia."""
-        instance = mock_client_cls.return_value
+        instance = AsyncMock()
         instance.fetch_count = AsyncMock(return_value={"results": []})
         instance.fetch_total = _mock_fetch_total({"drug_total": 100})
-        instance.close = AsyncMock()
+        _mock_client(mock_client_cls, instance)
 
         result = await signal_timeline("drug", "event")
 
@@ -345,10 +352,10 @@ class TestSignalTimeline:
     @patch("hypokrates.stats.api.FAERSClient")
     async def test_timeline_suspect_only(self, mock_client_cls: Any) -> None:
         """suspect_only adiciona characterization filter na search."""
-        instance = mock_client_cls.return_value
+        instance = AsyncMock()
         instance.fetch_count = AsyncMock(return_value={"results": []})
         instance.fetch_total = _mock_fetch_total({"drug_total": 100})
-        instance.close = AsyncMock()
+        _mock_client(mock_client_cls, instance)
 
         result = await signal_timeline("drug", "event", suspect_only=True)
 
@@ -503,11 +510,11 @@ class TestSignalTimelineBulkMode:
 
     @patch("hypokrates.stats.api.FAERSClient")
     async def test_signal_timeline_fetch_count_failure(self, mock_client_cls: Any) -> None:
-        """Quando fetch_count falha, retorna timeline vazia."""
-        instance = mock_client_cls.return_value
-        instance.fetch_count = AsyncMock(side_effect=RuntimeError("FAERS down"))
+        """Quando fetch_count falha com HypokratesError, retorna timeline vazia."""
+        instance = AsyncMock()
+        instance.fetch_count = AsyncMock(side_effect=HypokratesError("FAERS down"))
         instance.fetch_total = _mock_fetch_total({"drug_total": 100})
-        instance.close = AsyncMock()
+        _mock_client(mock_client_cls, instance)
 
         result = await signal_timeline("propofol", "bradycardia", use_bulk=False)
 

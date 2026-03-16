@@ -8,6 +8,7 @@ import statistics as _statistics
 from datetime import UTC, datetime
 from typing import Any
 
+from hypokrates.exceptions import HypokratesError
 from hypokrates.faers.api import resolve_drug_field
 from hypokrates.faers.client import FAERSClient
 from hypokrates.faers.constants import (
@@ -234,8 +235,7 @@ async def signal_timeline(
     reaction_field = SEARCH_FIELDS["reaction"]
     reaction_query = _build_reaction_query(event, reaction_field)
 
-    client = FAERSClient()
-    try:
+    async with FAERSClient() as client:
         drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
 
         char_filter = (
@@ -248,15 +248,13 @@ async def signal_timeline(
 
         try:
             data = await client.fetch_count(search, count_field, limit=1000, use_cache=use_cache)
-        except Exception:
+        except HypokratesError:
             logger.warning(
                 "signal_timeline %s + %s: count query failed, returning empty",
                 drug,
                 event,
             )
             data = {"results": []}
-    finally:
-        await client.close()
 
     raw_results: list[dict[str, Any]] = data.get("results", [])
     quarters = _aggregate_quarterly(raw_results)

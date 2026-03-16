@@ -58,8 +58,7 @@ async def adverse_events(
     Returns:
         FAERSResult com reports parseados e metadados.
     """
-    client = FAERSClient()
-    try:
+    async with FAERSClient() as client:
         drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
         search = _build_search(
             drug,
@@ -71,8 +70,6 @@ async def adverse_events(
             suspect_only=suspect_only,
         )
         data = await client.fetch(search, limit=limit, use_cache=use_cache)
-    finally:
-        await client.close()
 
     query_params: ParamsType = {"drug": drug}
     if age_min is not None:
@@ -119,14 +116,11 @@ async def top_events(
     Returns:
         FAERSResult com eventos ordenados por contagem.
     """
-    client = FAERSClient()
-    try:
+    async with FAERSClient() as client:
         drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
         search = _build_search(drug, drug_search=drug_search, suspect_only=suspect_only)
         count_field = COUNT_FIELDS["reaction"]
         data = await client.fetch_count(search, count_field, limit=limit, use_cache=use_cache)
-    finally:
-        await client.close()
 
     raw_results: list[dict[str, Any]] = data.get("results", [])
     events = parse_count_results(raw_results)
@@ -163,14 +157,11 @@ async def compare(
     results: dict[str, FAERSResult] = {}
     for drug in drugs:
         if outcome:
-            client = FAERSClient()
-            try:
+            async with FAERSClient() as client:
                 drug_search = await resolve_drug_field(drug, client=client, use_cache=use_cache)
                 search = _build_search(drug, drug_search=drug_search)
                 search += f' AND {SEARCH_FIELDS["reaction"]}:"{outcome}"'
                 data = await client.fetch(search, limit=limit, use_cache=use_cache)
-            finally:
-                await client.close()
 
             raw_results: list[dict[str, Any]] = data.get("results", [])
             reports = parse_reports(raw_results)
@@ -212,8 +203,7 @@ async def drugs_by_event(
     Returns:
         DrugsByEventResult com drogas ordenadas por contagem de reports.
     """
-    client = FAERSClient()
-    try:
+    async with FAERSClient() as client:
         search = _build_event_search(event, suspect_only=suspect_only)
         count_field = COUNT_FIELDS["drug"]
         data = await client.fetch_count(search, count_field, limit=limit, use_cache=use_cache)
@@ -238,8 +228,6 @@ async def drugs_by_event(
             for drug_item, total in zip(drugs, totals, strict=True):
                 if isinstance(total, int):
                     drug_item.total_drug_reports = total
-    finally:
-        await client.close()
 
     return DrugsByEventResult(
         event=event.upper(),

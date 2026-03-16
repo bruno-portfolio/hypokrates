@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from hypokrates.cross import api as cross_api
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
+from hypokrates.exceptions import HypokratesError
 from hypokrates.faers import api as faers_api
 from hypokrates.faers.client import FAERSClient
 from hypokrates.faers.constants import (
@@ -531,7 +532,7 @@ async def _check_bulk_available() -> bool:
         from hypokrates.faers_bulk.api import is_bulk_available
 
         return await is_bulk_available()
-    except Exception:
+    except (HypokratesError, ImportError):
         return False
 
 

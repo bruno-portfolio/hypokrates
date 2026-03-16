@@ -21,11 +21,12 @@ from hypokrates.cross.constants import (
 
 if TYPE_CHECKING:
     from hypokrates.chembl.models import ChEMBLMechanism
-    from hypokrates.dailymed.models import LabelEventsResult
+    from hypokrates.dailymed.models import LabelCheckResult, LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.faers.client import FAERSClient
     from hypokrates.faers.models import CoSuspectProfile
     from hypokrates.opentargets.models import OTDrugSafety
+    from hypokrates.trials.models import TrialsResult
 from hypokrates.cross.models import (
     CoAdminAnalysis,
     CompareResult,
@@ -400,7 +401,7 @@ async def hypothesis(
         if is_indication_term(event):
             indication_confounding = True
     except Exception:
-        pass
+        logger.debug("hypothesis %s + %s: indication detection unavailable", drug, event)
 
     classification = _classify(
         signal_detected=signal_result.signal_detected,
@@ -626,19 +627,16 @@ def _confidence_label(classification: HypothesisClassification) -> str:
     return labels[classification]
 
 
-def _format_label_detail(label_result: object) -> str:
+def _format_label_detail(label_result: LabelCheckResult) -> str:
     """Formata detalhe do label check."""
-    matched = getattr(label_result, "matched_terms", [])
-    if matched:
-        return f"Matched: {', '.join(matched)}"
+    if label_result.matched_terms:
+        return f"Matched: {', '.join(label_result.matched_terms)}"
     return "Not found in label"
 
 
-def _format_trials_detail(trials_result: object) -> str:
+def _format_trials_detail(trials_result: TrialsResult) -> str:
     """Formata detalhe dos trials."""
-    total = getattr(trials_result, "total_count", 0)
-    active = getattr(trials_result, "active_count", 0)
-    return f"{total} trials found, {active} active"
+    return f"{trials_result.total_count} trials found, {trials_result.active_count} active"
 
 
 async def compare_signals(
