@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "PA166104949",
+      "name": "CPIC Guideline for Pharmacogenetics-Guided Warfarin Dosing",
+      "source": "CPIC",
+      "relatedGenes": [{"symbol": "VKORC1"}, {"symbol": "CYP2C9"}],
+      "recommendation": true,
+      "summaryMarkdown": "CPIC guidelines for warfarin dosing based on CYP2C9 and VKORC1 genotypes."
+    },
+    {
+      "id": "PA166104950",
+      "name": "DPWG Guideline for warfarin and VKORC1",
+      "source": "DPWG",
+      "relatedGenes": [{"symbol": "VKORC1"}],
+      "recommendation": true,
+      "summaryMarkdown": "Dutch Pharmacogenetics Working Group guideline for warfarin."
+    }
+  ],
+  "status": "success"
+}

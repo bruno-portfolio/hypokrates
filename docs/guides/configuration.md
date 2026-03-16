@@ -42,6 +42,8 @@ All parameters are optional — only set what you need. Unset fields keep their 
 |-----------|------|---------|-------------|
 | `drugbank_path` | `str \| Path \| None` | `None` | Path to DrugBank XML file (~175MB). Required for `drug_info()` and `drug_interactions()`. Free academic license at [go.drugbank.com](https://go.drugbank.com/releases/latest). |
 | `anvisa_csv_path` | `str \| Path \| None` | `None` | Path to ANVISA medicamentos CSV. Optional — auto-downloaded on first call if not set. |
+| `onsides_path` | `str \| Path \| None` | `None` | Path to directory with OnSIDES CSVs (7 files from 313MB ZIP). Required for `onsides_events()` and `onsides_check_event()`. Free download from OnSIDES GitHub. |
+| `canada_bulk_path` | `str \| Path \| None` | `None` | Path to directory with extracted Canada Vigilance files (325MB ZIP). Required for `canada_signal()` and `canada_top_events()`. Free download from Health Canada. |
 
 ### Cache
 
@@ -61,6 +63,7 @@ The cache stores HTTP responses locally with source-specific TTLs. This reduces 
 | ClinicalTrials.gov | 24 hours |
 | OpenTargets | 7 days |
 | ChEMBL | 7 days |
+| PharmGKB | 7 days |
 
 To disable cache for a single call, use `use_cache=False`:
 
@@ -132,5 +135,7 @@ configure(
     ncbi_api_key=os.getenv("NCBI_API_KEY"),
     ncbi_email=os.getenv("NCBI_EMAIL"),
     drugbank_path=os.getenv("DRUGBANK_PATH"),
+    onsides_path=os.getenv("ONSIDES_PATH"),
+    canada_bulk_path=os.getenv("CANADA_BULK_PATH"),
 )
 ```

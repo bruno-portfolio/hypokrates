@@ -6,6 +6,7 @@ from mcp.server.fastmcp import FastMCP
 
 from hypokrates.mcp.tools import (
     anvisa,
+    canada,
     chembl,
     cross,
     dailymed,
@@ -13,7 +14,9 @@ from hypokrates.mcp.tools import (
     faers,
     faers_bulk,
     meta,
+    onsides,
     opentargets,
+    pharmgkb,
     pubmed,
     scan,
     stats,
@@ -27,6 +30,7 @@ mcp = FastMCP("hypokrates")
 def create_server() -> FastMCP:
     """Cria e configura o MCP server com todas as tools."""
     anvisa.register(mcp)
+    canada.register(mcp)
     faers.register(mcp)
     stats.register(mcp)
     pubmed.register(mcp)
@@ -37,7 +41,9 @@ def create_server() -> FastMCP:
     dailymed.register(mcp)
     trials.register(mcp)
     drugbank.register(mcp)
+    onsides.register(mcp)
     opentargets.register(mcp)
+    pharmgkb.register(mcp)
     chembl.register(mcp)
     faers_bulk.register(mcp)
     return mcp

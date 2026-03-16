@@ -15,12 +15,15 @@ from __future__ import annotations
 
 from hypokrates import (
     anvisa,
+    canada,
     chembl,
     cross,
     dailymed,
     drugbank,
     faers,
+    onsides,
     opentargets,
+    pharmgkb,
     pubmed,
     scan,
     stats,
@@ -28,6 +31,7 @@ from hypokrates import (
     vocab,
 )
 from hypokrates.anvisa import AnvisaMedicamento, AnvisaNomeMapping, AnvisaSearchResult
+from hypokrates.canada import CanadaBulkStatus, CanadaSignalResult
 from hypokrates.chembl import ChEMBLMechanism, ChEMBLMetabolism, ChEMBLTarget
 from hypokrates.config import configure
 from hypokrates.constants import __version__
@@ -45,7 +49,9 @@ from hypokrates.exceptions import (
     SourceUnavailableError,
     ValidationError,
 )
+from hypokrates.onsides import OnSIDESEvent, OnSIDESResult
 from hypokrates.opentargets import OTAdverseEvent, OTDrugSafety
+from hypokrates.pharmgkb import PharmGKBAnnotation, PharmGKBGuideline, PharmGKBResult
 from hypokrates.pubmed import PubMedArticle, PubMedSearchResult
 from hypokrates.scan import ScanItem, ScanResult
 from hypokrates.trials import ClinicalTrial, TrialsResult
@@ -56,6 +62,8 @@ __all__ = [
     "AnvisaNomeMapping",
     "AnvisaSearchResult",
     "CacheError",
+    "CanadaBulkStatus",
+    "CanadaSignalResult",
     "ChEMBLMechanism",
     "ChEMBLMetabolism",
     "ChEMBLTarget",
@@ -76,7 +84,12 @@ __all__ = [
     "NetworkError",
     "OTAdverseEvent",
     "OTDrugSafety",
+    "OnSIDESEvent",
+    "OnSIDESResult",
     "ParseError",
+    "PharmGKBAnnotation",
+    "PharmGKBGuideline",
+    "PharmGKBResult",
     "PubMedArticle",
     "PubMedSearchResult",
     "RateLimitError",
@@ -87,13 +100,16 @@ __all__ = [
     "ValidationError",
     "__version__",
     "anvisa",
+    "canada",
     "chembl",
     "configure",
     "cross",
     "dailymed",
     "drugbank",
     "faers",
+    "onsides",
     "opentargets",
+    "pharmgkb",
     "pubmed",
     "scan",
     "stats",

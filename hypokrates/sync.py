@@ -12,13 +12,16 @@ import functools
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from hypokrates.anvisa import api as anvisa_api
+from hypokrates.canada import api as canada_api
 from hypokrates.chembl import api as chembl_api
 from hypokrates.cross import api as cross_api
 from hypokrates.dailymed import api as dailymed_api
 from hypokrates.drugbank import api as drugbank_api
 from hypokrates.faers import api as faers_api
 from hypokrates.faers_bulk import api as faers_bulk_api
+from hypokrates.onsides import api as onsides_api
 from hypokrates.opentargets import api as opentargets_api
+from hypokrates.pharmgkb import api as pharmgkb_api
 from hypokrates.pubmed import api as pubmed_api
 from hypokrates.scan import api as scan_api
 from hypokrates.scan import class_compare as class_compare_api
@@ -170,8 +173,38 @@ class _SyncAnvisa:
     mapear_nome = staticmethod(_make_sync(anvisa_api.mapear_nome))
 
 
+class _SyncOnSIDES:
+    """Wrapper síncrono para hypokrates.onsides."""
+
+    onsides_events = staticmethod(_make_sync(onsides_api.onsides_events))
+    onsides_check_event = staticmethod(_make_sync(onsides_api.onsides_check_event))
+
+
 drugbank = _SyncDrugBank()
+onsides = _SyncOnSIDES()
 opentargets = _SyncOpenTargets()
+
+
+class _SyncPharmGKB:
+    """Wrapper síncrono para hypokrates.pharmgkb."""
+
+    pgx_annotations = staticmethod(_make_sync(pharmgkb_api.pgx_annotations))
+    pgx_guidelines = staticmethod(_make_sync(pharmgkb_api.pgx_guidelines))
+    pgx_drug_info = staticmethod(_make_sync(pharmgkb_api.pgx_drug_info))
+
+
+pharmgkb = _SyncPharmGKB()
 chembl = _SyncChEMBL()
 faers_bulk = _SyncFAERSBulk()
+
+
+class _SyncCanada:
+    """Wrapper síncrono para hypokrates.canada."""
+
+    canada_signal = staticmethod(_make_sync(canada_api.canada_signal))
+    canada_top_events = staticmethod(_make_sync(canada_api.canada_top_events))
+    canada_bulk_status = staticmethod(_make_sync(canada_api.canada_bulk_status))
+
+
 anvisa = _SyncAnvisa()
+canada = _SyncCanada()

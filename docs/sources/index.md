@@ -17,6 +17,9 @@ hypokrates queries multiple public health databases. Each source has its own rat
 | [OpenTargets](opentargets.md) | `hypokrates.opentargets` | FAERS-based LRT scores | 30 req/min | - |
 | ChEMBL | `hypokrates.chembl` | Mechanism of action, targets | 30 req/min | - |
 | [ANVISA](anvisa.md) | `hypokrates.anvisa` | 46K+ Brazilian drugs (registry) | Local (auto-download) | - |
+| [OnSIDES](onsides.md) | `hypokrates.onsides` | 7.1M drug-ADE pairs (US/EU/UK/JP labels) | Local (offline) | - |
+| [PharmGKB](pharmgkb.md) | `hypokrates.pharmgkb` | Pharmacogenomic gene-drug associations | 60 req/min | - |
+| [Canada Vigilance](canada.md) | `hypokrates.canada` | ~738K reports (1965-present) | Local (offline) | - |
 
 ## Planned
 
@@ -47,8 +50,9 @@ All HTTP responses are cached in a local DuckDB database with source-specific TT
 | ClinicalTrials.gov | 24 hours |
 | OpenTargets | 7 days |
 | ChEMBL | 7 days |
+| PharmGKB | 7 days |
 
-DrugBank and ANVISA use separate local DuckDB stores (`~/.cache/hypokrates/drugbank.duckdb` and `~/.cache/hypokrates/anvisa.duckdb`) — they are not part of the HTTP cache.
+DrugBank, ANVISA, OnSIDES, and Canada Vigilance use separate local DuckDB stores (`~/.cache/hypokrates/drugbank.duckdb` and `~/.cache/hypokrates/anvisa.duckdb`) — they are not part of the HTTP cache.
 
 Cache can be disabled per-call with `use_cache=False` or globally via `configure(cache_enabled=False)`.
 

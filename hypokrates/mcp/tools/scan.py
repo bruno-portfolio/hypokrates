@@ -32,6 +32,9 @@ def register(mcp: FastMCP) -> None:
         filter_operational: bool = True,
         role_filter: str = "suspect",
         check_coadmin: bool = False,
+        check_onsides: bool = False,
+        check_pharmgkb: bool = False,
+        check_canada: bool = False,
         check_direction: bool = False,
         use_bulk: bool | None = None,
     ) -> str:
@@ -65,6 +68,9 @@ def register(mcp: FastMCP) -> None:
                 "suspect" (PS+SS, default), "all" (includes concomitant).
                 ps_only requires bulk data.
             check_coadmin: Check co-administration confounding (opt-in, +1 API call/event).
+            check_onsides: Check international labels via OnSIDES (US/EU/UK/JP, opt-in).
+            check_pharmgkb: Check pharmacogenomics via PharmGKB (opt-in).
+            check_canada: Check Canada Vigilance for cross-country validation (opt-in).
             check_direction: Compare base PRR vs PS-only PRR per signal (bulk only).
             use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
@@ -92,6 +98,9 @@ def register(mcp: FastMCP) -> None:
                 suspect_only=_suspect_only,
                 primary_suspect_only=_primary_suspect_only,
                 check_coadmin=check_coadmin,
+                check_onsides=check_onsides,
+                check_pharmgkb=check_pharmgkb,
+                check_canada=check_canada,
                 check_direction=check_direction,
                 use_bulk=use_bulk,
                 on_progress=_on_progress,

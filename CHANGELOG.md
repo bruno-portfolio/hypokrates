@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Sprint 10 — Three New Data Sources (OnSIDES, PharmGKB, Canada Vigilance)
+
+### Added
+- **onsides/** module: `onsides_events()`, `onsides_check_event()` — NLP-extracted drug-ADE pairs from 51,460 labels across 4 countries (US/EU/UK/JP) via PubMedBERT (F1=0.935)
+  - DuckDB store at `~/.cache/hypokrates/onsides.duckdb` (same pattern as DrugBank/ANVISA)
+  - Loads 7 CSVs from OnSIDES ZIP (313MB download): product_label, product_adverse_effect, product_to_rxnorm, vocab_rxnorm_product, vocab_rxnorm_ingredient_to_product, vocab_rxnorm_ingredient, vocab_meddra_adverse_effect
+  - Query joins RxNorm ingredient → product → label → adverse effect → MedDRA vocab with confidence scores and country sources
+  - `OnSIDESEvent` model: meddra_id, meddra_name, label_section (BW/WP/AR), confidence (pred1), sources, num_sources
+  - `OnSIDESResult` model with MetaInfo
+  - `check_onsides` parameter on `hypothesis()` and `scan_drug()` (opt-in)
+  - `HypothesisResult.onsides_sources` field (list of country codes where ADE found)
+  - MCP tools: `onsides_events`, `onsides_check_event`
+  - Sync wrapper: `from hypokrates.sync import onsides`
+  - Config: `onsides_path: Path | None` in HypokratesConfig
+  - `Source.ONSIDES` enum value
+  - 25 new tests with golden data
+
+- **pharmgkb/** module: `pgx_annotations()`, `pgx_guidelines()`, `pgx_drug_info()` — pharmacogenomic gene-drug associations and dosing guidelines (CPIC/DPWG) from PharmGKB REST API
+  - HTTP client inheriting BaseClient (cache + rate limit at 60/min)
+  - Evidence level filtering (1A strongest → 4 weakest)
+  - `PharmGKBAnnotation` model: gene_symbol, level_of_evidence, annotation_types, score
+  - `PharmGKBGuideline` model: source (CPIC/DPWG/CPNDS/RNPGx), genes, recommendation, summary
+  - `PharmGKBResult` model with annotations, guidelines, pharmgkb_id, MetaInfo
+  - `check_pharmgkb` parameter on `hypothesis()` and `scan_drug()` (opt-in)
+  - `HypothesisResult.pharmacogenomics` field (gene summaries with evidence levels)
+  - MCP tools: `pgx_drug_info`, `pgx_annotations`
+  - Sync wrapper: `from hypokrates.sync import pharmgkb`
+  - `Source.PHARMGKB` enum value, `PHARMGKB_TTL = 7 days`
+  - 19 new tests with golden data + respx mocks
+
+- **canada/** module: `canada_signal()`, `canada_top_events()`, `canada_bulk_status()` — Canadian pharmacovigilance database (1965-present, ~738K reports)
+  - DuckDB store at `~/.cache/hypokrates/canada_vigilance.duckdb` (same pattern as FAERS Bulk)
+  - Parses $-delimited files from bulk download (325MB ZIP): Reports, Report_Drug, Reactions, Drug_Product, Drug_Product_Ingredients
+  - PRR calculation with four_counts (same formula as FAERS)
+  - `CanadaSignalResult` model: drug_event_count, drug_total, event_total, total_reports, prr, signal_detected
+  - `CanadaBulkStatus` model: total_reports, total_drugs, total_reactions, date_range
+  - `check_canada` parameter on `hypothesis()` and `scan_drug()` (opt-in)
+  - `HypothesisResult.canada_reports`, `HypothesisResult.canada_signal` fields
+  - MCP tools: `canada_signal`, `canada_top_events`, `canada_bulk_status`
+  - Sync wrapper: `from hypokrates.sync import canada`
+  - Config: `canada_bulk_path: Path | None` in HypokratesConfig
+  - `Source.CANADA` enum value
+  - 22 new tests with golden data
+
+### Previous (Sprint 9)
+
 ### Added
 - `protective_signal` classification in `hypothesis()` and `scan_drug()` — detects PRR < 1 with CI entirely below 1 (e.g., aspirin + colorectal cancer PRR=0.05). New `HypothesisClassification.PROTECTIVE_SIGNAL` enum value. `CLASSIFICATION_WEIGHTS[PROTECTIVE_SIGNAL]=3.0`
 - `no_data` field on `SignalResult` — distinguishes "no FAERS reports for this term" (drug+event=0) from "no signal" (PRR near 1). MCP signal tool shows "NO DATA" and warning when term is absent from FAERS

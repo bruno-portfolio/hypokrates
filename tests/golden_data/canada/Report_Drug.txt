@@ -1,0 +1,11 @@
+REPORT_DRUG_ID$REPORT_ID$DRUG_PRODUCT_ID$DRUGINVOLV_ENG
+1$1$100$Suspect
+2$2$100$Suspect
+3$3$100$Suspect
+4$4$100$Suspect
+5$5$200$Suspect
+6$6$200$Suspect
+7$7$300$Concomitant
+8$8$300$Suspect
+9$9$100$Concomitant
+10$10$200$Suspect

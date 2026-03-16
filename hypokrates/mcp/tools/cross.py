@@ -23,6 +23,9 @@ def register(mcp: FastMCP) -> None:
         check_opentargets: bool = False,
         check_chembl: bool = False,
         check_coadmin: bool = False,
+        check_onsides: bool = False,
+        check_pharmgkb: bool = False,
+        check_canada: bool = False,
         suspect_only: bool = False,
     ) -> str:
         """Cross-reference FAERS signal with PubMed literature for a drug-event pair.
@@ -39,6 +42,9 @@ def register(mcp: FastMCP) -> None:
             check_opentargets: Check OpenTargets for LRT score (opt-in).
             check_chembl: Check ChEMBL for mechanism/targets (opt-in, no API key).
             check_coadmin: Check co-administration confounding (opt-in).
+            check_onsides: Check international labels via OnSIDES (US/EU/UK/JP, opt-in).
+            check_pharmgkb: Check pharmacogenomics via PharmGKB (opt-in).
+            check_canada: Check Canada Vigilance for cross-country validation (opt-in).
             suspect_only: Only count reports where drug is suspect (not concomitant).
         """
         result = await cross_api.hypothesis(
@@ -50,6 +56,9 @@ def register(mcp: FastMCP) -> None:
             check_opentargets=check_opentargets,
             check_chembl=check_chembl,
             check_coadmin=check_coadmin,
+            check_onsides=check_onsides,
+            check_pharmgkb=check_pharmgkb,
+            check_canada=check_canada,
             suspect_only=suspect_only,
         )
         lines = [
@@ -107,6 +116,21 @@ def register(mcp: FastMCP) -> None:
                         "**Co-admin detected but signal appears specific to this drug.**",
                     ]
                 )
+        if result.pharmacogenomics:
+            lines.extend(["", "## Pharmacogenomics (PharmGKB)"])
+            for pgx in result.pharmacogenomics:
+                lines.append(f"- {pgx}")
+        if result.canada_reports is not None:
+            ca_signal = "YES" if result.canada_signal else "NO"
+            lines.append(
+                f"**Canada Vigilance:** {result.canada_reports} reports, signal={ca_signal}"
+            )
+        if result.onsides_sources is not None:
+            sources_str = ", ".join(result.onsides_sources)
+            lines.append(
+                f"**OnSIDES:** Listed in {len(result.onsides_sources)}/4 "
+                f"country labels ({sources_str})"
+            )
         if result.indication_confounding:
             lines.extend(
                 [

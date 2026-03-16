@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "1451127220",
+      "relatedGenes": [{"symbol": "CYP2B6"}],
+      "evidenceLevel": "3",
+      "phenotypeCategories": [{"term": "Metabolism/PK"}],
+      "score": 1.5
+    },
+    {
+      "id": "1451127221",
+      "relatedGenes": [{"symbol": "UGT1A9"}],
+      "evidenceLevel": "3",
+      "phenotypeCategories": [{"term": "Metabolism/PK"}, {"term": "Dosage"}],
+      "score": 1.2
+    },
+    {
+      "id": "1451127222",
+      "relatedGenes": [{"symbol": "ADRB2"}],
+      "evidenceLevel": "4",
+      "phenotypeCategories": [{"term": "Efficacy"}],
+      "score": 0.5
+    }
+  ],
+  "status": "success"
+}

@@ -27,6 +27,9 @@ class Source(StrEnum):
     OPENTARGETS = "opentargets"
     CHEMBL = "chembl"
     ANVISA = "anvisa"
+    ONSIDES = "onsides"
+    PHARMGKB = "pharmgkb"
+    CANADA = "canada"
 
 
 # --- URLs base ---
@@ -57,6 +60,7 @@ class CacheSettings:
     TRIALS_TTL: int = 86_400  # 24h
     OPENTARGETS_TTL: int = 604_800  # 7 dias
     CHEMBL_TTL: int = 604_800  # 7 dias (releases trimestrais)
+    PHARMGKB_TTL: int = 604_800  # 7 dias
     DEFAULT_TTL: int = 86_400  # 24h
     SCHEMA_VERSION: int = 1
 
@@ -81,4 +85,5 @@ class HTTPSettings:
         Source.DAILYMED: 60,  # conservador (nao documentado)
         Source.TRIALS: 50,  # documentado
         Source.OPENTARGETS: 30,  # conservador (nao documentado)
+        Source.PHARMGKB: 60,  # conservador (nao documentado)
     }

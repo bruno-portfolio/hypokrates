@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "1451127100",
+      "relatedGenes": [{"symbol": "VKORC1"}],
+      "evidenceLevel": "1A",
+      "phenotypeCategories": [{"term": "Dosage"}],
+      "score": 5.0
+    },
+    {
+      "id": "1451127101",
+      "relatedGenes": [{"symbol": "CYP2C9"}],
+      "evidenceLevel": "1A",
+      "phenotypeCategories": [{"term": "Dosage"}, {"term": "Toxicity"}],
+      "score": 4.8
+    },
+    {
+      "id": "1451127102",
+      "relatedGenes": [{"symbol": "CYP4F2"}],
+      "evidenceLevel": "2A",
+      "phenotypeCategories": [{"term": "Dosage"}],
+      "score": 2.0
+    }
+  ],
+  "status": "success"
+}

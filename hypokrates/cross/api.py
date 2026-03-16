@@ -177,6 +177,9 @@ async def hypothesis(
     check_opentargets: bool = False,
     check_chembl: bool = False,
     check_coadmin: bool = False,
+    check_onsides: bool = False,
+    check_pharmgkb: bool = False,
+    check_canada: bool = False,
     suspect_only: bool = False,
     use_bulk: bool | None = None,
     _label_cache: LabelEventsResult | None = None,
@@ -204,6 +207,9 @@ async def hypothesis(
         check_opentargets: Se deve buscar LRT score no OpenTargets.
         check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
         check_coadmin: Se deve analisar confounding por co-administração (Layer 1+2).
+        check_onsides: Se deve verificar bulas internacionais via OnSIDES (US/EU/UK/JP).
+        check_pharmgkb: Se deve buscar farmacogenômica via PharmGKB.
+        check_canada: Se deve verificar sinal no Canada Vigilance.
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
 
@@ -336,6 +342,53 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: ChEMBL unavailable", drug, event)
 
+    # 3e. OnSIDES (international labels, per-event)
+    onsides_sources: list[str] | None = None
+
+    if check_onsides:
+        from hypokrates.onsides import api as onsides_api_mod
+
+        try:
+            onsides_ev = await onsides_api_mod.onsides_check_event(drug, event)
+            if onsides_ev is not None:
+                onsides_sources = onsides_ev.sources
+        except Exception:
+            logger.warning("hypothesis %s + %s: OnSIDES unavailable", drug, event)
+
+    # 3e2. Canada Vigilance (cross-country validation)
+    canada_reports: int | None = None
+    canada_signal_detected: bool | None = None
+
+    if check_canada:
+        from hypokrates.canada import api as canada_api_mod
+
+        try:
+            canada_result = await canada_api_mod.canada_signal(
+                drug, event, suspect_only=suspect_only
+            )
+            canada_reports = canada_result.drug_event_count
+            canada_signal_detected = canada_result.signal_detected
+        except Exception:
+            logger.warning("hypothesis %s + %s: Canada Vigilance unavailable", drug, event)
+
+    # 3e3. PharmGKB (drug-level pharmacogenomics)
+    pharmacogenomics: list[str] = []
+
+    if check_pharmgkb:
+        from hypokrates.pharmgkb import api as pharmgkb_api_mod
+
+        try:
+            pgx_anns = await pharmgkb_api_mod.pgx_annotations(drug)
+            for ann in pgx_anns[:5]:
+                if ann.gene_symbol and ann.level_of_evidence:
+                    cats = ", ".join(ann.annotation_types[:2]) if ann.annotation_types else ""
+                    summary = f"{ann.gene_symbol} (Level {ann.level_of_evidence})"
+                    if cats:
+                        summary += f" — {cats}"
+                    pharmacogenomics.append(summary)
+        except Exception:
+            logger.warning("hypothesis %s + %s: PharmGKB unavailable", drug, event)
+
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
@@ -444,6 +497,10 @@ async def hypothesis(
         ot_llr=ot_llr,
         coadmin=coadmin_result,
         indication_confounding=indication_confounding,
+        onsides_sources=onsides_sources,
+        pharmacogenomics=pharmacogenomics,
+        canada_reports=canada_reports,
+        canada_signal=canada_signal_detected,
     )
 
 

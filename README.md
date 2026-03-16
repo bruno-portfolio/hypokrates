@@ -2,7 +2,7 @@
 
 > Normalize and cross-reference global public health data for medical hypothesis generation.
 
-Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
+Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL, OnSIDES, PharmGKB, Canada Vigilance) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
 
 ## Install
 
@@ -27,6 +27,8 @@ configure(
     ncbi_api_key="your-key",        # 180 -> 600 req/min
     ncbi_email="you@example.com",
     drugbank_path="/path/to/drugbank.xml",  # Optional: offline drug data
+    onsides_path="/path/to/onsides/csvs/",  # Optional: international labels
+    canada_bulk_path="/path/to/canada/",    # Optional: Canada Vigilance
 )
 ```
 
@@ -203,6 +205,56 @@ print(f"{mapping.nome_pt} → {mapping.nome_en}")  # DIPIRONA → METAMIZOLE
 
 > Auto-downloads ~5 MB CSV on first call. No setup required. Data: CC BY-ND 3.0, Fonte: ANVISA.
 
+## International drug labels (OnSIDES)
+
+```python
+from hypokrates.sync import onsides
+
+# All adverse events from US/EU/UK/JP labels (NLP-extracted)
+result = onsides.onsides_events("propofol", min_confidence=0.5)
+for ev in result.events[:10]:
+    print(f"{ev.meddra_name}: conf={ev.confidence:.2f}, sources={', '.join(ev.sources)}")
+
+# Check specific event across countries
+check = onsides.onsides_check_event("propofol", "bradycardia")
+if check:
+    print(f"Found in {check.num_sources}/4 country labels")
+```
+
+> Requires OnSIDES CSV files (313MB ZIP, free download). 7.1M drug-ADE pairs from 51,460 labels via PubMedBERT (F1=0.935).
+
+## Pharmacogenomics (PharmGKB)
+
+```python
+from hypokrates.sync import pharmgkb
+
+# Gene-drug associations
+info = pharmgkb.pgx_drug_info("warfarin")
+for ann in info.annotations:
+    print(f"{ann.gene_symbol}: Level {ann.level_of_evidence}")
+
+# Dosing guidelines (CPIC/DPWG)
+for gl in info.guidelines:
+    print(f"{gl.source}: {gl.name}")
+```
+
+## Canadian pharmacovigilance (Canada Vigilance)
+
+```python
+from hypokrates.sync import canada
+
+# Cross-country signal validation
+result = canada.canada_signal("propofol", "anaphylactic shock")
+print(f"PRR: {result.prr:.2f}, Reports: {result.drug_event_count}")
+
+# Top adverse events in Canada
+events = canada.canada_top_events("propofol", limit=10)
+for ev, count in events:
+    print(f"{ev}: {count} reports")
+```
+
+> Requires Canada Vigilance bulk download (325MB ZIP). ~738K reports from 1965-present.
+
 ## Drug normalization (RxNorm/MeSH)
 
 ```python
@@ -256,7 +308,7 @@ python -m hypokrates.mcp
 }
 ```
 
-34 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `list_tools`, `version`.
+41 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `onsides_events`, `onsides_check_event`, `pgx_drug_info`, `pgx_annotations`, `canada_signal`, `canada_top_events`, `canada_bulk_status`, `list_tools`, `version`.
 
 ## Data Sources
 
@@ -273,10 +325,13 @@ python -m hypokrates.mcp
 | OpenTargets | `opentargets` | None | 30/min |
 | ChEMBL | `chembl` | None | 30/min |
 | ANVISA | `anvisa` | None (auto-download) | Local |
+| OnSIDES | `onsides` | Local CSVs (313MB) | Offline |
+| PharmGKB | `pharmgkb` | None | 60/min |
+| Canada Vigilance | `canada` | Local bulk (325MB) | Offline |
 
 ## Status
 
-**Alpha** — 1142 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1293 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 

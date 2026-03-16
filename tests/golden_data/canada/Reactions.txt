@@ -1,0 +1,11 @@
+REACTION_ID$REPORT_ID$PT_NAME_ENG$SOC_NAME_ENG$MEDDRA_VERSION
+1$1$Bradycardia$Cardiac disorders$24.0
+2$2$Bradycardia$Cardiac disorders$24.0
+3$3$Hypotension$Vascular disorders$24.0
+4$4$Anaphylactic shock$Immune system disorders$24.0
+5$5$Respiratory depression$Respiratory disorders$24.0
+6$6$Nausea$Gastrointestinal disorders$24.0
+7$7$Hepatotoxicity$Hepatobiliary disorders$24.0
+8$8$Nausea$Gastrointestinal disorders$24.0
+9$9$Bradycardia$Cardiac disorders$24.0
+10$10$Respiratory depression$Respiratory disorders$24.0

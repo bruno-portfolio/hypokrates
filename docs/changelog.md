@@ -4,7 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-### Sprint 9 — Signal Quality, Protective Detection, New Sources (in progress)
+### Sprint 10 — Three New Data Sources
+
+- **onsides/** module: `onsides_events()`, `onsides_check_event()` — NLP-extracted drug-ADE pairs from 51,460 labels across US/EU/UK/JP (PubMedBERT F1=0.935)
+  - DuckDB store, 7 CSVs (313MB ZIP), confidence scores, multi-country source tracking
+  - `check_onsides` on `hypothesis()` and `scan_drug()`, `HypothesisResult.onsides_sources`
+  - MCP: `onsides_events`, `onsides_check_event`
+  - Config: `onsides_path`
+
+- **pharmgkb/** module: `pgx_annotations()`, `pgx_guidelines()`, `pgx_drug_info()` — pharmacogenomics from PharmGKB REST API
+  - Gene-drug associations with evidence levels (1A-4), dosing guidelines (CPIC/DPWG)
+  - HTTP client with cache (7d TTL), rate limit 60/min
+  - `check_pharmgkb` on `hypothesis()` and `scan_drug()`, `HypothesisResult.pharmacogenomics`
+  - MCP: `pgx_drug_info`, `pgx_annotations`
+
+- **canada/** module: `canada_signal()`, `canada_top_events()`, `canada_bulk_status()` — Canada Vigilance (1965-present, ~738K reports)
+  - DuckDB store, $-delimited bulk files (325MB ZIP), PRR calculation
+  - `check_canada` on `hypothesis()` and `scan_drug()`, `HypothesisResult.canada_reports/canada_signal`
+  - MCP: `canada_signal`, `canada_top_events`, `canada_bulk_status`
+  - Config: `canada_bulk_path`
+
+- 66 new tests (1293 total)
+- `Source.ONSIDES`, `Source.PHARMGKB`, `Source.CANADA` enum values
+- Sync wrappers: `from hypokrates.sync import onsides, pharmgkb, canada`
+- MCP: 7 new tools (41 total)
+
+### Sprint 9 — Signal Quality, Protective Detection, New Sources
 
 - **cross/models.py**: `HypothesisClassification.PROTECTIVE_SIGNAL` — new enum value for PRR < 1 with CI entirely below 1 (e.g., aspirin + colorectal cancer)
 - **cross/api.py**: `_classify()` now receives `prr`, `prr_ci_upper`, `drug_event_count` to detect protective associations
