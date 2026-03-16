@@ -296,13 +296,22 @@ hypokrates exposes all functions as MCP tools for LLM integration:
 # Run standalone
 python -m hypokrates.mcp
 
-# Or configure in .mcp.json
+# Or configure in .mcp.json (env vars are auto-detected on startup)
 {
   "mcpServers": {
     "hypokrates": {
       "type": "stdio",
       "command": "python",
-      "args": ["-m", "hypokrates.mcp"]
+      "args": ["-m", "hypokrates.mcp"],
+      "env": {
+        "OPENFDA_API_KEY": "your-key",
+        "NCBI_API_KEY": "your-key",
+        "NCBI_EMAIL": "you@example.com",
+        "DRUGBANK_PATH": "/path/to/drugbank.xml",
+        "ONSIDES_PATH": "/path/to/onsides/csvs/",
+        "CANADA_BULK_PATH": "/path/to/canada/extracted/",
+        "FAERS_BULK_DIR": "/path/to/faers/quarterly/"
+      }
     }
   }
 }

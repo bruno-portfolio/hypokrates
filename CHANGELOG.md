@@ -6,6 +6,9 @@
 
 ### Fixed
 - **PharmGKB parser**: `accession_id` e `guideline_id` vinham como `int` da API mas o Pydantic model esperava `str` — adicionado `str()` no parser
+- **PharmGKB parser**: `summaryMarkdown` da API retorna `{"id": int, "html": str}` (dict) em vez de string — `summary[:500]` causava `KeyError: slice(None, 500, None)`. Adicionado `_extract_text()` que extrai `html` de dicts e `_strip_html()` que remove tags HTML
+- **MCP env var config**: `__main__.py` não lia environment variables — `OPENFDA_API_KEY` setada no `.mcp.json` era ignorada. Adicionado `_configure_from_env()` que lê `OPENFDA_API_KEY`, `NCBI_API_KEY`, `NCBI_EMAIL`, `DRUGBANK_PATH`, `ONSIDES_PATH`, `CANADA_BULK_PATH`, `FAERS_BULK_DIR` e aplica `configure()` no startup
+- **Testes scan/stats vs FAERS Bulk**: testes que mockavam `faers_api.top_events` e `FAERSClient` falhavam em máquinas com `faers_bulk.duckdb` carregado (auto-detect usava bulk real em vez do mock). Adicionado `conftest.py` em `test_scan/` e `test_stats/` que desabilita auto-detect; testes de bulk mode re-patcheiam explicitamente
 - **DailyMed SPL selection**: `label_events("acetaminophen")` selecionava combo acetaminophen+codeine em vez de standalone — `parse_spl_search()` agora retorna `(singles, combos)` separados e `label_events` tenta singles first (4-pass: single AR → single safety → combo AR → combo safety)
 
 ### Added

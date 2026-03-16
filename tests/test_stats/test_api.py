@@ -386,7 +386,10 @@ class TestSignalBulkMode:
         assert result.drug == "propofol"
         assert result.event == "bradycardia"
 
-    async def test_signal_use_bulk_auto_detects(self) -> None:
+    @patch(
+        "hypokrates.faers_bulk.api.is_bulk_available", new_callable=AsyncMock, return_value=True
+    )
+    async def test_signal_use_bulk_auto_detects(self, _mock_avail: AsyncMock) -> None:
         """use_bulk=None auto-detecta bulk disponível."""
         result = await signal("propofol", "bradycardia", use_bulk=None)
         assert result.meta.source == "FAERS/bulk (deduplicated)"
@@ -484,7 +487,10 @@ class TestSignalTimelineBulkMode:
         yield  # type: ignore[misc]
         FAERSBulkStore._instance = None
 
-    async def test_signal_timeline_uses_bulk_when_available(self) -> None:
+    @patch(
+        "hypokrates.faers_bulk.api.is_bulk_available", new_callable=AsyncMock, return_value=True
+    )
+    async def test_signal_timeline_uses_bulk_when_available(self, _mock_avail: AsyncMock) -> None:
         """signal_timeline com use_bulk=None auto-detecta bulk e usa."""
         result = await signal_timeline("propofol", "bradycardia", use_bulk=None)
         assert isinstance(result, TimelineResult)

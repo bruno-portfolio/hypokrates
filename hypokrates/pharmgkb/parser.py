@@ -3,11 +3,30 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from hypokrates.pharmgkb.models import PharmGKBAnnotation, PharmGKBGuideline
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_html(html: str) -> str:
+    """Remove tags HTML simples, retornando texto limpo."""
+    return re.sub(r"<[^>]+>", "", html).strip()
+
+
+def _extract_text(item: dict[str, Any], key: str) -> str:
+    """Extrai texto de campo PharmGKB (pode ser str ou dict com 'html')."""
+    val = item.get(key)
+    if val is None:
+        return ""
+    if isinstance(val, str):
+        return _strip_html(val)
+    if isinstance(val, dict):
+        raw = str(val.get("html", ""))
+        return _strip_html(raw)
+    return str(val)
 
 
 def parse_chemical_id(data: dict[str, Any]) -> str | None:
@@ -109,7 +128,7 @@ def parse_guidelines(data: dict[str, Any]) -> list[PharmGKBGuideline]:
         # Extrair recommendation e summary
         name = item.get("name", "")
         recommendation = item.get("recommendation", False) or False
-        summary = item.get("summaryMarkdown", "") or item.get("summary", "") or ""
+        summary = _extract_text(item, "summaryMarkdown") or _extract_text(item, "summary") or ""
 
         guidelines.append(
             PharmGKBGuideline(
