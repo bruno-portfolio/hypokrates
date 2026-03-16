@@ -43,10 +43,19 @@ def register(mcp: FastMCP) -> None:
             use_bulk: None=auto-detect, true=force bulk, false=force API.
         """
         result = await stats_api.signal(drug, event, suspect_only=suspect_only, use_bulk=use_bulk)
-        detected = "YES" if result.signal_detected else "NO"
+        if result.no_data:
+            detected = "NO DATA"
+        elif result.signal_detected:
+            detected = "YES"
+        else:
+            detected = "NO"
         lines = [
             f"# Signal Detection: {drug.upper()} + {event.upper()}",
             f"**Signal detected:** {detected}",
+        ]
+        if result.no_data:
+            lines.append("**⚠ No FAERS reports found for this drug-event term.**")
+        lines += [
             "",
             "## Measures",
             _format_measure("PRR", result.prr),

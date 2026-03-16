@@ -20,6 +20,7 @@ class HypothesisClassification(StrEnum):
     EMERGING_SIGNAL = "emerging_signal"
     KNOWN_ASSOCIATION = "known_association"
     NO_SIGNAL = "no_signal"
+    PROTECTIVE_SIGNAL = "protective_signal"
 
 
 class CoSignalItem(BaseModel):

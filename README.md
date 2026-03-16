@@ -84,7 +84,7 @@ result = cross.hypothesis(
     check_chembl=True,       # ChEMBL mechanism
     check_opentargets=True,  # OpenTargets LRT
 )
-print(result.classification)    # novel_hypothesis | emerging_signal | known_association | no_signal
+print(result.classification)    # novel_hypothesis | emerging_signal | known_association | no_signal | protective_signal
 print(result.summary)
 print(result.literature_count)
 ```

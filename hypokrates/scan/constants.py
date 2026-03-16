@@ -13,6 +13,7 @@ CLASSIFICATION_WEIGHTS: dict[HypothesisClassification, float] = {
     HypothesisClassification.EMERGING_SIGNAL: 5.0,
     HypothesisClassification.KNOWN_ASSOCIATION: 1.0,
     HypothesisClassification.NO_SIGNAL: 0.0,
+    HypothesisClassification.PROTECTIVE_SIGNAL: 3.0,
 }
 
 LABEL_NOT_IN_MULTIPLIER: float = 1.5

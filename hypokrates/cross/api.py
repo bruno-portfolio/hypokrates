@@ -345,10 +345,20 @@ async def hypothesis(
         novel_max=novel_max,
         emerging_max=emerging_max,
         in_label=in_label,
+        prr=signal_result.prr.value,
+        prr_ci_upper=signal_result.prr.ci_upper,
+        drug_event_count=signal_result.table.a,
     )
 
     # 5. Gerar summary
-    summary = _build_summary(drug, event, classification, literature_count, in_label=in_label)
+    summary = _build_summary(
+        drug,
+        event,
+        classification,
+        literature_count,
+        in_label=in_label,
+        signal_detected=signal_result.signal_detected,
+    )
 
     # 6. Gerar EvidenceBlock
     thresholds_used = {"novel_max": novel_max, "emerging_max": emerging_max}
@@ -432,9 +442,21 @@ def _classify(
     novel_max: int,
     emerging_max: int,
     in_label: bool | None = None,
+    prr: float | None = None,
+    prr_ci_upper: float | None = None,
+    drug_event_count: int = 0,
 ) -> HypothesisClassification:
     """Classifica hipótese com base em sinal, literatura e label."""
     if not signal_detected:
+        # PRR < 1 com CI inteiro abaixo de 1 e dados existentes → protetor
+        if (
+            drug_event_count > 0
+            and prr is not None
+            and prr_ci_upper is not None
+            and prr < 1.0
+            and prr_ci_upper < 1.0
+        ):
+            return HypothesisClassification.PROTECTIVE_SIGNAL
         # Mesmo sem sinal FAERS, literatura substancial + bula = known
         if in_label is True and literature_count > emerging_max:
             return HypothesisClassification.KNOWN_ASSOCIATION
@@ -461,6 +483,7 @@ def _build_summary(
     literature_count: int,
     *,
     in_label: bool | None = None,
+    signal_detected: bool = True,
 ) -> str:
     """Gera resumo textual da classificação."""
     labels = {
@@ -468,6 +491,7 @@ def _build_summary(
         HypothesisClassification.EMERGING_SIGNAL: "Emerging signal",
         HypothesisClassification.KNOWN_ASSOCIATION: "Known association",
         HypothesisClassification.NO_SIGNAL: "No signal",
+        HypothesisClassification.PROTECTIVE_SIGNAL: "Protective association",
     }
     label = labels[classification]
 
@@ -475,7 +499,13 @@ def _build_summary(
         f"{label}: {drug.upper()} + {event.upper()}.",
     ]
 
-    if classification == HypothesisClassification.NO_SIGNAL:
+    if classification == HypothesisClassification.PROTECTIVE_SIGNAL:
+        parts.append(
+            f"FAERS reporting rate is significantly BELOW expected (PRR < 1). "
+            f"Literature count: {literature_count} papers. "
+            f"Possible protective or preventive association."
+        )
+    elif classification == HypothesisClassification.NO_SIGNAL:
         parts.append("No disproportionality signal detected in FAERS.")
     elif classification == HypothesisClassification.NOVEL_HYPOTHESIS:
         parts.append(
@@ -483,15 +513,27 @@ def _build_summary(
             f"({literature_count} papers). Potential novel finding — requires validation."
         )
     elif classification == HypothesisClassification.EMERGING_SIGNAL:
-        parts.append(
-            f"FAERS signal detected with limited literature "
-            f"({literature_count} papers). Emerging evidence — monitor closely."
-        )
-    else:
-        parts.append(
-            f"FAERS signal detected with substantial literature "
-            f"({literature_count} papers). Well-documented association."
-        )
+        if signal_detected:
+            parts.append(
+                f"FAERS signal detected with limited literature "
+                f"({literature_count} papers). Emerging evidence — monitor closely."
+            )
+        else:
+            parts.append(
+                f"No FAERS disproportionality signal, but literature suggests "
+                f"emerging evidence ({literature_count} papers). Monitor closely."
+            )
+    elif classification == HypothesisClassification.KNOWN_ASSOCIATION:
+        if signal_detected:
+            parts.append(
+                f"FAERS signal detected with substantial literature "
+                f"({literature_count} papers). Well-documented association."
+            )
+        else:
+            parts.append(
+                f"No FAERS signal, but well-documented in literature "
+                f"({literature_count} papers) and FDA label."
+            )
 
     if in_label is True:
         parts.append("Event is listed in the FDA label.")
@@ -508,6 +550,9 @@ def _confidence_label(classification: HypothesisClassification) -> str:
         HypothesisClassification.EMERGING_SIGNAL: "moderate — limited corroborating literature",
         HypothesisClassification.KNOWN_ASSOCIATION: "high — well-documented in literature",
         HypothesisClassification.NO_SIGNAL: "n/a — no signal detected",
+        HypothesisClassification.PROTECTIVE_SIGNAL: (
+            "moderate — PRR < 1, requires clinical validation"
+        ),
     }
     return labels[classification]
 

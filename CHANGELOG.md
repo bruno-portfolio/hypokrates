@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- `protective_signal` classification in `hypothesis()` and `scan_drug()` — detects PRR < 1 with CI entirely below 1 (e.g., aspirin + colorectal cancer PRR=0.05). New `HypothesisClassification.PROTECTIVE_SIGNAL` enum value. `CLASSIFICATION_WEIGHTS[PROTECTIVE_SIGNAL]=3.0`
+- `no_data` field on `SignalResult` — distinguishes "no FAERS reports for this term" (drug+event=0) from "no signal" (PRR near 1). MCP signal tool shows "NO DATA" and warning when term is absent from FAERS
+
+### Fixed
+- `_build_summary()` no longer says "FAERS signal detected" when `signal_detected=False` (e.g., aspirin+colorectal cancer as `emerging_signal` without FAERS signal now says "No FAERS disproportionality signal, but literature suggests emerging evidence")
+- `_build_summary()` for `known_association` without FAERS signal (e.g., label+literature only) now says "No FAERS signal, but well-documented in literature and FDA label"
+
+### Previous (Sprint 8)
+
+### Added
 - Bulk scan: `scan_drug()` now uses FAERS Bulk (deduplicated quarterly files) for event discovery when available
   - `bulk_top_events(drug, role_filter, limit)` — top events from bulk store with dedup + role filter
   - `bulk_drug_total(drug, role_filter)` — total deduplicated cases for a drug

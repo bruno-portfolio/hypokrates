@@ -171,6 +171,7 @@ async def signal(
         ror=ror,
         ic=ic,
         signal_detected=signal_detected,
+        no_data=drug_event_count == 0,
         meta=MetaInfo(
             source="OpenFDA/FAERS",
             query={"drug": drug, "event": event},

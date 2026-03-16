@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Sprint 9 — Signal Quality, Protective Detection, New Sources (in progress)
+
+- **cross/models.py**: `HypothesisClassification.PROTECTIVE_SIGNAL` — new enum value for PRR < 1 with CI entirely below 1 (e.g., aspirin + colorectal cancer)
+- **cross/api.py**: `_classify()` now receives `prr`, `prr_ci_upper`, `drug_event_count` to detect protective associations
+- **cross/api.py**: `_build_summary()` fix — no longer says "FAERS signal detected" when `signal_detected=False` (emerging/known without FAERS signal)
+- **stats/models.py**: `SignalResult.no_data` field — True when drug+event=0 (term absent from FAERS)
+- **stats/api.py**: sets `no_data=True` when `drug_event_count == 0`
+- **mcp/tools/stats.py**: signal tool shows "NO DATA" + warning when term absent from FAERS
+- **scan/constants.py**: `CLASSIFICATION_WEIGHTS[PROTECTIVE_SIGNAL] = 3.0`
+
 ### Sprint 8 — Bulk Scan, Label Match Fix, Direction Analysis
 
 - **faers_bulk/**: `bulk_top_events()`, `bulk_drug_total()` — event discovery via deduplicated bulk store with role filter (PS_ONLY, SUSPECT, ALL)

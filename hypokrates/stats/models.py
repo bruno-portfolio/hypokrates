@@ -55,6 +55,10 @@ class SignalResult(BaseModel):
     ror: DisproportionalityResult
     ic: DisproportionalityResult = Field(description="IC (BCPNN — Norén et al. 2006)")
     signal_detected: bool = Field(description="Heurística: >= 2 medidas significantes")
+    no_data: bool = Field(
+        default=False,
+        description="True quando drug+event=0 (termo ausente no FAERS, diferente de sem sinal)",
+    )
     meta: MetaInfo
 
 
