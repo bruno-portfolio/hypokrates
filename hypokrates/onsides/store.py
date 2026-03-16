@@ -48,22 +48,22 @@ CREATE TABLE IF NOT EXISTS product_adverse_effect (
 
 CREATE TABLE IF NOT EXISTS product_to_rxnorm (
     label_id INTEGER NOT NULL,
-    rxnorm_product_id INTEGER NOT NULL
+    rxnorm_product_id VARCHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_product (
-    rxnorm_id INTEGER PRIMARY KEY,
+    rxnorm_id VARCHAR PRIMARY KEY,
     rxnorm_name VARCHAR DEFAULT '',
     rxnorm_term_type VARCHAR DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_ingredient_to_product (
-    product_id INTEGER NOT NULL,
-    ingredient_id INTEGER NOT NULL
+    product_id VARCHAR NOT NULL,
+    ingredient_id VARCHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_ingredient (
-    rxnorm_id INTEGER PRIMARY KEY,
+    rxnorm_id VARCHAR PRIMARY KEY,
     rxnorm_name VARCHAR DEFAULT '',
     rxnorm_term_type VARCHAR DEFAULT ''
 );
@@ -267,7 +267,7 @@ class OnSIDESStore:
         with self._db_lock:
             self._conn.execute(
                 f"INSERT INTO {table} SELECT * FROM read_csv('{csv_path}', "
-                f"header=true, auto_detect=true)"
+                f"header=true, all_varchar=true)"
             )
             result = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             return result[0] if result else 0
