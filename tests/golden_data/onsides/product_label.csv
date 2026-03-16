@@ -1,7 +1,7 @@
-label_id,source,source_product_name
-1,US,Propofol Injectable Emulsion
-2,EU,Propofol-Lipuro
-3,UK,Propofol 1% w/v
-4,US,Amidate
-5,US,Sublimaze
-6,JP,Propofol Injection
+label_id,source,source_product_name,source_product_id,source_label_url
+1,US,Propofol Injectable Emulsion,NDC-001,https://dailymed.nlm.nih.gov/dailymed/propofol
+2,EU,Propofol-Lipuro,EU-001,https://ema.europa.eu/propofol
+3,UK,Propofol 1% w/v,UK-001,https://mhra.gov.uk/propofol
+4,US,Amidate,NDC-002,https://dailymed.nlm.nih.gov/dailymed/amidate
+5,US,Sublimaze,NDC-003,https://dailymed.nlm.nih.gov/dailymed/sublimaze
+6,JP,Propofol Injection,JP-001,https://pmda.go.jp/propofol

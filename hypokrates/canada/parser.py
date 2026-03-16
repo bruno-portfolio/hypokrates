@@ -1,4 +1,12 @@
-"""Parser para arquivos $-delimited do Canada Vigilance."""
+"""Parser para arquivos $-delimited do Canada Vigilance.
+
+Os arquivos bulk do Canada Vigilance NÃO possuem header row.
+Usamos csv.reader com acesso posicional (índice de coluna).
+
+Posições documentadas em:
+https://www.canada.ca/en/health-canada/services/drugs-health-products/
+medeffect-canada/adverse-reaction-database/read-file-layouts.html
+"""
 
 from __future__ import annotations
 
@@ -17,12 +25,27 @@ from hypokrates.canada.constants import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from hypokrates.canada.store import CanadaVigilanceStore
 
 logger = logging.getLogger(__name__)
 
 # Batch size para inserts
 _BATCH_SIZE = 5000
+
+
+def _find_file(base_path: Path, primary: str, *alternates: str) -> Path | None:
+    """Busca arquivo por nome, tentando alternativas (case-insensitive no Windows).
+
+    Alguns extracts do Canada Vigilance usam nomes diferentes
+    (e.g., ``Drug_Product.txt`` vs ``drug_products.txt``).
+    """
+    for name in (primary, *alternates):
+        candidate = base_path / name
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
@@ -51,32 +74,36 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     total_reports = 0
 
     # 1. Reports
-    reports_path = base_path / FILE_REPORTS
-    if reports_path.exists():
+    reports_path = _find_file(base_path, FILE_REPORTS, "reports.txt")
+    if reports_path:
         total_reports = _load_reports(store, reports_path)
         logger.info("Canada: loaded %d reports", total_reports)
+    else:
+        logger.warning("Canada: Reports file not found in %s", csv_dir)
 
     # 2. Report_Drug
-    drugs_path = base_path / FILE_REPORT_DRUG
-    if drugs_path.exists():
+    drugs_path = _find_file(base_path, FILE_REPORT_DRUG, "report_drug.txt")
+    if drugs_path:
         count = _load_report_drugs(store, drugs_path)
         logger.info("Canada: loaded %d drug records", count)
 
     # 3. Reactions
-    reactions_path = base_path / FILE_REACTIONS
-    if reactions_path.exists():
+    reactions_path = _find_file(base_path, FILE_REACTIONS, "reactions.txt")
+    if reactions_path:
         count = _load_reactions(store, reactions_path)
         logger.info("Canada: loaded %d reaction records", count)
 
-    # 4. Drug_Product
-    products_path = base_path / FILE_DRUG_PRODUCT
-    if products_path.exists():
+    # 4. Drug_Product (pode ser drug_products.txt em alguns extracts)
+    products_path = _find_file(
+        base_path, FILE_DRUG_PRODUCT, "drug_products.txt", "Drug_Products.txt"
+    )
+    if products_path:
         count = _load_products(store, products_path)
         logger.info("Canada: loaded %d products", count)
 
     # 5. Drug_Product_Ingredients
-    ingredients_path = base_path / FILE_DRUG_INGREDIENTS
-    if ingredients_path.exists():
+    ingredients_path = _find_file(base_path, FILE_DRUG_INGREDIENTS, "drug_product_ingredients.txt")
+    if ingredients_path:
         count = _load_ingredients(store, ingredients_path)
         logger.info("Canada: loaded %d ingredients", count)
 
@@ -84,41 +111,52 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     return total_reports
 
 
-def _read_delimited(path: Path) -> csv.DictReader[str]:
-    """Lê arquivo $-delimited como DictReader."""
-    # Canada Vigilance usa $ como delimitador e " como quotechar
+def _read_rows(path: Path) -> Iterator[list[str]]:
+    """Lê arquivo $-delimited como csv.reader (sem header)."""
     fh = path.open(encoding="utf-8", errors="replace")
-    return csv.DictReader(fh, delimiter=DELIMITER, quotechar='"')
+    yield from csv.reader(fh, delimiter=DELIMITER, quotechar='"')
 
 
-def _safe_int(val: str | None, default: int = 0) -> int:
+def _safe_int(val: str, default: int = 0) -> int:
     """Converte string para int com fallback."""
-    if not val or not val.strip():
+    val = val.strip()
+    if not val:
         return default
     try:
-        return int(val.strip())
+        return int(val)
     except ValueError:
         return default
 
 
+def _col(row: list[str], idx: int) -> str:
+    """Acessa coluna por índice com fallback para string vazia."""
+    if idx < len(row):
+        return row[idx]
+    return ""
+
+
+# ── Reports.txt ──────────────────────────────────────────────
+# Col 0: REPORT_ID, 3: DATRECEIVED, 9: GENDER_CODE,
+# 12: AGE, 16: OUTCOME_CODE, 25: SERIOUSNESS_CODE
+
+
 def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
     """Carrega Reports.txt."""
-    reader = _read_delimited(path)
     rows: list[list[object]] = []
     count = 0
 
-    for record in reader:
-        report_id = _safe_int(record.get("REPORT_ID"))
+    for record in _read_rows(path):
+        report_id = _safe_int(_col(record, 0))
         if report_id == 0:
             continue
         rows.append(
             [
                 report_id,
-                (record.get("DATRECEIVED") or "").strip(),
-                (record.get("GENDER_CODE") or "").strip(),
-                (record.get("AGE") or "").strip(),
-                (record.get("OUTCOME_CODE") or "").strip(),
-                (record.get("SERIOUSNESS_CODE") or "").strip(),
+                _col(record, 3).strip(),  # DATRECEIVED
+                _col(record, 9).strip(),  # GENDER_CODE
+                _col(record, 12).strip(),  # AGE
+                _col(record, 16).strip(),  # OUTCOME_CODE
+                _col(record, 25).strip(),  # SERIOUSNESS_CODE
             ]
         )
         if len(rows) >= _BATCH_SIZE:
@@ -133,22 +171,26 @@ def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
     return count
 
 
+# ── Report_Drug.txt ──────────────────────────────────────────
+# Col 0: REPORT_DRUG_ID, 1: REPORT_ID, 2: DRUG_PRODUCT_ID,
+# 3: DRUGNAME, 4: DRUGINVOLV_ENG
+
+
 def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
     """Carrega Report_Drug.txt."""
-    reader = _read_delimited(path)
     rows: list[list[object]] = []
     count = 0
 
-    for record in reader:
-        report_id = _safe_int(record.get("REPORT_ID"))
+    for record in _read_rows(path):
+        report_id = _safe_int(_col(record, 1))
         if report_id == 0:
             continue
         rows.append(
             [
-                _safe_int(record.get("REPORT_DRUG_ID")),
-                report_id,
-                _safe_int(record.get("DRUG_PRODUCT_ID")),
-                (record.get("DRUGINVOLV_ENG") or "").strip(),
+                _safe_int(_col(record, 0)),  # REPORT_DRUG_ID
+                report_id,  # REPORT_ID
+                _safe_int(_col(record, 2)),  # DRUG_PRODUCT_ID
+                _col(record, 4).strip(),  # DRUGINVOLV_ENG
             ]
         )
         if len(rows) >= _BATCH_SIZE:
@@ -163,23 +205,28 @@ def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
     return count
 
 
+# ── Reactions.txt ────────────────────────────────────────────
+# Col 0: REACTION_ID, 1: REPORT_ID, 2: DURATION,
+# 3: DURATION_UNIT_ENG, 4: DURATION_UNIT_FR,
+# 5: PT_NAME_ENG, 7: SOC_NAME_ENG, 9: MEDDRA_VERSION
+
+
 def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
     """Carrega Reactions.txt."""
-    reader = _read_delimited(path)
     rows: list[list[object]] = []
     count = 0
 
-    for record in reader:
-        report_id = _safe_int(record.get("REPORT_ID"))
+    for record in _read_rows(path):
+        report_id = _safe_int(_col(record, 1))
         if report_id == 0:
             continue
         rows.append(
             [
-                _safe_int(record.get("REACTION_ID")),
-                report_id,
-                (record.get("PT_NAME_ENG") or "").strip(),
-                (record.get("SOC_NAME_ENG") or "").strip(),
-                (record.get("MEDDRA_VERSION") or "").strip(),
+                _safe_int(_col(record, 0)),  # REACTION_ID
+                report_id,  # REPORT_ID
+                _col(record, 5).strip(),  # PT_NAME_ENG
+                _col(record, 7).strip(),  # SOC_NAME_ENG
+                _col(record, 9).strip(),  # MEDDRA_VERSION
             ]
         )
         if len(rows) >= _BATCH_SIZE:
@@ -194,20 +241,23 @@ def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
     return count
 
 
+# ── Drug_Product.txt / drug_products.txt ─────────────────────
+# Col 0: DRUG_PRODUCT_ID, 1: DRUGNAME
+
+
 def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
     """Carrega Drug_Product.txt."""
-    reader = _read_delimited(path)
     rows: list[list[object]] = []
     count = 0
 
-    for record in reader:
-        product_id = _safe_int(record.get("DRUG_PRODUCT_ID"))
+    for record in _read_rows(path):
+        product_id = _safe_int(_col(record, 0))
         if product_id == 0:
             continue
         rows.append(
             [
                 product_id,
-                (record.get("DRUGNAME") or "").strip(),
+                _col(record, 1).strip(),  # DRUGNAME
             ]
         )
         if len(rows) >= _BATCH_SIZE:
@@ -222,20 +272,24 @@ def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
     return count
 
 
+# ── Drug_Product_Ingredients.txt ─────────────────────────────
+# Col 0: LINK_ID(?), 1: DRUG_PRODUCT_ID, 2: DRUGNAME,
+# 3: INGREDIENT_ID(?), 4: ACTIVE_INGREDIENT_NAME
+
+
 def _load_ingredients(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Drug_Product_Ingredients.txt."""
-    reader = _read_delimited(path)
+    """Carrega Drug_Product_Ingredients.txt (5 colunas)."""
     rows: list[list[object]] = []
     count = 0
 
-    for record in reader:
-        product_id = _safe_int(record.get("DRUG_PRODUCT_ID"))
+    for record in _read_rows(path):
+        product_id = _safe_int(_col(record, 1))
         if product_id == 0:
             continue
         rows.append(
             [
                 product_id,
-                (record.get("ACTIVE_INGREDIENT_NAME") or "").strip(),
+                _col(record, 4).strip(),  # ACTIVE_INGREDIENT_NAME
             ]
         )
         if len(rows) >= _BATCH_SIZE:

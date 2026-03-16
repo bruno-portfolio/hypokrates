@@ -61,32 +61,64 @@ def parse_annotations(data: dict[str, Any]) -> list[PharmGKBAnnotation]:
 
     annotations: list[PharmGKBAnnotation] = []
     for item in items:
-        # Extrair gene symbol dos related genes
+        # Extrair gene symbol — real API: location.genes[].symbol
         gene_symbol = ""
-        related_genes = item.get("relatedGenes", [])
-        if related_genes and isinstance(related_genes, list):
-            gene_symbol = related_genes[0].get("symbol", "")
+        location = item.get("location")
+        if isinstance(location, dict):
+            genes = location.get("genes", [])
+            if genes and isinstance(genes, list):
+                first_gene = genes[0]
+                if isinstance(first_gene, dict):
+                    gene_symbol = first_gene.get("symbol", "")
+        # Fallback: golden data format (relatedGenes)
+        if not gene_symbol:
+            related_genes = item.get("relatedGenes", [])
+            if related_genes and isinstance(related_genes, list):
+                first_rg = related_genes[0]
+                if isinstance(first_rg, dict):
+                    gene_symbol = first_rg.get("symbol", "")
 
-        # Extrair evidence level
-        level = item.get("evidenceLevel", "") or ""
+        # Extrair evidence level — real API: levelOfEvidence.term
+        level = ""
+        level_obj = item.get("levelOfEvidence")
+        if isinstance(level_obj, dict):
+            level = str(level_obj.get("term", ""))
+        elif isinstance(level_obj, str):
+            level = level_obj
+        # Fallback: golden data format (evidenceLevel as string)
+        if not level:
+            ev = item.get("evidenceLevel", "")
+            if isinstance(ev, str):
+                level = ev
 
-        # Extrair annotation types
+        # Extrair annotation types — real API: types[] (flat strings)
         ann_types: list[str] = []
         phenotype_cats: list[str] = []
-        phenotypes = item.get("phenotypeCategories", [])
-        if isinstance(phenotypes, list):
-            for p in phenotypes:
-                if isinstance(p, dict):
-                    term = p.get("term", "")
-                    if term:
-                        phenotype_cats.append(term)
-                elif isinstance(p, str):
-                    phenotype_cats.append(p)
-            ann_types = phenotype_cats.copy()
+        types_list = item.get("types", [])
+        if isinstance(types_list, list):
+            for t in types_list:
+                if isinstance(t, str) and t:
+                    ann_types.append(t)
+            phenotype_cats = ann_types.copy()
+        # Fallback: golden data format (phenotypeCategories[].term)
+        if not ann_types:
+            phenotypes = item.get("phenotypeCategories", [])
+            if isinstance(phenotypes, list):
+                for p in phenotypes:
+                    if isinstance(p, dict):
+                        term = p.get("term", "")
+                        if term:
+                            phenotype_cats.append(term)
+                    elif isinstance(p, str):
+                        phenotype_cats.append(p)
+                ann_types = phenotype_cats.copy()
+
+        # accessionId (real API) vs id (golden data)
+        acc_id = str(item.get("accessionId", "")) or str(item.get("id", ""))
 
         annotations.append(
             PharmGKBAnnotation(
-                accession_id=str(item.get("id", "")),
+                accession_id=acc_id,
                 gene_symbol=gene_symbol,
                 level_of_evidence=level,
                 annotation_types=ann_types,

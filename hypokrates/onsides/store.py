@@ -31,13 +31,18 @@ _CREATE_TABLES = """
 CREATE TABLE IF NOT EXISTS product_label (
     label_id INTEGER PRIMARY KEY,
     source VARCHAR NOT NULL,
-    source_product_name VARCHAR DEFAULT ''
+    source_product_name VARCHAR DEFAULT '',
+    source_product_id VARCHAR DEFAULT '',
+    source_label_url VARCHAR DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS product_adverse_effect (
     product_label_id INTEGER NOT NULL,
-    effect_meddra_id INTEGER NOT NULL,
+    effect_id INTEGER DEFAULT 0,
     label_section VARCHAR DEFAULT '',
+    effect_meddra_id INTEGER NOT NULL,
+    match_method VARCHAR DEFAULT '',
+    pred0 DOUBLE DEFAULT 0.0,
     pred1 DOUBLE DEFAULT 0.0
 );
 
@@ -49,23 +54,24 @@ CREATE TABLE IF NOT EXISTS product_to_rxnorm (
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_product (
     rxnorm_id INTEGER PRIMARY KEY,
     rxnorm_name VARCHAR DEFAULT '',
-    term_type VARCHAR DEFAULT ''
+    rxnorm_term_type VARCHAR DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_ingredient_to_product (
-    ingredient_id INTEGER NOT NULL,
-    product_id INTEGER NOT NULL
+    product_id INTEGER NOT NULL,
+    ingredient_id INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS vocab_rxnorm_ingredient (
     rxnorm_id INTEGER PRIMARY KEY,
-    rxnorm_name VARCHAR DEFAULT ''
+    rxnorm_name VARCHAR DEFAULT '',
+    rxnorm_term_type VARCHAR DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS vocab_meddra_adverse_effect (
     meddra_id INTEGER PRIMARY KEY,
     meddra_name VARCHAR DEFAULT '',
-    term_type VARCHAR DEFAULT ''
+    meddra_term_type VARCHAR DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_ingredient_name

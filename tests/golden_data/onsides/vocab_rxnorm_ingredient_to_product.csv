@@ -1,4 +1,4 @@
-ingredient_id,product_id
-8782,100001
-3289,100002
-4337,100003
+product_id,ingredient_id
+100001,8782
+100002,3289
+100003,4337

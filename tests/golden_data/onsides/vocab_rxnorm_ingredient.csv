@@ -1,4 +1,4 @@
-rxnorm_id,rxnorm_name
-8782,Propofol
-3289,Etomidate
-4337,Fentanyl
+rxnorm_id,rxnorm_name,rxnorm_term_type
+8782,Propofol,Ingredient
+3289,Etomidate,Ingredient
+4337,Fentanyl,Ingredient
