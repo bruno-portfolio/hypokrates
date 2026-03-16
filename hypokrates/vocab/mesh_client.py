@@ -79,12 +79,15 @@ class MeSHClient(BaseClient):
     def _build_search_params(
         self,
         term: str,
+        *,
+        retmax: int = 20,
     ) -> ParamsType:
         """Monta parâmetros do ESearch db=mesh."""
         params: ParamsType = {
             "db": MESH_DATABASE,
             "term": term,
             "retmode": "json",
+            "retmax": retmax,
             "tool": TOOL_NAME,
         }
         inject_ncbi_auth(params)

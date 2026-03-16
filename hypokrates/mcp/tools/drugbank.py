@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hypokrates.drugbank import api as drugbank_api
+from hypokrates.exceptions import HypokratesError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -22,7 +23,15 @@ def register(mcp: FastMCP) -> None:
         Args:
             drug: Generic drug name (e.g., "propofol").
         """
-        info = await drugbank_api.drug_info(drug)
+        try:
+            info = await drugbank_api.drug_info(drug)
+        except HypokratesError as exc:
+            return (
+                f"DrugBank not available: {exc}. "
+                "Configure with configure(drugbank_path='/path/to/drugbank.xml')."
+            )
+        except Exception as exc:
+            return f"DrugBank error: {exc}"
         if info is None:
             return f"Drug '{drug}' not found in DrugBank."
 
@@ -68,7 +77,15 @@ def register(mcp: FastMCP) -> None:
         Args:
             drug: Generic drug name (e.g., "propofol").
         """
-        interactions = await drugbank_api.drug_interactions(drug)
+        try:
+            interactions = await drugbank_api.drug_interactions(drug)
+        except HypokratesError as exc:
+            return (
+                f"DrugBank not available: {exc}. "
+                "Configure with configure(drugbank_path='/path/to/drugbank.xml')."
+            )
+        except Exception as exc:
+            return f"DrugBank error: {exc}"
         if not interactions:
             return f"No interactions found for '{drug}' in DrugBank."
 

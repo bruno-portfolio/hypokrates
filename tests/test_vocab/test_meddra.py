@@ -75,6 +75,35 @@ class TestExpandEventTerms:
         assert "TYPE 2 DIABETES MELLITUS" in terms
         assert len(terms) == 6
 
+    # --- Novos grupos (FIX 1) ---
+
+    @pytest.mark.parametrize(
+        ("input_term", "expected_canonical", "min_group_size"),
+        [
+            ("heart failure", "CARDIAC FAILURE", 7),
+            ("congestive heart failure", "CARDIAC FAILURE", 7),
+            ("stroke", "CEREBROVASCULAR ACCIDENT", 6),
+            ("cerebral infarction", "CEREBROVASCULAR ACCIDENT", 6),
+            ("bleeding", "HAEMORRHAGE", 6),
+            ("hemorrhage", "HAEMORRHAGE", 6),
+            ("pneumonitis", "PULMONARY FIBROSIS", 5),
+            ("interstitial lung disease", "PULMONARY FIBROSIS", 5),
+            ("depressed mood", "DEPRESSION", 4),
+            ("fever", "PYREXIA", 4),
+            ("skin eruption", "RASH", 5),
+            ("liver damage", "HEPATOTOXICITY", 9),
+            ("heart attack", "MYOCARDIAL INFARCTION", 4),
+            ("blood clot", "DEEP VEIN THROMBOSIS", 6),
+        ],
+    )
+    def test_expand_new_groups(
+        self, input_term: str, expected_canonical: str, min_group_size: int
+    ) -> None:
+        """Novos termos comuns expandem corretamente."""
+        terms = expand_event_terms(input_term)
+        assert expected_canonical in terms
+        assert len(terms) >= min_group_size
+
 
 # ---------------------------------------------------------------------------
 # canonical_term()
@@ -149,6 +178,52 @@ class TestCanonicalTerm:
         assert canonical_term("DVT") == "DEEP VEIN THROMBOSIS"
         assert canonical_term("VENOUS THROMBOSIS") == "DEEP VEIN THROMBOSIS"
 
+    # --- Novos grupos (FIX 1) ---
+
+    def test_heart_failure_aliases(self) -> None:
+        assert canonical_term("HEART FAILURE") == "CARDIAC FAILURE"
+        assert canonical_term("CONGESTIVE HEART FAILURE") == "CARDIAC FAILURE"
+        assert canonical_term("CARDIOGENIC SHOCK") == "CARDIAC FAILURE"
+
+    def test_stroke_aliases(self) -> None:
+        assert canonical_term("STROKE") == "CEREBROVASCULAR ACCIDENT"
+        assert canonical_term("CEREBRAL INFARCTION") == "CEREBROVASCULAR ACCIDENT"
+        assert canonical_term("ISCHAEMIC STROKE") == "CEREBROVASCULAR ACCIDENT"
+
+    def test_bleeding_aliases(self) -> None:
+        assert canonical_term("BLEEDING") == "HAEMORRHAGE"
+        assert canonical_term("HEMORRHAGE") == "HAEMORRHAGE"
+        assert canonical_term("GASTROINTESTINAL BLEEDING") == "HAEMORRHAGE"
+
+    def test_pulmonary_fibrosis_aliases(self) -> None:
+        assert canonical_term("PNEUMONITIS") == "PULMONARY FIBROSIS"
+        assert canonical_term("INTERSTITIAL LUNG DISEASE") == "PULMONARY FIBROSIS"
+
+    def test_depression_aliases(self) -> None:
+        assert canonical_term("DEPRESSED MOOD") == "DEPRESSION"
+        assert canonical_term("MAJOR DEPRESSION") == "DEPRESSION"
+
+    def test_fever_aliases(self) -> None:
+        assert canonical_term("FEVER") == "PYREXIA"
+        assert canonical_term("HYPERTHERMIA") == "PYREXIA"
+
+    def test_rash_aliases(self) -> None:
+        assert canonical_term("SKIN ERUPTION") == "RASH"
+        assert canonical_term("MACULOPAPULAR RASH") == "RASH"
+
+    # --- Expansões em grupos existentes ---
+
+    def test_hepatotoxicity_expanded(self) -> None:
+        assert canonical_term("LIVER DAMAGE") == "HEPATOTOXICITY"
+        assert canonical_term("LIVER FAILURE") == "HEPATOTOXICITY"
+        assert canonical_term("HEPATIC DYSFUNCTION") == "HEPATOTOXICITY"
+
+    def test_heart_attack_alias(self) -> None:
+        assert canonical_term("HEART ATTACK") == "MYOCARDIAL INFARCTION"
+
+    def test_blood_clot_alias(self) -> None:
+        assert canonical_term("BLOOD CLOT") == "DEEP VEIN THROMBOSIS"
+
 
 # ---------------------------------------------------------------------------
 # MEDDRA_GROUPS integrity
@@ -184,7 +259,7 @@ class TestMeddraGroupsIntegrity:
         assert len(_ALIAS_MAP) == count
 
     def test_minimum_groups(self) -> None:
-        assert len(MEDDRA_GROUPS) >= 30, f"Expected >=30 groups, got {len(MEDDRA_GROUPS)}"
+        assert len(MEDDRA_GROUPS) >= 37, f"Expected >=37 groups, got {len(MEDDRA_GROUPS)}"
 
 
 # ---------------------------------------------------------------------------

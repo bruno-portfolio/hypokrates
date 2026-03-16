@@ -106,6 +106,11 @@ async def map_to_mesh(
 ) -> MeSHResult:
     """Mapeia termo médico para MeSH heading via NCBI.
 
+    Busca top 5 UIDs e ranqueia por similaridade com a query
+    (token_sort_ratio do rapidfuzz). Evita pegar resultados irrelevantes
+    como "Anti-Arrhythmia Agents" para "arrhythmia" ou "MELAS" para
+    "lactic acidosis".
+
     Args:
         term: Termo médico para mapear.
         use_cache: Se deve usar cache.
@@ -123,8 +128,23 @@ async def map_to_mesh(
         tree_numbers: list[str] = []
 
         if uids:
-            desc_data = await client.fetch_descriptor(uids[0], use_cache=use_cache)
-            mesh_id, mesh_term, tree_numbers = parse_mesh_descriptor(desc_data)
+            # Fetch top 5 candidates and rank by similarity
+            candidates: list[tuple[str | None, str | None, list[str], float]] = []
+            query_lower = term.lower()
+            top_uids = uids[:5]
+
+            for uid in top_uids:
+                desc_data = await client.fetch_descriptor(uid, use_cache=use_cache)
+                m_id, m_term, m_trees = parse_mesh_descriptor(desc_data)
+                if m_term:
+                    score = _mesh_similarity(query_lower, m_term.lower())
+                    candidates.append((m_id, m_term, m_trees, score))
+
+            if candidates:
+                # Best match by similarity
+                candidates.sort(key=lambda c: c[3], reverse=True)
+                best = candidates[0]
+                mesh_id, mesh_term, tree_numbers = best[0], best[1], best[2]
     finally:
         await client.close()
 
@@ -142,3 +162,21 @@ async def map_to_mesh(
             "May not match all synonyms or non-English terms.",
         ),
     )
+
+
+def _mesh_similarity(query: str, mesh_term: str) -> float:
+    """Score de similaridade entre query e mesh_term.
+
+    Usa rapidfuzz token_sort_ratio se disponível, senão heurística básica.
+    """
+    try:
+        from rapidfuzz.fuzz import token_sort_ratio  # type: ignore[import-not-found,unused-ignore]
+
+        return float(token_sort_ratio(query, mesh_term))
+    except ImportError:
+        # Fallback: exact prefix/containment heuristic
+        if query == mesh_term:
+            return 100.0
+        if query in mesh_term or mesh_term in query:
+            return 80.0
+        return 0.0

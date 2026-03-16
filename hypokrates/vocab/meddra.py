@@ -83,6 +83,9 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "DRUG-INDUCED LIVER INJURY",
         "HEPATITIS TOXIC",
         "HEPATIC NECROSIS",
+        "LIVER DAMAGE",
+        "LIVER FAILURE",
+        "HEPATIC DYSFUNCTION",
     ],
     "RENAL FAILURE": [
         "RENAL FAILURE ACUTE",
@@ -120,6 +123,7 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
     "MYOCARDIAL INFARCTION": [
         "ACUTE MYOCARDIAL INFARCTION",
         "CORONARY ARTERY OCCLUSION",
+        "HEART ATTACK",
     ],
     "VENTRICULAR FIBRILLATION": [
         "VENTRICULAR TACHYCARDIA",
@@ -201,6 +205,51 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "VENOUS THROMBOSIS",
         "THROMBOSIS",
         "VENOUS THROMBOEMBOLISM",
+        "BLOOD CLOT",
+    ],
+    "CARDIAC FAILURE": [
+        "HEART FAILURE",
+        "CONGESTIVE HEART FAILURE",
+        "LEFT VENTRICULAR FAILURE",
+        "RIGHT VENTRICULAR FAILURE",
+        "CARDIOGENIC SHOCK",
+        "CARDIAC DECOMPENSATION",
+    ],
+    "CEREBROVASCULAR ACCIDENT": [
+        "STROKE",
+        "CEREBRAL INFARCTION",
+        "ISCHAEMIC STROKE",
+        "HAEMORRHAGIC STROKE",
+        "CEREBRAL HAEMORRHAGE",
+    ],
+    "HAEMORRHAGE": [
+        "HEMORRHAGE",
+        "BLEEDING",
+        "GASTROINTESTINAL HAEMORRHAGE",
+        "GASTROINTESTINAL BLEEDING",
+        "INTRACRANIAL HAEMORRHAGE",
+    ],
+    "PULMONARY FIBROSIS": [
+        "PULMONARY INFILTRATES",
+        "INTERSTITIAL LUNG DISEASE",
+        "PNEUMONITIS",
+        "PULMONARY TOXICITY",
+    ],
+    "DEPRESSION": [
+        "DEPRESSED MOOD",
+        "MAJOR DEPRESSION",
+        "DEPRESSIVE DISORDER",
+    ],
+    "PYREXIA": [
+        "FEVER",
+        "HYPERTHERMIA",
+        "FEBRILE DISORDER",
+    ],
+    "RASH": [
+        "ERYTHEMATOUS RASH",
+        "MACULOPAPULAR RASH",
+        "MORBILLIFORM RASH",
+        "SKIN ERUPTION",
     ],
 }
 

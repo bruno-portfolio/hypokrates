@@ -57,11 +57,12 @@ Two-pass selection: first prefers SPLs with a formal Adverse Reactions section (
 
 ## Label Matching
 
-`match_event_in_label()` uses a **3-layer matching strategy**:
+`match_event_in_label()` uses a **4-layer matching strategy**:
 
 1. **Substring match** (case-insensitive) — fast, no false positives
-2. **MedDRA synonyms** — expands the event to all synonyms in its MedDRA group (35 groups, ~120 aliases) via `expand_event_terms()`, then retries substring match
-3. **Fuzzy match** — uses `rapidfuzz.fuzz.token_sort_ratio` (threshold ≥ 85) to catch reordered words ("hyperthermia malignant" → "malignant hyperthermia"), BrE/AmE spellings (apnoea/apnea), and minor variations
+2. **MedDRA synonyms** — expands the event to all synonyms in its MedDRA group (45 groups, ~140 aliases) via `expand_event_terms()`, then retries substring match
+3. **Word-level match** — all words of the event must be present in a label term, not necessarily contiguous. Catches "pulmonary fibrosis" in "pulmonary infiltrates or fibrosis"
+4. **Fuzzy match** — uses `rapidfuzz.fuzz.token_sort_ratio` (threshold ≥ 85) to catch reordered words ("hyperthermia malignant" → "malignant hyperthermia"), BrE/AmE spellings (apnoea/apnea), and minor variations
 
 For example, querying `"anaphylactic shock"` will also match `"anaphylaxis"`, `"anaphylactic reaction"`, and `"anaphylactoid reaction"` in the label text.
 
@@ -72,7 +73,7 @@ All layers apply to both structured terms extracted from the XML and the raw tex
 - Not all drugs have SPL labels in DailyMed
 - Adverse reactions section varies in structure across labels
 - `label_events()` event count may be inflated — narrative text (boilerplate, section references, FDA contact info) can be captured as "events" because the parser splits by commas/semicolons without MedDRA validation
-- MedDRA synonym coverage is limited to 35 static groups (~120 aliases) — terms outside these groups rely on fuzzy matching
+- MedDRA synonym coverage is limited to 45 static groups (~140 aliases) — terms outside these groups rely on fuzzy matching
 - Generic drugs may have multiple labels from different manufacturers
 - Fuzzy matching may produce rare false positives for very short terms
 - Combination products with " AND " in the title are penalized but some edge cases (e.g., "LIDOCAINE AND EPINEPHRINE") may be incorrectly deprioritized when the combination is the most clinically relevant formulation

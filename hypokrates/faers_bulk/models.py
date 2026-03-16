@@ -24,6 +24,8 @@ class BulkStoreStatus(BaseModel):
 
     total_reports: int  # rows em faers_demo
     deduped_cases: int  # rows em faers_dedup
+    total_drug_records: int = 0  # rows em faers_drug (real count)
+    total_reac_records: int = 0  # rows em faers_reac (real count)
     quarters_loaded: list[QuarterInfo] = Field(default_factory=list)
     oldest_quarter: str | None = None
     newest_quarter: str | None = None

@@ -41,6 +41,15 @@ All notable changes to this project will be documented in this file.
 - **OPERATIONAL_MEDDRA_TERMS**: +4 generic terms (GENERAL PHYSICAL HEALTH DETERIORATION, PAIN, FALL, MALAISE)
 - **New dependency**: `rapidfuzz>=3.6,<4`
 
+#### Bug Fixes (6 bugs from MCP stress test #2, 2026-03-16)
+
+- **MedDRA common terms**: +7 groups (cardiac failure, stroke, haemorrhage, pulmonary fibrosis, depression, pyrexia, rash) +6 aliases in 3 existing groups. "heart failure", "stroke", "bleeding", "fever" now expand correctly.
+- **hypothesis() graceful degradation**: check_label, check_trials, check_opentargets, check_chembl, check_coadmin now catch exceptions and degrade (previously only check_drugbank had try/except).
+- **DailyMed word-level matching**: Layer 1.5 (all-words-present) — "pulmonary fibrosis" matches "pulmonary infiltrates or fibrosis".
+- **MeSH ranking**: `map_to_mesh()` ranks top 5 UIDs by similarity. Fixes "lactic acidosis"→MELAS, "arrhythmia"→Anti-Arrhythmia Agents.
+- **Bulk status**: `BulkStoreStatus` gains `total_drug_records`, `total_reac_records` (real counts from DB).
+- **DrugBank MCP**: Friendly error message with config instructions instead of raw exception.
+
 #### Bug Fixes (11 bugs from MCP dogfooding session)
 
 - **MedDRA expansion OpenFDA (CRITICAL)**: `_build_reaction_query()` and `_build_event_search()` used `+` (AND) instead of space (OR). All 38 MedDRA groups returned 0 via API path.

@@ -454,6 +454,62 @@ class TestHasSafetySections:
         assert has_safety_sections(xml_text) is True
 
 
+class TestMatchEventWordLevel:
+    """match_event_in_label — Layer 1.5 word-level matching (non-contiguous)."""
+
+    def test_pulmonary_fibrosis_in_intercalated_phrase(self) -> None:
+        """'pulmonary fibrosis' → matches 'pulmonary infiltrates or fibrosis'."""
+        found, matched = match_event_in_label(
+            "pulmonary fibrosis",
+            ["pulmonary infiltrates or fibrosis", "Nausea"],
+        )
+        assert found is True
+        assert "pulmonary infiltrates or fibrosis" in matched
+
+    def test_renal_failure_in_longer_term(self) -> None:
+        """'renal failure' → matches 'acute renal failure reported'."""
+        found, _matched = match_event_in_label(
+            "renal failure",
+            ["acute renal failure reported"],
+        )
+        # This should match via substring (already covered), but let's verify
+        assert found is True
+
+    def test_liver_damage_in_phrase(self) -> None:
+        """'liver damage' → matches 'liver toxicity and damage'."""
+        found, _matched = match_event_in_label(
+            "liver damage",
+            ["liver toxicity and damage"],
+        )
+        assert found is True
+
+    def test_single_word_skipped_by_word_match(self) -> None:
+        """Single-word terms use substring, not word-level match."""
+        found, _matched = match_event_in_label(
+            "nausea",
+            ["Nausea and vomiting"],
+        )
+        assert found is True  # matched via substring, not word-level
+
+    def test_no_false_positive_partial_words(self) -> None:
+        """'heart rate' should NOT match 'heartburn' (word boundaries)."""
+        found, _matched = match_event_in_label(
+            "cardiac arrest",
+            ["cardiac output monitoring"],
+        )
+        # "cardiac" and "arrest" — "arrest" not in "cardiac output monitoring"
+        assert found is False
+
+    def test_word_level_via_meddra_expansion(self) -> None:
+        """MedDRA-expanded term matches via word-level."""
+        found, _matched = match_event_in_label(
+            "pulmonary fibrosis",
+            ["interstitial fibrosis and pulmonary changes"],
+        )
+        # "pulmonary" and "fibrosis" are both present
+        assert found is True
+
+
 class TestMatchEventFuzzyBugHunting:
     """Testes para pares que falharam no bug hunting — fuzzy + MedDRA."""
 

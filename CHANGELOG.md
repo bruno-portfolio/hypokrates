@@ -73,6 +73,14 @@
 - **DailyMed SPL selection two-pass**: `label_events()` now selects SPLs in two passes — first prefers SPLs with formal Adverse Reactions section (LOINC 34084-4), then falls back to any safety section. OTC labels typically have only Warnings (34071-1), not Adverse Reactions.
 - **DailyMed SPL pagesize**: Increased from 10 to 100 to surface prescription labels for drugs with many OTC formulations (lidocaine: 2,403 SPLs, first 10 were all patches).
 
+### Fixed (6 bugs from MCP stress test #2, 2026-03-16)
+- **MedDRA common terms**: Added 7 new groups (cardiac failure, cerebrovascular accident, haemorrhage, pulmonary fibrosis, depression, pyrexia, rash) + expanded 3 existing (hepatotoxicity +3 aliases, myocardial infarction +heart attack, deep vein thrombosis +blood clot). Fixes "heart failure", "stroke", "bleeding", "fever" etc. returning 0 reports silently.
+- **hypothesis() graceful degradation**: All optional enrichments (check_label, check_trials, check_opentargets, check_chembl, check_coadmin) now wrapped in try/except — previously only check_drugbank had error handling. Exceptions log a warning and continue with None instead of propagating.
+- **DailyMed word-level matching**: Added Layer 1.5 (all-words-present) between substring and fuzzy matching — "pulmonary fibrosis" now matches "pulmonary infiltrates or fibrosis" in label text.
+- **MeSH mapping ranking**: `map_to_mesh()` now fetches top 5 UIDs and ranks by similarity (rapidfuzz token_sort_ratio) instead of blindly picking first result. Fixes "lactic acidosis"→MELAS and "arrhythmia"→Anti-Arrhythmia Agents.
+- **Bulk status real counts**: `BulkStoreStatus` now includes `total_drug_records` and `total_reac_records` computed from actual DB tables. Previously showed 0 for quarters loaded before metadata tracking was added.
+- **DrugBank MCP error message**: `drug_info` and `drug_interactions` MCP tools now catch `HypokratesError` and return friendly message with configuration instructions instead of raw exception.
+
 ### Changed
 - IC upgraded from simplified to BCPNN (Norén et al. 2006) with Jeffreys prior (alpha=0.5) — resolves small-numbers instability
 

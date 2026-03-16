@@ -212,6 +212,18 @@ def match_event_in_label(
     if matched:
         return True, matched
 
+    # Layer 1.5: all-words-present match (non-contiguous)
+    for search_event in search_terms:
+        event_words = set(search_event.lower().split())
+        if len(event_words) < 2:
+            continue  # single-word already covered by substring
+        for term in terms:
+            term_lower = term.lower()
+            if all(w in term_lower for w in event_words) and term not in matched:
+                matched.append(term)
+    if matched:
+        return True, matched
+
     # Layer 2 fallback: buscar no texto raw com todos os sinônimos
     if raw_text:
         raw_lower = raw_text.lower()

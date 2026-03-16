@@ -44,6 +44,8 @@ print(result.articles)         # PubMedArticle list
 | `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
 | `use_cache` | `bool` | `True` | Use DuckDB cache |
 
+All optional enrichments (`check_label`, `check_trials`, `check_drugbank`, `check_opentargets`, `check_chembl`, `check_coadmin`) degrade gracefully — if any external source is unavailable, a warning is logged and the corresponding field is set to `None` instead of raising an exception.
+
 **Returns:** [`HypothesisResult`](#hypothesisresult)
 
 ---

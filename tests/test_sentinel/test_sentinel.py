@@ -601,11 +601,10 @@ class TestSentinelGracefulFailure:
         mock_pubmed: AsyncMock,
         mock_check_label: AsyncMock,
     ) -> None:
-        """DailyMed sem SPL (exceção) → hypothesis propaga a exceção.
+        """DailyMed sem SPL (exceção) → hypothesis degrada gracefully.
 
-        BUG CONHECIDO: hypothesis() não captura exceções de check_label.
-        Este teste documenta o comportamento atual (propaga).
-        TODO: Adicionar try/except em hypothesis() para degradar gracefully.
+        FIX: hypothesis() agora captura exceções de check_label e continua
+        com in_label=None em vez de propagar a exceção.
         """
         mock_signal.return_value = _signal("propofol", "NAUSEA", detected=True)
         mock_pubmed.return_value = _pubmed(0)
@@ -613,9 +612,9 @@ class TestSentinelGracefulFailure:
 
         from hypokrates.cross.api import hypothesis
 
-        # Comportamento atual: exceção propaga (BUG — deveria degradar)
-        with pytest.raises(Exception, match="No SPL found"):
-            await hypothesis("propofol", "NAUSEA", check_label=True, use_cache=False)
+        result = await hypothesis("propofol", "NAUSEA", check_label=True, use_cache=False)
+        assert result.in_label is None
+        assert result.classification is not None
 
     @patch("hypokrates.scan.api.cross_api.hypothesis")
     @patch("hypokrates.scan.api.faers_api.top_events")

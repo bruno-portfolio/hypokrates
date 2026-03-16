@@ -135,6 +135,93 @@ async def test_normalize_drug_pt_en_fallback(mock_client_cls: AsyncMock) -> None
     instance.close.assert_called_once()
 
 
+@patch("hypokrates.vocab.api.MeSHClient")
+async def test_map_to_mesh_ranks_by_similarity(mock_client_cls: AsyncMock) -> None:
+    """MeSH ranking: 'lactic acidosis' deve preferir 'Acidosis, Lactic' sobre 'MELAS Syndrome'."""
+    instance = AsyncMock()
+
+    # Search retorna 3 UIDs
+    uids = ["68000005", "68065001", "68000040"]
+    instance.search.return_value = {"esearchresult": {"idlist": uids}}
+
+    # Descriptors com termos diferentes
+    instance.fetch_descriptor.side_effect = [
+        {
+            "result": {
+                "uids": ["68000005"],
+                "68000005": {
+                    "ds_meshui": "D000005",
+                    "ds_meshterms": ["MELAS Syndrome"],
+                    "ds_treenumberlist": ["C10.228"],
+                },
+            }
+        },
+        {
+            "result": {
+                "uids": ["68065001"],
+                "68065001": {
+                    "ds_meshui": "D065001",
+                    "ds_meshterms": ["Acidosis, Lactic"],
+                    "ds_treenumberlist": ["C18.452.076.127"],
+                },
+            }
+        },
+        {
+            "result": {
+                "uids": ["68000040"],
+                "68000040": {
+                    "ds_meshui": "D000040",
+                    "ds_meshterms": ["Acidosis"],
+                    "ds_treenumberlist": ["C18.452.076"],
+                },
+            }
+        },
+    ]
+    mock_client_cls.return_value = instance
+
+    result = await map_to_mesh("lactic acidosis")
+
+    assert result.mesh_term == "Acidosis, Lactic"
+    assert result.mesh_id == "D065001"
+
+
+@patch("hypokrates.vocab.api.MeSHClient")
+async def test_map_to_mesh_arrhythmia_not_agents(mock_client_cls: AsyncMock) -> None:
+    """MeSH ranking: 'arrhythmia' → 'Arrhythmias, Cardiac' (not Agents)."""
+    instance = AsyncMock()
+
+    instance.search.return_value = {"esearchresult": {"idlist": ["68000889", "68001145"]}}
+
+    instance.fetch_descriptor.side_effect = [
+        {
+            "result": {
+                "uids": ["68000889"],
+                "68000889": {
+                    "ds_meshui": "D000889",
+                    "ds_meshterms": ["Anti-Arrhythmia Agents"],
+                    "ds_treenumberlist": ["D27.505.954.411.121"],
+                },
+            }
+        },
+        {
+            "result": {
+                "uids": ["68001145"],
+                "68001145": {
+                    "ds_meshui": "D001145",
+                    "ds_meshterms": ["Arrhythmias, Cardiac"],
+                    "ds_treenumberlist": ["C14.280.067"],
+                },
+            }
+        },
+    ]
+    mock_client_cls.return_value = instance
+
+    result = await map_to_mesh("arrhythmia")
+
+    assert result.mesh_term == "Arrhythmias, Cardiac"
+    assert result.mesh_id == "D001145"
+
+
 @patch("hypokrates.vocab.api.RxNormClient")
 async def test_normalize_drug_paracetamol_pt_en(mock_client_cls: AsyncMock) -> None:
     """'paracetamol' → generic_name via NOME_PT_EN (acetaminophen)."""

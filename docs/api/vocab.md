@@ -40,7 +40,7 @@ Normalizes a drug name to its generic equivalent via a 3-step fallback chain:
 
 ## `map_to_mesh()`
 
-Maps a medical term to its MeSH (Medical Subject Headings) equivalent via NCBI E-utilities.
+Maps a medical term to its MeSH (Medical Subject Headings) equivalent via NCBI E-utilities. Fetches up to 5 candidate UIDs and ranks them by similarity (rapidfuzz `token_sort_ratio`) to return the best match — avoids picking irrelevant results like "Anti-Arrhythmia Agents" for "arrhythmia" or "MELAS Syndrome" for "lactic acidosis".
 
 === "Async"
 

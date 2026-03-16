@@ -404,6 +404,123 @@ class TestHypothesisWithDrugBank:
         assert result.enzymes == []
 
 
+class TestHypothesisGracefulDegradation:
+    """hypothesis() continua funcionando quando enrichments opcionais falham."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_label_failure_degrades_gracefully(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_check_label: AsyncMock
+    ) -> None:
+        """check_label exception → in_label stays None, result still returned."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_check_label.side_effect = Exception("DailyMed down")
+
+        result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
+
+        assert isinstance(result, HypothesisResult)
+        assert result.in_label is None
+        assert result.label_detail is None
+
+    @patch("hypokrates.trials.api.search_trials", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_trials_failure_degrades_gracefully(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_trials: AsyncMock
+    ) -> None:
+        """check_trials exception → active_trials stays None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_trials.side_effect = Exception("ClinicalTrials.gov down")
+
+        result = await hypothesis("propofol", "bradycardia", check_trials=True, use_cache=False)
+
+        assert isinstance(result, HypothesisResult)
+        assert result.active_trials is None
+        assert result.trials_detail is None
+
+    @patch("hypokrates.opentargets.api.drug_safety_score", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_opentargets_failure_degrades_gracefully(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_ot: AsyncMock
+    ) -> None:
+        """check_opentargets exception → ot_llr stays None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_ot.side_effect = Exception("OpenTargets down")
+
+        result = await hypothesis(
+            "propofol", "bradycardia", check_opentargets=True, use_cache=False
+        )
+
+        assert isinstance(result, HypothesisResult)
+        assert result.ot_llr is None
+
+    @patch("hypokrates.chembl.api.drug_mechanism", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_chembl_failure_degrades_gracefully(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_chembl: AsyncMock
+    ) -> None:
+        """check_chembl exception → mechanism stays None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_chembl.side_effect = Exception("ChEMBL down")
+
+        result = await hypothesis("propofol", "bradycardia", check_chembl=True, use_cache=False)
+
+        assert isinstance(result, HypothesisResult)
+        assert result.mechanism is None
+
+    @patch("hypokrates.cross.api.faers_api.co_suspect_profile", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_coadmin_failure_degrades_gracefully(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_coadmin: AsyncMock
+    ) -> None:
+        """check_coadmin exception → coadmin stays None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_coadmin.side_effect = Exception("FAERS co-suspect down")
+
+        result = await hypothesis("propofol", "bradycardia", check_coadmin=True, use_cache=False)
+
+        assert isinstance(result, HypothesisResult)
+        assert result.coadmin is None
+
+    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.trials.api.search_trials", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_label_and_trials_both_fail(
+        self,
+        mock_signal: AsyncMock,
+        mock_pubmed: AsyncMock,
+        mock_trials: AsyncMock,
+        mock_label: AsyncMock,
+    ) -> None:
+        """check_label + check_trials both fail → both stay None."""
+        mock_signal.return_value = _make_signal(detected=True)
+        mock_pubmed.return_value = _make_pubmed_result(0)
+        mock_label.side_effect = Exception("DailyMed down")
+        mock_trials.side_effect = Exception("Trials down")
+
+        result = await hypothesis(
+            "propofol", "bradycardia", check_label=True, check_trials=True, use_cache=False
+        )
+
+        assert isinstance(result, HypothesisResult)
+        assert result.in_label is None
+        assert result.active_trials is None
+
+
 class TestHypothesisWithOpenTargets:
     """hypothesis() com check_opentargets=True."""
 

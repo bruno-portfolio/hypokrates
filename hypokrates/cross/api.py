@@ -244,28 +244,39 @@ async def hypothesis(
         from hypokrates.dailymed import api as dailymed_api
         from hypokrates.trials import api as trials_api
 
-        label_result, trials_result = await asyncio.gather(
-            dailymed_api.check_label(drug, event, use_cache=use_cache, _label_cache=_label_cache),
-            trials_api.search_trials(drug, event, use_cache=use_cache),
-        )
-        in_label = label_result.in_label
-        label_detail = _format_label_detail(label_result)
-        active_trials = trials_result.active_count
-        trials_detail = _format_trials_detail(trials_result)
+        try:
+            label_result, trials_result = await asyncio.gather(
+                dailymed_api.check_label(
+                    drug, event, use_cache=use_cache, _label_cache=_label_cache
+                ),
+                trials_api.search_trials(drug, event, use_cache=use_cache),
+            )
+            in_label = label_result.in_label
+            label_detail = _format_label_detail(label_result)
+            active_trials = trials_result.active_count
+            trials_detail = _format_trials_detail(trials_result)
+        except Exception:
+            logger.warning("hypothesis %s + %s: label/trials unavailable", drug, event)
     elif check_label:
         from hypokrates.dailymed import api as dailymed_api
 
-        label_result = await dailymed_api.check_label(
-            drug, event, use_cache=use_cache, _label_cache=_label_cache
-        )
-        in_label = label_result.in_label
-        label_detail = _format_label_detail(label_result)
+        try:
+            label_result = await dailymed_api.check_label(
+                drug, event, use_cache=use_cache, _label_cache=_label_cache
+            )
+            in_label = label_result.in_label
+            label_detail = _format_label_detail(label_result)
+        except Exception:
+            logger.warning("hypothesis %s + %s: label unavailable", drug, event)
     elif check_trials:
         from hypokrates.trials import api as trials_api
 
-        trials_result = await trials_api.search_trials(drug, event, use_cache=use_cache)
-        active_trials = trials_result.active_count
-        trials_detail = _format_trials_detail(trials_result)
+        try:
+            trials_result = await trials_api.search_trials(drug, event, use_cache=use_cache)
+            active_trials = trials_result.active_count
+            trials_detail = _format_trials_detail(trials_result)
+        except Exception:
+            logger.warning("hypothesis %s + %s: trials unavailable", drug, event)
 
     # 3b. DrugBank (drug-level, cached externally)
     mechanism: str | None = None
@@ -300,24 +311,30 @@ async def hypothesis(
     if check_opentargets:
         from hypokrates.opentargets import api as opentargets_api
 
-        ot_llr = await opentargets_api.drug_safety_score(
-            drug, event, use_cache=use_cache, _safety_cache=_ot_safety_cache
-        )
+        try:
+            ot_llr = await opentargets_api.drug_safety_score(
+                drug, event, use_cache=use_cache, _safety_cache=_ot_safety_cache
+            )
+        except Exception:
+            logger.warning("hypothesis %s + %s: OpenTargets unavailable", drug, event)
 
     # 3d. ChEMBL (mecanismo + targets, alternativa ao DrugBank sem download)
     if check_chembl and mechanism is None:
         from hypokrates.chembl import api as chembl_api
 
-        if _chembl_cache is not None:
-            chembl_mech = _chembl_cache
-        else:
-            chembl_mech = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
+        try:
+            if _chembl_cache is not None:
+                chembl_mech = _chembl_cache
+            else:
+                chembl_mech = await chembl_api.drug_mechanism(drug, use_cache=use_cache)
 
-        if chembl_mech.mechanism_of_action:
-            mechanism = chembl_mech.mechanism_of_action
-        if not enzymes_list and chembl_mech.targets:
-            for t in chembl_mech.targets:
-                enzymes_list.extend(g for g in t.gene_names if g not in enzymes_list)
+            if chembl_mech.mechanism_of_action:
+                mechanism = chembl_mech.mechanism_of_action
+            if not enzymes_list and chembl_mech.targets:
+                for t in chembl_mech.targets:
+                    enzymes_list.extend(g for g in t.gene_names if g not in enzymes_list)
+        except Exception:
+            logger.warning("hypothesis %s + %s: ChEMBL unavailable", drug, event)
 
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
@@ -359,29 +376,32 @@ async def hypothesis(
     # 3e. Co-administration analysis (Layer 1 sempre, Layer 2 se sinal detectado)
     coadmin_result: CoAdminAnalysis | None = None
     if check_coadmin:
-        coadmin_profile = await faers_api.co_suspect_profile(
-            drug,
-            event,
-            suspect_only=suspect_only,
-            use_cache=use_cache,
-            _client=_faers_client,
-            _drug_search=_drug_search,
-        )
-        if signal_result.signal_detected:
-            coadmin_result = await coadmin_analysis(
+        try:
+            coadmin_profile = await faers_api.co_suspect_profile(
                 drug,
                 event,
-                coadmin_profile,
-                drug_prr=signal_result.prr.value,
                 suspect_only=suspect_only,
                 use_cache=use_cache,
+                _client=_faers_client,
+                _drug_search=_drug_search,
             )
-        else:
-            # Sem sinal FAERS → Layer 1 only (profile sem comparative PRR)
-            coadmin_result = CoAdminAnalysis(
-                profile=coadmin_profile,
-                verdict="no_signal",
-            )
+            if signal_result.signal_detected:
+                coadmin_result = await coadmin_analysis(
+                    drug,
+                    event,
+                    coadmin_profile,
+                    drug_prr=signal_result.prr.value,
+                    suspect_only=suspect_only,
+                    use_cache=use_cache,
+                )
+            else:
+                # Sem sinal FAERS → Layer 1 only (profile sem comparative PRR)
+                coadmin_result = CoAdminAnalysis(
+                    profile=coadmin_profile,
+                    verdict="no_signal",
+                )
+        except Exception:
+            logger.warning("hypothesis %s + %s: coadmin analysis unavailable", drug, event)
 
     return HypothesisResult(
         drug=drug,

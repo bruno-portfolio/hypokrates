@@ -403,9 +403,13 @@ class FAERSBulkStore:
         with self._db_lock:
             demo_count = self._conn.execute("SELECT COUNT(*) FROM faers_demo").fetchone()
             dedup_count = self._conn.execute("SELECT COUNT(*) FROM faers_dedup").fetchone()
+            drug_count = self._conn.execute("SELECT COUNT(*) FROM faers_drug").fetchone()
+            reac_count = self._conn.execute("SELECT COUNT(*) FROM faers_reac").fetchone()
 
         total_reports = demo_count[0] if demo_count else 0
         deduped_cases = dedup_count[0] if dedup_count else 0
+        total_drug = drug_count[0] if drug_count else 0
+        total_reac = reac_count[0] if reac_count else 0
 
         oldest = min((q.quarter_key for q in quarters), default=None)
         newest = max((q.quarter_key for q in quarters), default=None)
@@ -413,6 +417,8 @@ class FAERSBulkStore:
         return BulkStoreStatus(
             total_reports=total_reports,
             deduped_cases=deduped_cases,
+            total_drug_records=total_drug,
+            total_reac_records=total_reac,
             quarters_loaded=quarters,
             oldest_quarter=oldest,
             newest_quarter=newest,

@@ -256,6 +256,12 @@ class TestStatus:
         assert status.oldest_quarter == "2024Q3"
         assert status.newest_quarter == "2024Q3"
 
+    def test_get_status_has_real_drug_reac_counts(self, loaded_store: FAERSBulkStore) -> None:
+        """Status retorna contagens reais de drug e reac records."""
+        status = loaded_store.get_status()
+        assert status.total_drug_records == 12
+        assert status.total_reac_records == 11
+
     def test_get_loaded_quarters(self, loaded_store: FAERSBulkStore) -> None:
         quarters = loaded_store.get_loaded_quarters()
         assert len(quarters) == 1
