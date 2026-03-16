@@ -31,11 +31,8 @@ async def search_trials(
     Returns:
         TrialsResult com trials encontrados e contagem de ativos.
     """
-    client = TrialsClient()
-    try:
+    async with TrialsClient() as client:
         data = await client.search(drug, event, page_size=page_size, use_cache=use_cache)
-    finally:
-        await client.close()
 
     total_count, trials = parse_studies(data)
     active_count = count_active(trials)

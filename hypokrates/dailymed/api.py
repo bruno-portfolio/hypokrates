@@ -33,8 +33,7 @@ async def label_events(
     Returns:
         LabelEventsResult com termos de adverse reactions e texto raw.
     """
-    client = DailyMedClient()
-    try:
+    async with DailyMedClient() as client:
         # 1. Buscar SPLs — separados em singles e combos
         search_data = await client.search_spls(drug, use_cache=use_cache)
         single_ids, combo_ids = parse_spl_search(search_data)
@@ -112,8 +111,6 @@ async def label_events(
 
         # 3. Parsear adverse reactions
         terms, raw_text = parse_adverse_reactions_xml(xml_text)
-    finally:
-        await client.close()
 
     return LabelEventsResult(
         drug=drug,

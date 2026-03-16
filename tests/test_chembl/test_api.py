@@ -15,6 +15,12 @@ def _load(name: str) -> dict[str, object]:
     return json.loads((GOLDEN / name).read_text())  # type: ignore[return-value]
 
 
+def _mock_client(mock_cls: AsyncMock, instance: AsyncMock) -> None:
+    """Configura mock para suportar async with (context manager)."""
+    instance.__aenter__ = AsyncMock(return_value=instance)
+    mock_cls.return_value = instance
+
+
 class TestDrugMechanism:
     """Testes para drug_mechanism()."""
 
@@ -26,8 +32,7 @@ class TestDrugMechanism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.side_effect = [search_data, mech_data, target_data]
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_mechanism("propofol", use_cache=False)
 
@@ -41,8 +46,7 @@ class TestDrugMechanism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.return_value = {"molecules": []}
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_mechanism("nonexistent", use_cache=False)
 
@@ -55,8 +59,7 @@ class TestDrugMechanism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.side_effect = [search_data, {"mechanisms": []}]
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_mechanism("propofol", use_cache=False)
 
@@ -70,8 +73,7 @@ class TestDrugMechanism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.side_effect = [mech_data, target_data]
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_mechanism("propofol", use_cache=False, _chembl_id="CHEMBL526")
 
@@ -91,8 +93,7 @@ class TestDrugTargets:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.side_effect = [search_data, mech_data, target_data]
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             genes = await drug_targets("propofol", use_cache=False)
 
@@ -103,8 +104,7 @@ class TestDrugTargets:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.return_value = {"molecules": []}
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             genes = await drug_targets("nonexistent", use_cache=False)
 
@@ -121,8 +121,7 @@ class TestDrugMetabolism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.side_effect = [search_data, met_data]
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_metabolism("propofol", use_cache=False)
 
@@ -134,8 +133,7 @@ class TestDrugMetabolism:
         with patch("hypokrates.chembl.api.ChEMBLClient") as mock_cls:
             instance = AsyncMock()
             instance.get.return_value = {"molecules": []}
-            instance.close = AsyncMock()
-            mock_cls.return_value = instance
+            _mock_client(mock_cls, instance)
 
             result = await drug_metabolism("nonexistent", use_cache=False)
 

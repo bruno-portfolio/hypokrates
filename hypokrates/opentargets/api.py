@@ -34,8 +34,7 @@ async def drug_adverse_events(
     Returns:
         OTDrugSafety com lista de adverse events e LRT scores.
     """
-    client = OpenTargetsClient()
-    try:
+    async with OpenTargetsClient() as client:
         # 1. Resolver nome → ChEMBL ID
         search_data = await client.query(
             SEARCH_DRUG_QUERY,
@@ -83,8 +82,6 @@ async def drug_adverse_events(
                 "LRT score indicates statistical association, not causation.",
             ),
         )
-    finally:
-        await client.close()
 
 
 async def drug_safety_score(

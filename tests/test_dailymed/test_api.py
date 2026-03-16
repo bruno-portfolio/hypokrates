@@ -11,6 +11,12 @@ from tests.helpers import load_golden
 GOLDEN_DATA = Path(__file__).parent.parent / "golden_data"
 
 
+def _mock_client(mock_cls: AsyncMock, instance: AsyncMock) -> None:
+    """Configura mock para suportar async with (context manager)."""
+    instance.__aenter__ = AsyncMock(return_value=instance)
+    mock_cls.return_value = instance
+
+
 @patch("hypokrates.dailymed.api.DailyMedClient")
 async def test_label_events_found(mock_client_cls: AsyncMock) -> None:
     """propofol → lista de adverse reactions."""
@@ -20,7 +26,7 @@ async def test_label_events_found(mock_client_cls: AsyncMock) -> None:
     instance = AsyncMock()
     instance.search_spls.return_value = golden_spls
     instance.fetch_spl_xml.return_value = golden_xml
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await label_events("propofol")
 
@@ -28,7 +34,6 @@ async def test_label_events_found(mock_client_cls: AsyncMock) -> None:
     assert result.set_id == "b169a494-5042-4577-a5e2-f6b48b4c7e21"
     assert len(result.events) > 0
     assert result.meta.source == "DailyMed/FDA"
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.dailymed.api.DailyMedClient")
@@ -36,7 +41,7 @@ async def test_label_events_not_found(mock_client_cls: AsyncMock) -> None:
     """Droga não encontrada → resultado vazio."""
     instance = AsyncMock()
     instance.search_spls.return_value = {"data": []}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await label_events("unknowndrug123")
 
@@ -44,7 +49,6 @@ async def test_label_events_not_found(mock_client_cls: AsyncMock) -> None:
     assert result.set_id is None
     assert result.events == []
     instance.fetch_spl_xml.assert_not_called()
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.dailymed.api.DailyMedClient")
@@ -56,7 +60,7 @@ async def test_check_label_in_label(mock_client_cls: AsyncMock) -> None:
     instance = AsyncMock()
     instance.search_spls.return_value = golden_spls
     instance.fetch_spl_xml.return_value = golden_xml
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await check_label("propofol", "bradycardia")
 
@@ -76,7 +80,7 @@ async def test_check_label_not_in_label(mock_client_cls: AsyncMock) -> None:
     instance = AsyncMock()
     instance.search_spls.return_value = golden_spls
     instance.fetch_spl_xml.return_value = golden_xml
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await check_label("propofol", "serotonin syndrome")
 
@@ -89,7 +93,7 @@ async def test_check_label_drug_not_found(mock_client_cls: AsyncMock) -> None:
     """Droga não encontrada → in_label=False."""
     instance = AsyncMock()
     instance.search_spls.return_value = {"data": []}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await check_label("unknowndrug123", "bradycardia")
 
@@ -120,7 +124,7 @@ async def test_label_events_skips_spl_without_safety(mock_client_cls: AsyncMock)
     instance = AsyncMock()
     instance.search_spls.return_value = golden_spls
     instance.fetch_spl_xml.side_effect = xml_by_setid
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await label_events("gabapentin")
 
@@ -129,7 +133,6 @@ async def test_label_events_skips_spl_without_safety(mock_client_cls: AsyncMock)
     # Capsule has safety sections → should be selected
     assert result.set_id == "bbbb-capsule-with-safety"
     assert len(result.events) > 0
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.dailymed.api.DailyMedClient")
@@ -155,11 +158,10 @@ async def test_label_events_fallback_when_no_safety(mock_client_cls: AsyncMock) 
     instance.search_spls.return_value = golden_spls
     # All SPLs lack safety sections; fallback re-fetches first
     instance.fetch_spl_xml.return_value = no_safety_xml
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await label_events("testdrug")
 
     assert result.drug == "testdrug"
     assert result.set_id == "aaa-no-safety"
     assert result.events == []
-    instance.close.assert_called_once()

@@ -16,6 +16,12 @@ def _load_golden(name: str) -> dict[str, object]:
     return json.loads((GOLDEN / name).read_text())  # type: ignore[return-value]
 
 
+def _mock_client(mock_cls: AsyncMock, instance: AsyncMock) -> None:
+    """Configura mock para suportar async with (context manager)."""
+    instance.__aenter__ = AsyncMock(return_value=instance)
+    mock_cls.return_value = instance
+
+
 class TestDrugAdverseEvents:
     """Testes para drug_adverse_events()."""
 
@@ -26,8 +32,7 @@ class TestDrugAdverseEvents:
         with patch("hypokrates.opentargets.api.OpenTargetsClient") as mock_client_cls:
             instance = AsyncMock()
             instance.query.side_effect = [search_data, ae_data]
-            instance.close = AsyncMock()
-            mock_client_cls.return_value = instance
+            _mock_client(mock_client_cls, instance)
 
             result = await drug_adverse_events("propofol", use_cache=False)
 
@@ -40,8 +45,7 @@ class TestDrugAdverseEvents:
         with patch("hypokrates.opentargets.api.OpenTargetsClient") as mock_client_cls:
             instance = AsyncMock()
             instance.query.return_value = {"search": {"hits": []}}
-            instance.close = AsyncMock()
-            mock_client_cls.return_value = instance
+            _mock_client(mock_client_cls, instance)
 
             result = await drug_adverse_events("nonexistent", use_cache=False)
 
@@ -55,8 +59,7 @@ class TestDrugAdverseEvents:
         with patch("hypokrates.opentargets.api.OpenTargetsClient") as mock_client_cls:
             instance = AsyncMock()
             instance.query.side_effect = [search_data, ae_data]
-            instance.close = AsyncMock()
-            mock_client_cls.return_value = instance
+            _mock_client(mock_client_cls, instance)
 
             result = await drug_adverse_events("propofol", use_cache=False)
 
@@ -125,8 +128,7 @@ class TestDrugSafetyScore:
         with patch("hypokrates.opentargets.api.OpenTargetsClient") as mock_client_cls:
             instance = AsyncMock()
             instance.query.side_effect = [search_data, ae_data]
-            instance.close = AsyncMock()
-            mock_client_cls.return_value = instance
+            _mock_client(mock_client_cls, instance)
 
             score = await drug_safety_score("propofol", "Bradycardia", use_cache=False)
 
@@ -139,8 +141,7 @@ class TestDrugSafetyScore:
         with patch("hypokrates.opentargets.api.OpenTargetsClient") as mock_client_cls:
             instance = AsyncMock()
             instance.query.side_effect = [search_data, ae_data]
-            instance.close = AsyncMock()
-            mock_client_cls.return_value = instance
+            _mock_client(mock_client_cls, instance)
 
             score = await drug_safety_score("propofol", "nonexistent_event", use_cache=False)
 

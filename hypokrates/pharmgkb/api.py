@@ -47,8 +47,7 @@ async def pgx_annotations(
     Returns:
         Lista de PharmGKBAnnotation ordenada por evidence level.
     """
-    client = PharmGKBClient()
-    try:
+    async with PharmGKBClient() as client:
         data = await client.get(
             CLINICAL_ANNOTATION_ENDPOINT,
             {"relatedChemicals.name": drug},
@@ -64,8 +63,6 @@ async def pgx_annotations(
         filtered.sort(key=lambda a: _level_sort_key(a.level_of_evidence))
 
         return filtered
-    finally:
-        await client.close()
 
 
 async def pgx_guidelines(
@@ -82,16 +79,13 @@ async def pgx_guidelines(
     Returns:
         Lista de PharmGKBGuideline.
     """
-    client = PharmGKBClient()
-    try:
+    async with PharmGKBClient() as client:
         data = await client.get(
             GUIDELINE_ENDPOINT,
             {"relatedChemicals.name": drug},
             use_cache=use_cache,
         )
         return parse_guidelines(data)
-    finally:
-        await client.close()
 
 
 async def pgx_drug_info(
@@ -110,8 +104,7 @@ async def pgx_drug_info(
     Returns:
         PharmGKBResult com annotations, guidelines e metadata.
     """
-    client = PharmGKBClient()
-    try:
+    async with PharmGKBClient() as client:
         # 1. Resolver PharmGKB ID
         chem_data = await client.get(
             CHEMICAL_ENDPOINT,
@@ -151,5 +144,3 @@ async def pgx_drug_info(
                 "Clinical implementation requires validated genotyping.",
             ),
         )
-    finally:
-        await client.close()

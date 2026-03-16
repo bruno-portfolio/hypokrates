@@ -62,8 +62,7 @@ async def drug_mechanism(
     Returns:
         ChEMBLMechanism com mechanism_of_action, action_type, targets.
     """
-    client = ChEMBLClient()
-    try:
+    async with ChEMBLClient() as client:
         # 1. Resolver nome → ChEMBL ID
         if _chembl_id:
             chembl_id = _chembl_id
@@ -121,8 +120,6 @@ async def drug_mechanism(
             max_phase=max_phase if isinstance(max_phase, int) else 0,
             meta=_meta(drug_name, chembl_id),
         )
-    finally:
-        await client.close()
 
 
 async def drug_targets(
@@ -166,8 +163,7 @@ async def drug_metabolism(
     Returns:
         ChEMBLMetabolism com enzimas e conversões.
     """
-    client = ChEMBLClient()
-    try:
+    async with ChEMBLClient() as client:
         if _chembl_id:
             chembl_id = _chembl_id
             pref_name = drug_name
@@ -194,8 +190,6 @@ async def drug_metabolism(
             pathways=pathways,
             meta=_meta(drug_name, chembl_id),
         )
-    finally:
-        await client.close()
 
 
 def _meta(drug_name: str, chembl_id: str) -> MetaInfo:
