@@ -617,6 +617,7 @@ class TestDailyMedTools:
 
         mock_result = LabelEventsResult(
             drug="unknowndrug",
+            set_id="test-set-id",
             events=[],
             meta=_make_meta("DailyMed"),
         )

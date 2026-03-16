@@ -273,6 +273,29 @@ def match_event_in_label(
     return len(matched) > 0, matched
 
 
+def parse_indications_text(xml_text: str) -> str:
+    """Extrai texto da seção INDICATIONS AND USAGE (LOINC 34067-9).
+
+    Usado para detectar confounding por indicação — se o evento adverso
+    aparece na seção de indicações, o PRR alto pode refletir o perfil
+    de uso da droga, não toxicidade.
+
+    Args:
+        xml_text: XML completo do SPL.
+
+    Returns:
+        Texto raw da seção de indicações, ou string vazia.
+    """
+    from hypokrates.dailymed.constants import INDICATIONS_LOINC
+
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return ""
+
+    return _find_section_by_loinc(root, INDICATIONS_LOINC)
+
+
 def has_adverse_reactions_section(xml_text: str) -> bool:
     """Verifica se um SPL XML contém seção Adverse Reactions (LOINC 34084-4).
 

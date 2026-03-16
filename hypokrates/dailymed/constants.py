@@ -22,5 +22,8 @@ SAFETY_LOINC_CODES: dict[str, str] = {
     WARNINGS_PRECAUTIONS_LOINC: "Warnings and Precautions",
 }
 
+# LOINC code para seção "Indications and Usage"
+INDICATIONS_LOINC = "34067-9"
+
 # SPL XML namespace
 SPL_NAMESPACE = "{urn:hl7-org:v3}"

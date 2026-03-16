@@ -285,13 +285,16 @@ class TestHypothesisCoAdminIntegration:
     @patch("hypokrates.cross.api.faers_api.co_suspect_profile")
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
-    async def test_coadmin_layer1_only_when_no_signal(
+    async def test_coadmin_layer1_only_when_no_signal_and_no_flag(
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_profile: AsyncMock
     ) -> None:
-        """Sem sinal FAERS → coadmin roda Layer 1 only (profile, sem comparative PRR)."""
+        """Sem sinal FAERS e sem co_admin_flag → Layer 1 only."""
         mock_signal.return_value = _make_signal_result(signal_detected=False, prr=0.5)
         mock_pubmed.return_value = _make_pubmed()
-        mock_profile.return_value = _make_profile()
+        mock_profile.return_value = _make_profile(
+            median=2.0,
+            co_admin_flag=False,
+        )
 
         result = await hypothesis("propofol", "anaphylactic shock", check_coadmin=True)
 

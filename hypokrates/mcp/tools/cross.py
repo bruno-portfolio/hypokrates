@@ -107,6 +107,15 @@ def register(mcp: FastMCP) -> None:
                         "**Co-admin detected but signal appears specific to this drug.**",
                     ]
                 )
+        if result.indication_confounding:
+            lines.extend(
+                [
+                    "",
+                    "**⚠ INDICATION CONFOUNDING:** This event matches a known "
+                    "therapeutic indication. High PRR may reflect the patient "
+                    "population, not drug toxicity.",
+                ]
+            )
         if result.articles:
             lines.append("")
             lines.append("## Articles")

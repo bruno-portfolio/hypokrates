@@ -35,8 +35,13 @@ def register(mcp: FastMCP) -> None:
                 lines.append(f"- {event}")
             if len(result.events) > 50:
                 lines.append(f"... and {len(result.events) - 50} more")
-        else:
+        elif result.set_id:
             lines.append("No adverse reactions section found in label.")
+        else:
+            lines.append(
+                "**⚠ No SPL found in DailyMed.** Drug may be withdrawn, "
+                "not marketed in the US, or listed under a different name."
+            )
 
         return "\n".join(lines)
 
@@ -61,5 +66,10 @@ def register(mcp: FastMCP) -> None:
             lines.append(f"**Matched terms:** {', '.join(result.matched_terms)}")
         if result.set_id:
             lines.append(f"**SET ID:** {result.set_id}")
+        else:
+            lines.append(
+                "**⚠ No SPL found in DailyMed.** Drug may be withdrawn, "
+                "not marketed in the US, or listed under a different name."
+            )
 
         return "\n".join(lines)

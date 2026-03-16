@@ -80,6 +80,7 @@ class HypothesisResult(BaseModel):
     enzymes: list[str] = Field(default_factory=list)
     ot_llr: float | None = None
     coadmin: CoAdminAnalysis | None = None
+    indication_confounding: bool = False
 
 
 class CompareSignalItem(BaseModel):

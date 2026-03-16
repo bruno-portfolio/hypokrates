@@ -339,6 +339,16 @@ async def hypothesis(
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
+    # 3f. Indication confounding detection
+    indication_confounding = False
+    try:
+        from hypokrates.scan.indications import is_indication_term
+
+        if is_indication_term(event):
+            indication_confounding = True
+    except Exception:
+        pass
+
     classification = _classify(
         signal_detected=signal_result.signal_detected,
         literature_count=literature_count,
@@ -395,7 +405,8 @@ async def hypothesis(
                 _client=_faers_client,
                 _drug_search=_drug_search,
             )
-            if signal_result.signal_detected:
+            # Layer 2 roda quando há sinal OU co-admin flag alto
+            if signal_result.signal_detected or coadmin_profile.co_admin_flag:
                 coadmin_result = await coadmin_analysis(
                     drug,
                     event,
@@ -405,7 +416,7 @@ async def hypothesis(
                     use_cache=use_cache,
                 )
             else:
-                # Sem sinal FAERS → Layer 1 only (profile sem comparative PRR)
+                # Sem sinal FAERS e sem co-admin flag → Layer 1 only
                 coadmin_result = CoAdminAnalysis(
                     profile=coadmin_profile,
                     verdict="no_signal",
@@ -432,6 +443,7 @@ async def hypothesis(
         enzymes=enzymes_list,
         ot_llr=ot_llr,
         coadmin=coadmin_result,
+        indication_confounding=indication_confounding,
     )
 
 

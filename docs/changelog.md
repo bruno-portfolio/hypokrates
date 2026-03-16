@@ -16,6 +16,13 @@ All notable changes to this project will be documented in this file.
 - **vocab/api.py**: `map_to_mesh()` depth bonus for shallower MeSH headings (fixes arrhythmia → "Arrhythmias, Cardiac")
 - **dailymed/parser.py**: combo penalty -30 → -50 (fixes acetaminophen picking codeine combo)
 - **dailymed/parser.py**: `match_event_in_label()` Layer 2.5 — all-words-present in full raw_text (fixes cisplatin + febrile neutropenia)
+- **dailymed/parser.py**: `parse_indications_text()` — extracts INDICATIONS AND USAGE (LOINC 34067-9) for indication confounding
+- **dailymed/constants.py**: `INDICATIONS_LOINC = "34067-9"`
+- **cross/models.py**: `HypothesisResult.indication_confounding` field
+- **cross/api.py**: indication confounding detection via `is_indication_term()` — flags events matching known therapeutic indications
+- **cross/api.py**: co-admin Layer 2 now triggers on `co_admin_flag=True` (not just `signal_detected`)
+- **mcp/tools/cross.py**: `hypothesis` shows "⚠ INDICATION CONFOUNDING" warning
+- **mcp/tools/dailymed.py**: `check_label` and `label_events` show "drug may be withdrawn" when no SPL found
 
 ### Sprint 8 — Bulk Scan, Label Match Fix, Direction Analysis
 

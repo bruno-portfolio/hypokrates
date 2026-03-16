@@ -10,6 +10,11 @@
 - MeSH ranking: `map_to_mesh()` now boosts shallower (more general) MeSH headings — fixes "arrhythmia" mapping to "Arrhythmia, Sinus" instead of "Arrhythmias, Cardiac"
 - DailyMed SPL: combination product penalty increased from -30 to -50 — fixes "acetaminophen" picking codeine combo instead of standalone label
 - DailyMed `match_event_in_label()`: new Layer 2.5 (all-words-present in full raw_text) — catches multi-word events split across sections (e.g., "febrile neutropenia" in cisplatin label)
+- DailyMed `parse_indications_text()` — extracts INDICATIONS AND USAGE section (LOINC 34067-9) from SPL XML for indication confounding detection
+- DailyMed MCP tools: `check_label` and `label_events` now show "drug may be withdrawn" warning when no SPL found
+- Co-admin Layer 2 now triggers on `co_admin_flag=True` even without FAERS signal — catches confounding in ondansetron+febrile neutropenia scenarios
+- `HypothesisResult.indication_confounding` field — True when event matches known therapeutic indication (static INDICATION_TERMS list)
+- `hypothesis()` MCP output shows "⚠ INDICATION CONFOUNDING" warning when event matches indication
 
 ### Fixed
 - `_build_summary()` no longer says "FAERS signal detected" when `signal_detected=False` (e.g., aspirin+colorectal cancer as `emerging_signal` without FAERS signal now says "No FAERS disproportionality signal, but literature suggests emerging evidence")
