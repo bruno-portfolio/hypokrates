@@ -161,9 +161,12 @@ class CanadaVigilanceStore:
         return self._loaded
 
     def _check_loaded(self) -> bool:
-        """Verifica se já existem dados no store."""
-        result = self._conn.execute("SELECT COUNT(*) FROM canada_reports").fetchone()
-        return result is not None and result[0] > 0
+        """Verifica se já existem dados no store (reports + drugs + reactions)."""
+        for table in ("canada_reports", "canada_drugs", "canada_reactions"):
+            result = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            if result is None or result[0] == 0:
+                return False
+        return True
 
     def load_from_csvs(self, csv_dir: str) -> int:
         """Carrega arquivos $-delimited do Canada Vigilance.
@@ -257,6 +260,17 @@ class CanadaVigilanceStore:
                 self._conn.execute(sql, params)
             else:
                 self._conn.execute(sql)
+
+    def query_in_lock(
+        self,
+        sql: str,
+        params: list[object] | None = None,
+    ) -> list[tuple[object, ...]]:
+        """Executa SQL dentro do lock e retorna resultado."""
+        with self._db_lock:
+            if params:
+                return self._conn.execute(sql, params).fetchall()
+            return self._conn.execute(sql).fetchall()
 
     def executemany_in_lock(self, sql: str, rows: list[list[object]]) -> None:
         """Executa SQL com múltiplas linhas dentro do lock."""

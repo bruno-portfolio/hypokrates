@@ -1,7 +1,7 @@
 """Parser para arquivos $-delimited do Canada Vigilance.
 
 Os arquivos bulk do Canada Vigilance NÃO possuem header row.
-Usamos csv.reader com acesso posicional (índice de coluna).
+Usamos DuckDB read_csv() nativo para performance (~100x mais rápido que csv.reader).
 
 Posições documentadas em:
 https://www.canada.ca/en/health-canada/services/drugs-health-products/
@@ -10,13 +10,11 @@ medeffect-canada/adverse-reaction-database/read-file-layouts.html
 
 from __future__ import annotations
 
-import csv
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hypokrates.canada.constants import (
-    DELIMITER,
     FILE_DRUG_INGREDIENTS,
     FILE_DRUG_PRODUCT,
     FILE_REACTIONS,
@@ -25,14 +23,9 @@ from hypokrates.canada.constants import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
     from hypokrates.canada.store import CanadaVigilanceStore
 
 logger = logging.getLogger(__name__)
-
-# Batch size para inserts
-_BATCH_SIZE = 5000
 
 
 def _find_file(base_path: Path, primary: str, *alternates: str) -> Path | None:
@@ -48,8 +41,23 @@ def _find_file(base_path: Path, primary: str, *alternates: str) -> Path | None:
     return None
 
 
+def _csv_opts(path: Path, *, null_padding: bool = False) -> str:
+    """Monta opções comuns do read_csv para arquivos $-delimited."""
+    escaped = str(path).replace("'", "''")
+    extra = ""
+    if null_padding:
+        extra = ", null_padding=true, parallel=false, strict_mode=false"
+    return (
+        f"read_csv('{escaped}', "
+        f"delim='$', header=false, all_varchar=true, "
+        f"ignore_errors=true, quote='\"'{extra})"
+    )
+
+
 def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     """Carrega todos os arquivos do Canada Vigilance no DuckDB store.
+
+    Usa DuckDB read_csv() nativo para máxima performance.
 
     Args:
         store: CanadaVigilanceStore instance.
@@ -86,53 +94,37 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     if drugs_path:
         count = _load_report_drugs(store, drugs_path)
         logger.info("Canada: loaded %d drug records", count)
+    else:
+        logger.warning("Canada: Report_Drug file not found in %s", csv_dir)
 
     # 3. Reactions
     reactions_path = _find_file(base_path, FILE_REACTIONS, "reactions.txt")
     if reactions_path:
         count = _load_reactions(store, reactions_path)
         logger.info("Canada: loaded %d reaction records", count)
+    else:
+        logger.warning("Canada: Reactions file not found in %s", csv_dir)
 
-    # 4. Drug_Product (pode ser drug_products.txt em alguns extracts)
+    # 4. Drug_Product
     products_path = _find_file(
         base_path, FILE_DRUG_PRODUCT, "drug_products.txt", "Drug_Products.txt"
     )
     if products_path:
         count = _load_products(store, products_path)
         logger.info("Canada: loaded %d products", count)
+    else:
+        logger.warning("Canada: Drug_Product file not found in %s", csv_dir)
 
     # 5. Drug_Product_Ingredients
     ingredients_path = _find_file(base_path, FILE_DRUG_INGREDIENTS, "drug_product_ingredients.txt")
     if ingredients_path:
         count = _load_ingredients(store, ingredients_path)
         logger.info("Canada: loaded %d ingredients", count)
+    else:
+        logger.warning("Canada: Drug_Product_Ingredients file not found in %s", csv_dir)
 
     logger.info("Canada Vigilance load complete: %d reports", total_reports)
     return total_reports
-
-
-def _read_rows(path: Path) -> Iterator[list[str]]:
-    """Lê arquivo $-delimited como csv.reader (sem header)."""
-    fh = path.open(encoding="utf-8", errors="replace")
-    yield from csv.reader(fh, delimiter=DELIMITER, quotechar='"')
-
-
-def _safe_int(val: str, default: int = 0) -> int:
-    """Converte string para int com fallback."""
-    val = val.strip()
-    if not val:
-        return default
-    try:
-        return int(val)
-    except ValueError:
-        return default
-
-
-def _col(row: list[str], idx: int) -> str:
-    """Acessa coluna por índice com fallback para string vazia."""
-    if idx < len(row):
-        return row[idx]
-    return ""
 
 
 # ── Reports.txt ──────────────────────────────────────────────
@@ -141,34 +133,26 @@ def _col(row: list[str], idx: int) -> str:
 
 
 def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Reports.txt."""
-    rows: list[list[object]] = []
-    count = 0
+    """Carrega Reports.txt via DuckDB read_csv().
 
-    for record in _read_rows(path):
-        report_id = _safe_int(_col(record, 0))
-        if report_id == 0:
-            continue
-        rows.append(
-            [
-                report_id,
-                _col(record, 3).strip(),  # DATRECEIVED
-                _col(record, 9).strip(),  # GENDER_CODE
-                _col(record, 12).strip(),  # AGE
-                _col(record, 16).strip(),  # OUTCOME_CODE
-                _col(record, 25).strip(),  # SERIOUSNESS_CODE
-            ]
-        )
-        if len(rows) >= _BATCH_SIZE:
-            store.executemany_in_lock("INSERT INTO canada_reports VALUES (?, ?, ?, ?, ?, ?)", rows)
-            count += len(rows)
-            rows = []
-
-    if rows:
-        store.executemany_in_lock("INSERT INTO canada_reports VALUES (?, ?, ?, ?, ?, ?)", rows)
-        count += len(rows)
-
-    return count
+    42 colunas → DuckDB zero-pads: column00..column41.
+    """
+    src = _csv_opts(path)
+    sql = f"""
+        INSERT INTO canada_reports
+        SELECT
+            TRY_CAST(column00 AS INTEGER),
+            TRIM(column03),
+            TRIM(column09),
+            TRIM(column12),
+            TRIM(column16),
+            TRIM(column25)
+        FROM {src}
+        WHERE TRY_CAST(column00 AS INTEGER) IS NOT NULL
+          AND TRY_CAST(column00 AS INTEGER) > 0
+    """
+    store.execute_in_lock(sql)
+    return _count_table(store, "canada_reports")
 
 
 # ── Report_Drug.txt ──────────────────────────────────────────
@@ -177,32 +161,24 @@ def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Report_Drug.txt."""
-    rows: list[list[object]] = []
-    count = 0
+    """Carrega Report_Drug.txt via DuckDB read_csv().
 
-    for record in _read_rows(path):
-        report_id = _safe_int(_col(record, 1))
-        if report_id == 0:
-            continue
-        rows.append(
-            [
-                _safe_int(_col(record, 0)),  # REPORT_DRUG_ID
-                report_id,  # REPORT_ID
-                _safe_int(_col(record, 2)),  # DRUG_PRODUCT_ID
-                _col(record, 4).strip(),  # DRUGINVOLV_ENG
-            ]
-        )
-        if len(rows) >= _BATCH_SIZE:
-            store.executemany_in_lock("INSERT INTO canada_drugs VALUES (?, ?, ?, ?)", rows)
-            count += len(rows)
-            rows = []
-
-    if rows:
-        store.executemany_in_lock("INSERT INTO canada_drugs VALUES (?, ?, ?, ?)", rows)
-        count += len(rows)
-
-    return count
+    22 colunas → DuckDB zero-pads: column00..column21.
+    """
+    src = _csv_opts(path)
+    sql = f"""
+        INSERT INTO canada_drugs
+        SELECT
+            TRY_CAST(column00 AS INTEGER),
+            TRY_CAST(column01 AS INTEGER),
+            COALESCE(TRY_CAST(column02 AS INTEGER), 0),
+            TRIM(column04)
+        FROM {src}
+        WHERE TRY_CAST(column01 AS INTEGER) IS NOT NULL
+          AND TRY_CAST(column01 AS INTEGER) > 0
+    """
+    store.execute_in_lock(sql)
+    return _count_table(store, "canada_drugs")
 
 
 # ── Reactions.txt ────────────────────────────────────────────
@@ -212,33 +188,22 @@ def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Reactions.txt."""
-    rows: list[list[object]] = []
-    count = 0
-
-    for record in _read_rows(path):
-        report_id = _safe_int(_col(record, 1))
-        if report_id == 0:
-            continue
-        rows.append(
-            [
-                _safe_int(_col(record, 0)),  # REACTION_ID
-                report_id,  # REPORT_ID
-                _col(record, 5).strip(),  # PT_NAME_ENG
-                _col(record, 7).strip(),  # SOC_NAME_ENG
-                _col(record, 9).strip(),  # MEDDRA_VERSION
-            ]
-        )
-        if len(rows) >= _BATCH_SIZE:
-            store.executemany_in_lock("INSERT INTO canada_reactions VALUES (?, ?, ?, ?, ?)", rows)
-            count += len(rows)
-            rows = []
-
-    if rows:
-        store.executemany_in_lock("INSERT INTO canada_reactions VALUES (?, ?, ?, ?, ?)", rows)
-        count += len(rows)
-
-    return count
+    """Carrega Reactions.txt via DuckDB read_csv()."""
+    src = _csv_opts(path)
+    sql = f"""
+        INSERT INTO canada_reactions
+        SELECT
+            TRY_CAST(column0 AS INTEGER),
+            TRY_CAST(column1 AS INTEGER),
+            TRIM(column5),
+            TRIM(column7),
+            TRIM(column9)
+        FROM {src}
+        WHERE TRY_CAST(column1 AS INTEGER) IS NOT NULL
+          AND TRY_CAST(column1 AS INTEGER) > 0
+    """
+    store.execute_in_lock(sql)
+    return _count_table(store, "canada_reactions")
 
 
 # ── Drug_Product.txt / drug_products.txt ─────────────────────
@@ -246,30 +211,19 @@ def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Drug_Product.txt."""
-    rows: list[list[object]] = []
-    count = 0
-
-    for record in _read_rows(path):
-        product_id = _safe_int(_col(record, 0))
-        if product_id == 0:
-            continue
-        rows.append(
-            [
-                product_id,
-                _col(record, 1).strip(),  # DRUGNAME
-            ]
-        )
-        if len(rows) >= _BATCH_SIZE:
-            store.executemany_in_lock("INSERT INTO canada_products VALUES (?, ?)", rows)
-            count += len(rows)
-            rows = []
-
-    if rows:
-        store.executemany_in_lock("INSERT INTO canada_products VALUES (?, ?)", rows)
-        count += len(rows)
-
-    return count
+    """Carrega Drug_Product.txt via DuckDB read_csv()."""
+    src = _csv_opts(path, null_padding=True)
+    sql = f"""
+        INSERT INTO canada_products
+        SELECT
+            TRY_CAST(column0 AS INTEGER),
+            TRIM(column1)
+        FROM {src}
+        WHERE TRY_CAST(column0 AS INTEGER) IS NOT NULL
+          AND TRY_CAST(column0 AS INTEGER) > 0
+    """
+    store.execute_in_lock(sql)
+    return _count_table(store, "canada_products")
 
 
 # ── Drug_Product_Ingredients.txt ─────────────────────────────
@@ -278,27 +232,25 @@ def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_ingredients(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Drug_Product_Ingredients.txt (5 colunas)."""
-    rows: list[list[object]] = []
-    count = 0
+    """Carrega Drug_Product_Ingredients.txt via DuckDB read_csv()."""
+    src = _csv_opts(path, null_padding=True)
+    sql = f"""
+        INSERT INTO canada_ingredients
+        SELECT
+            TRY_CAST(column1 AS INTEGER),
+            TRIM(column4)
+        FROM {src}
+        WHERE TRY_CAST(column1 AS INTEGER) IS NOT NULL
+          AND TRY_CAST(column1 AS INTEGER) > 0
+    """
+    store.execute_in_lock(sql)
+    return _count_table(store, "canada_ingredients")
 
-    for record in _read_rows(path):
-        product_id = _safe_int(_col(record, 1))
-        if product_id == 0:
-            continue
-        rows.append(
-            [
-                product_id,
-                _col(record, 4).strip(),  # ACTIVE_INGREDIENT_NAME
-            ]
-        )
-        if len(rows) >= _BATCH_SIZE:
-            store.executemany_in_lock("INSERT INTO canada_ingredients VALUES (?, ?)", rows)
-            count += len(rows)
-            rows = []
 
-    if rows:
-        store.executemany_in_lock("INSERT INTO canada_ingredients VALUES (?, ?)", rows)
-        count += len(rows)
-
-    return count
+def _count_table(store: CanadaVigilanceStore, table: str) -> int:
+    """Conta registros em uma tabela."""
+    rows = store.query_in_lock(f"SELECT COUNT(*) FROM {table}")
+    if rows and rows[0]:
+        count = rows[0][0]
+        return int(count) if isinstance(count, (int, float, str)) else 0
+    return 0
