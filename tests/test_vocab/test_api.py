@@ -8,13 +8,19 @@ from hypokrates.vocab.api import map_to_mesh, normalize_drug
 from tests.helpers import load_golden
 
 
+def _mock_client(mock_cls: AsyncMock, instance: AsyncMock) -> None:
+    """Configura mock para suportar async with (context manager)."""
+    instance.__aenter__.return_value = instance
+    mock_cls.return_value = instance
+
+
 @patch("hypokrates.vocab.api.RxNormClient")
 async def test_normalize_drug_found(mock_client_cls: AsyncMock) -> None:
     """'advil' → generic_name='ibuprofen'."""
     golden = load_golden("vocab", "rxnorm_drugs_ibuprofen.json")
     instance = AsyncMock()
     instance.search.return_value = golden
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await normalize_drug("advil")
 
@@ -23,7 +29,6 @@ async def test_normalize_drug_found(mock_client_cls: AsyncMock) -> None:
     assert "Advil" in result.brand_names
     assert result.rxcui == "5640"
     assert result.meta.source == "RxNorm"
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.vocab.api.RxNormClient")
@@ -33,7 +38,7 @@ async def test_normalize_drug_not_found(mock_client_cls: AsyncMock) -> None:
     instance = AsyncMock()
     instance.search.return_value = golden
     instance.search_by_name.return_value = {"idGroup": {}}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await normalize_drug("xyz123")
 
@@ -51,7 +56,7 @@ async def test_map_to_mesh_found(mock_client_cls: AsyncMock) -> None:
     instance = AsyncMock()
     instance.search.return_value = search_golden
     instance.fetch_descriptor.return_value = summary_golden
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await map_to_mesh("aspirin")
 
@@ -59,7 +64,6 @@ async def test_map_to_mesh_found(mock_client_cls: AsyncMock) -> None:
     assert result.mesh_id == "D001241"
     assert result.mesh_term == "Aspirin"
     assert result.meta.source == "NCBI/MeSH"
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.vocab.api.MeSHClient")
@@ -67,7 +71,7 @@ async def test_map_to_mesh_not_found(mock_client_cls: AsyncMock) -> None:
     """'xyz123' → mesh_term=None."""
     instance = AsyncMock()
     instance.search.return_value = {"esearchresult": {"idlist": []}}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await map_to_mesh("xyz123")
 
@@ -86,7 +90,7 @@ async def test_map_to_mesh_with_tree_numbers(mock_client_cls: AsyncMock) -> None
     instance = AsyncMock()
     instance.search.return_value = search_golden
     instance.fetch_descriptor.return_value = summary_golden
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await map_to_mesh("aspirin")
 
@@ -106,14 +110,13 @@ async def test_normalize_drug_rxcui_fallback(mock_client_cls: AsyncMock) -> None
     instance.search.return_value = golden_drugs
     instance.search_by_name.return_value = golden_rxcui
     instance.fetch_allrelated.return_value = golden_allrelated
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await normalize_drug("Diprivan")
 
     assert result.original == "Diprivan"
     assert result.generic_name == "propofol"
     assert result.rxcui == "8782"
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.vocab.api.RxNormClient")
@@ -124,7 +127,7 @@ async def test_normalize_drug_pt_en_fallback(mock_client_cls: AsyncMock) -> None
     instance = AsyncMock()
     instance.search.side_effect = [golden_not_found, golden_not_found]
     instance.search_by_name.return_value = {"idGroup": {}}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await normalize_drug("dipirona")
 
@@ -132,7 +135,6 @@ async def test_normalize_drug_pt_en_fallback(mock_client_cls: AsyncMock) -> None
     # Should resolve via NOME_PT_EN: DIPIRONA -> METAMIZOLE
     assert result.generic_name is not None
     assert "metamizole" in result.generic_name.lower()
-    instance.close.assert_called_once()
 
 
 @patch("hypokrates.vocab.api.MeSHClient")
@@ -177,7 +179,7 @@ async def test_map_to_mesh_ranks_by_similarity(mock_client_cls: AsyncMock) -> No
             }
         },
     ]
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await map_to_mesh("lactic acidosis")
 
@@ -214,7 +216,7 @@ async def test_map_to_mesh_arrhythmia_not_agents(mock_client_cls: AsyncMock) -> 
             }
         },
     ]
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await map_to_mesh("arrhythmia")
 
@@ -229,11 +231,10 @@ async def test_normalize_drug_paracetamol_pt_en(mock_client_cls: AsyncMock) -> N
     instance = AsyncMock()
     instance.search.side_effect = [golden_not_found, golden_not_found]
     instance.search_by_name.return_value = {"idGroup": {}}
-    mock_client_cls.return_value = instance
+    _mock_client(mock_client_cls, instance)
 
     result = await normalize_drug("paracetamol")
 
     assert result.original == "paracetamol"
     assert result.generic_name is not None
     assert "acetaminophen" in result.generic_name.lower()
-    instance.close.assert_called_once()

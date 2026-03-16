@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
+from rapidfuzz.fuzz import token_sort_ratio  # type: ignore[import-not-found,unused-ignore]
+
+from hypokrates.exceptions import HypokratesError
 from hypokrates.models import MetaInfo
 from hypokrates.vocab.mesh_client import MeSHClient
 from hypokrates.vocab.models import DrugNormResult, MeSHResult
@@ -39,8 +43,7 @@ async def normalize_drug(
     Returns:
         DrugNormResult com nome genérico, brand names e RXCUI.
     """
-    client = RxNormClient()
-    try:
+    async with RxNormClient() as client:
         # Step 1: /drugs.json (endpoint padrão)
         data = await client.search(name, use_cache=use_cache)
         generic_name, brand_names, rxcui = parse_rxnorm_drugs(data)
@@ -56,7 +59,7 @@ async def normalize_drug(
                     if related_name:
                         generic_name = related_name
                         rxcui = related_rxcui or found_rxcui
-            except Exception:
+            except HypokratesError:
                 logger.debug("RxNorm rxcui/allrelated fallback failed for %s", name)
 
         # Step 3: NOME_PT_EN — nomes internacionais (dipirona→metamizole)
@@ -78,10 +81,8 @@ async def normalize_drug(
                     else:
                         # EN name existe no mapeamento mas não no RxNorm — usar direto
                         generic_name = en_name.lower()
-                except Exception:
+                except HypokratesError:
                     generic_name = en_name.lower()
-    finally:
-        await client.close()
 
     return DrugNormResult(
         original=name,
@@ -118,8 +119,7 @@ async def map_to_mesh(
     Returns:
         MeSHResult com MeSH ID, term, e tree numbers.
     """
-    client = MeSHClient()
-    try:
+    async with MeSHClient() as client:
         search_data = await client.search(term, use_cache=use_cache)
         uids = parse_mesh_search(search_data)
 
@@ -128,13 +128,15 @@ async def map_to_mesh(
         tree_numbers: list[str] = []
 
         if uids:
-            # Fetch top 5 candidates and rank by similarity
+            # Fetch top 5 candidates in parallel and rank by similarity
+            top_uids = uids[:5]
+            desc_results = await asyncio.gather(
+                *(client.fetch_descriptor(uid, use_cache=use_cache) for uid in top_uids)
+            )
+
             candidates: list[tuple[str | None, str | None, list[str], float]] = []
             query_lower = term.lower()
-            top_uids = uids[:5]
-
-            for uid in top_uids:
-                desc_data = await client.fetch_descriptor(uid, use_cache=use_cache)
+            for desc_data in desc_results:
                 m_id, m_term, m_trees = parse_mesh_descriptor(desc_data)
                 if m_term:
                     score = _mesh_similarity(query_lower, m_term.lower())
@@ -149,8 +151,6 @@ async def map_to_mesh(
                 candidates.sort(key=lambda c: c[3], reverse=True)
                 best = candidates[0]
                 mesh_id, mesh_term, tree_numbers = best[0], best[1], best[2]
-    finally:
-        await client.close()
 
     return MeSHResult(
         query=term,
@@ -169,18 +169,5 @@ async def map_to_mesh(
 
 
 def _mesh_similarity(query: str, mesh_term: str) -> float:
-    """Score de similaridade entre query e mesh_term.
-
-    Usa rapidfuzz token_sort_ratio se disponível, senão heurística básica.
-    """
-    try:
-        from rapidfuzz.fuzz import token_sort_ratio  # type: ignore[import-not-found,unused-ignore]
-
-        return float(token_sort_ratio(query, mesh_term))
-    except ImportError:
-        # Fallback: exact prefix/containment heuristic
-        if query == mesh_term:
-            return 100.0
-        if query in mesh_term or mesh_term in query:
-            return 80.0
-        return 0.0
+    """Score de similaridade entre query e mesh_term via rapidfuzz."""
+    return float(token_sort_ratio(query, mesh_term))

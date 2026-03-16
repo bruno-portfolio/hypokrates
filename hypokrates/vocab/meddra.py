@@ -7,6 +7,7 @@ Exemplo: ANAPHYLACTIC SHOCK, ANAPHYLACTIC REACTION, ANAPHYLAXIS → ANAPHYLAXIS
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -308,11 +309,9 @@ def group_scan_items(items: list[ScanItem]) -> list[ScanItem]:
 
     Items sem grupo (canonical == original) passam inalterados.
     """
-    groups: dict[str, list[ScanItem]] = {}
+    groups: dict[str, list[ScanItem]] = defaultdict(list)
     for item in items:
         canonical = canonical_term(item.event)
-        if canonical not in groups:
-            groups[canonical] = []
         groups[canonical].append(item)
 
     merged: list[ScanItem] = []

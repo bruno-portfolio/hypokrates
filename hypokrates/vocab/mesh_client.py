@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from hypokrates.config import get_config
 from hypokrates.constants import NCBI_EUTILS_BASE_URL, HTTPSettings, Source
-from hypokrates.exceptions import ParseError, SourceUnavailableError
-from hypokrates.http.auth import inject_ncbi_auth
+from hypokrates.http.auth import inject_ncbi_auth, parse_ncbi_response
 from hypokrates.http.base_client import BaseClient, ParamsType
 from hypokrates.pubmed.constants import RATE_WITH_KEY
 from hypokrates.vocab.constants import (
@@ -109,16 +108,4 @@ class MeSHClient(BaseClient):
 
     def _parse_response(self, response: httpx.Response) -> dict[str, Any]:
         """Parseia JSON response com tratamento de erro NCBI."""
-        try:
-            data: dict[str, Any] = response.json()
-        except Exception as exc:
-            raise ParseError(Source.MESH, f"Invalid JSON: {exc}") from exc
-
-        if "error" in data:
-            raise SourceUnavailableError(Source.MESH, str(data["error"]))
-
-        esearch = data.get("esearchresult", {})
-        if isinstance(esearch, dict) and "ERROR" in esearch:
-            raise SourceUnavailableError(Source.MESH, str(esearch["ERROR"]))
-
-        return data
+        return parse_ncbi_response(Source.MESH, response)

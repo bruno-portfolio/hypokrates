@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
@@ -54,7 +54,7 @@ class BaseClient:
             await self._client.aclose()
             self._client = None
 
-    async def __aenter__(self) -> BaseClient:
+    async def __aenter__(self) -> Self:
         """Entra no context manager."""
         return self
 
