@@ -53,6 +53,7 @@ class TestSignalResult:
             prr=self._make_disp("PRR", 4.5, significant=True),
             ror=self._make_disp("ROR", 4.9, significant=True),
             ic=self._make_disp("IC", 2.1, significant=True),
+            ebgm=self._make_disp("EBGM", 4.0, significant=True),
             signal_detected=True,
             meta=MetaInfo(
                 source="OpenFDA/FAERS",
@@ -64,7 +65,7 @@ class TestSignalResult:
         assert result.signal_detected is True
 
     def test_individual_measures_exposed(self) -> None:
-        """prr, ror, ic acessíveis individualmente."""
+        """prr, ror, ic, ebgm acessíveis individualmente."""
         table = ContingencyTable(a=100, b=900, c=200, d=8800)
         result = SignalResult(
             drug="propofol",
@@ -73,6 +74,7 @@ class TestSignalResult:
             prr=self._make_disp("PRR", 4.5, significant=True),
             ror=self._make_disp("ROR", 4.9, significant=True),
             ic=self._make_disp("IC", 2.1, significant=True),
+            ebgm=self._make_disp("EBGM", 4.0, significant=True),
             signal_detected=True,
             meta=MetaInfo(
                 source="OpenFDA/FAERS",
@@ -83,6 +85,7 @@ class TestSignalResult:
         assert result.prr.measure == "PRR"
         assert result.ror.measure == "ROR"
         assert result.ic.measure == "IC"
+        assert result.ebgm.measure == "EBGM"
 
     def test_serialization_roundtrip(self) -> None:
         table = ContingencyTable(a=10, b=90, c=20, d=880)
@@ -93,6 +96,7 @@ class TestSignalResult:
             prr=self._make_disp("PRR", 1.0, significant=False),
             ror=self._make_disp("ROR", 1.0, significant=False),
             ic=self._make_disp("IC", 0.0, significant=False),
+            ebgm=self._make_disp("EBGM", 1.0, significant=False),
             signal_detected=False,
             meta=MetaInfo(
                 source="OpenFDA/FAERS",
@@ -106,3 +110,4 @@ class TestSignalResult:
         assert restored.event == result.event
         assert restored.table.a == result.table.a
         assert restored.signal_detected == result.signal_detected
+        assert restored.ebgm.measure == "EBGM"

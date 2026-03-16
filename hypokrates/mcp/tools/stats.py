@@ -53,6 +53,7 @@ def register(mcp: FastMCP) -> None:
             _format_measure("PRR", result.prr),
             _format_measure("ROR", result.ror),
             _format_measure("IC ", result.ic),
+            _format_measure("EBGM", result.ebgm),
             "",
             "## Contingency Table",
             f"- drug+event: {result.table.a}",
@@ -113,6 +114,7 @@ def register(mcp: FastMCP) -> None:
                 f"{'*' if getattr(result.prr, 'significant', False) else ''} | "
                 f"ROR={getattr(result.ror, 'value', 0):.2f} | "
                 f"IC={getattr(result.ic, 'value', 0):.2f} | "
+                f"EBGM={getattr(result.ebgm, 'value', 0):.2f} | "
                 f"n={result.table.a}"
             )
 

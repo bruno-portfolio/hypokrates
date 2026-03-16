@@ -44,6 +44,9 @@ def _make_signal(
         ic=DisproportionalityResult(
             measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=detected
         ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=detected
+        ),
         signal_detected=detected,
         meta=_make_meta(),
     )
@@ -711,6 +714,9 @@ async def test_scan_volume_flag_set_when_above_threshold(
         ic=DisproportionalityResult(
             measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
         ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
+        ),
         signal_detected=True,
         meta=_make_meta(),
     )
@@ -1030,6 +1036,9 @@ async def test_scan_direction_analysis_strengthens(
             ic=DisproportionalityResult(
                 measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
             ),
+            ebgm=DisproportionalityResult(
+                measure="EBGM", value=3.0, ci_lower=2.5, ci_upper=3.5, significant=True
+            ),
             signal_detected=True,
             meta=_make_meta(),
         )
@@ -1083,6 +1092,9 @@ async def test_scan_direction_analysis_weakens(
             ),
             ic=DisproportionalityResult(
                 measure="IC", value=0.5, ci_lower=0.1, ci_upper=0.9, significant=False
+            ),
+            ebgm=DisproportionalityResult(
+                measure="EBGM", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=False
             ),
             signal_detected=True,
             meta=_make_meta(),

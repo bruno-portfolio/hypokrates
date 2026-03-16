@@ -20,7 +20,13 @@ from hypokrates.stats.constants import (
     MIN_REPORT_COUNT,
     SIGNAL_DISCLAIMER,
 )
-from hypokrates.stats.measures import build_table, compute_ic, compute_prr, compute_ror
+from hypokrates.stats.measures import (
+    build_table,
+    compute_ebgm,
+    compute_ic,
+    compute_prr,
+    compute_ror,
+)
 from hypokrates.stats.models import SignalResult
 
 logger = logging.getLogger(__name__)
@@ -123,6 +129,7 @@ async def bulk_signal(
     prr = compute_prr(table)
     ror = compute_ror(table)
     ic = compute_ic(table)
+    ebgm = compute_ebgm(table)
 
     significant_count = sum([prr.significant, ror.significant, ic.significant])
     signal_detected = (
@@ -142,6 +149,7 @@ async def bulk_signal(
         prr=prr,
         ror=ror,
         ic=ic,
+        ebgm=ebgm,
         signal_detected=signal_detected,
         meta=MetaInfo(
             source="FAERS/bulk (deduplicated)",

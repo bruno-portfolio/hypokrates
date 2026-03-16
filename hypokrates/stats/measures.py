@@ -4,9 +4,18 @@ from __future__ import annotations
 
 import math
 
+from scipy.special import digamma as _digamma
 from scipy.special import polygamma
+from scipy.stats import gamma as _gamma_dist
+from scipy.stats import nbinom as _nbinom
 
 from hypokrates.stats.constants import (
+    EBGM_ALPHA1,
+    EBGM_ALPHA2,
+    EBGM_BETA1,
+    EBGM_BETA2,
+    EBGM_P,
+    SIGNIFICANCE_THRESHOLD_EBGM,
     SIGNIFICANCE_THRESHOLD_IC,
     SIGNIFICANCE_THRESHOLD_PRR,
     SIGNIFICANCE_THRESHOLD_ROR,
@@ -153,6 +162,126 @@ def compute_ic(table: ContingencyTable) -> DisproportionalityResult:
         ci_upper=ci_upper,
         significant=ci_lower > SIGNIFICANCE_THRESHOLD_IC,
     )
+
+
+def compute_ebgm(table: ContingencyTable) -> DisproportionalityResult:
+    """EBGM (Empirical Bayes Geometric Mean) via GPS/DuMouchel (1999).
+
+    Gamma-Poisson Shrinker: método oficial da FDA (sistema MGPS).
+    Shrinkage bayesiano penaliza estimativas com poucos reports,
+    reduzindo falsos positivos. Com counts altos, EBGM converge
+    para N/E (ratio observado/esperado).
+
+    CI: EB05 (5th percentile) e EB95 (95th percentile) da posterior
+    mixture of two gammas, obtidos por bisection.
+
+    Referência: DuMouchel W (1999). Bayesian Data Mining in Large
+    Frequency Tables. The American Statistician, 53(3), 177-190.
+    """
+    a = table.a
+    n = table.n
+    ab = a + table.b
+    ac = a + table.c
+
+    if a == 0 or n == 0 or ab == 0 or ac == 0:
+        return DisproportionalityResult(
+            measure="EBGM",
+            value=0.0,
+            ci_lower=0.0,
+            ci_upper=0.0,
+            significant=False,
+        )
+
+    # Expected count under independence
+    e_val = ab * ac / n
+
+    if e_val <= 0:
+        return DisproportionalityResult(
+            measure="EBGM",
+            value=0.0,
+            ci_lower=0.0,
+            ci_upper=0.0,
+            significant=False,
+        )
+
+    # Posterior mixture weight Qn (DuMouchel Eq. 6)
+    qn = _ebgm_qn(a, e_val)
+
+    # EBGM point estimate (DuMouchel Eq. 9-11)
+    e_ln_lambda = qn * (float(_digamma(EBGM_ALPHA1 + a)) - math.log(EBGM_BETA1 + e_val)) + (
+        1 - qn
+    ) * (float(_digamma(EBGM_ALPHA2 + a)) - math.log(EBGM_BETA2 + e_val))
+    ebgm = math.exp(e_ln_lambda)
+
+    # EB05 and EB95 via bisection on posterior CDF
+    eb05 = _ebgm_quantile(a, e_val, qn, 0.05)
+    eb95 = _ebgm_quantile(a, e_val, qn, 0.95)
+
+    return DisproportionalityResult(
+        measure="EBGM",
+        value=ebgm,
+        ci_lower=eb05,
+        ci_upper=eb95,
+        significant=eb05 > SIGNIFICANCE_THRESHOLD_EBGM,
+    )
+
+
+def _ebgm_qn(n_obs: int, e_val: float) -> float:
+    """Posterior mixture weight Q_n (DuMouchel Eq. 6).
+
+    Uses log-space to avoid underflow with extreme values.
+    """
+    p1 = EBGM_BETA1 / (EBGM_BETA1 + e_val)
+    p2 = EBGM_BETA2 / (EBGM_BETA2 + e_val)
+
+    log_f1 = float(_nbinom.logpmf(n_obs, EBGM_ALPHA1, p1))
+    log_f2 = float(_nbinom.logpmf(n_obs, EBGM_ALPHA2, p2))
+
+    log_w1 = math.log(EBGM_P) + log_f1
+    log_w2 = math.log(1 - EBGM_P) + log_f2
+
+    # logsumexp inline to avoid extra import
+    max_log = max(log_w1, log_w2)
+    log_sum = max_log + math.log(math.exp(log_w1 - max_log) + math.exp(log_w2 - max_log))
+
+    return math.exp(log_w1 - log_sum)
+
+
+def _ebgm_quantile(
+    n_obs: int,
+    e_val: float,
+    qn: float,
+    target: float,
+    *,
+    max_iter: int = 50,
+    tol: float = 1e-5,
+) -> float:
+    """Quantile of posterior mixture via bisection.
+
+    Posterior = Qn * Gamma(alpha1+n, rate=beta1+E)
+             + (1-Qn) * Gamma(alpha2+n, rate=beta2+E)
+    """
+    a1n = EBGM_ALPHA1 + n_obs
+    a2n = EBGM_ALPHA2 + n_obs
+    scale1 = 1.0 / (EBGM_BETA1 + e_val)
+    scale2 = 1.0 / (EBGM_BETA2 + e_val)
+
+    lo = 1e-10
+    hi = max(n_obs / e_val * 10, 100.0)
+
+    for _ in range(max_iter):
+        mid = (lo + hi) / 2
+        cdf_val = qn * float(_gamma_dist.cdf(mid, a1n, scale=scale1)) + (1 - qn) * float(
+            _gamma_dist.cdf(mid, a2n, scale=scale2)
+        )
+        if cdf_val < target:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < tol:
+            break
+
+    return (lo + hi) / 2
 
 
 def build_table(

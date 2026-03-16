@@ -94,6 +94,7 @@ def register(mcp: FastMCP) -> None:
             _format_measure("PRR", result.prr),
             _format_measure("ROR", result.ror),
             _format_measure("IC ", result.ic),
+            _format_measure("EBGM", result.ebgm),
             "",
             "## Contingency Table (deduplicated)",
             f"- drug+event: {result.table.a}",

@@ -24,7 +24,13 @@ from hypokrates.stats.constants import (
     SIGNAL_DISCLAIMER,
     SPIKE_THRESHOLD_SIGMA,
 )
-from hypokrates.stats.measures import build_table, compute_ic, compute_prr, compute_ror
+from hypokrates.stats.measures import (
+    build_table,
+    compute_ebgm,
+    compute_ic,
+    compute_prr,
+    compute_ror,
+)
 from hypokrates.stats.models import QuarterlyCount, SignalResult, TimelineResult
 from hypokrates.vocab.meddra import expand_event_terms
 
@@ -152,6 +158,7 @@ async def signal(
     prr = compute_prr(table)
     ror = compute_ror(table)
     ic = compute_ic(table)
+    ebgm = compute_ebgm(table)
 
     significant_count = sum([prr.significant, ror.significant, ic.significant])
     signal_detected = (
@@ -171,6 +178,7 @@ async def signal(
         prr=prr,
         ror=ror,
         ic=ic,
+        ebgm=ebgm,
         signal_detected=signal_detected,
         no_data=drug_event_count == 0,
         meta=MetaInfo(

@@ -11,6 +11,7 @@ import pytest
 from hypokrates.stats.measures import (
     _BCPNN_ALPHA,
     build_table,
+    compute_ebgm,
     compute_ic,
     compute_prr,
     compute_ror,
@@ -199,6 +200,73 @@ class TestComputeIC:
         assert _BCPNN_ALPHA == 0.5
 
 
+class TestComputeEBGM:
+    """Testa EBGM (GPS/DuMouchel 1999) — Empirical Bayes Geometric Mean."""
+
+    def test_known_values(self, golden_table: ContingencyTable) -> None:
+        """a=100,b=900,c=200,d=8800 → EBGM > 1.0 (sinal real)."""
+        result = compute_ebgm(golden_table)
+        assert result.measure == "EBGM"
+        assert result.value > 1.0
+
+    def test_ci_contains_point_estimate(self, golden_table: ContingencyTable) -> None:
+        result = compute_ebgm(golden_table)
+        assert result.ci_lower < result.value < result.ci_upper
+
+    def test_significant_when_eb05_above_threshold(self, golden_table: ContingencyTable) -> None:
+        result = compute_ebgm(golden_table)
+        assert result.ci_lower > 1.0
+        assert result.significant is True
+
+    def test_not_significant_small_count(self) -> None:
+        """a=1 → shrinkage → EB05 < 1.0."""
+        table = ContingencyTable(a=1, b=999, c=200, d=8800)
+        result = compute_ebgm(table)
+        assert result.significant is False
+
+    def test_zero_a_handled(self) -> None:
+        table = ContingencyTable(a=0, b=1000, c=500, d=8500)
+        result = compute_ebgm(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_zero_e_handled(self) -> None:
+        """E=0 (ab=0 ou ac=0) → retorna zeros."""
+        table = ContingencyTable(a=0, b=0, c=500, d=8500)
+        result = compute_ebgm(table)
+        assert result.value == 0.0
+        assert result.significant is False
+
+    def test_shrinkage_small_counts(self) -> None:
+        """a=3 → EBGM << N/E (shrinkage em ação)."""
+        table = ContingencyTable(a=3, b=97, c=50, d=9850)
+        result = compute_ebgm(table)
+        # N/E sem shrinkage
+        n = table.n
+        e_val = (3 + 97) * (3 + 50) / n
+        raw_ratio = 3 / e_val
+        # EBGM deve ser menor que raw ratio (shrinkage)
+        assert result.value < raw_ratio
+
+    def test_convergence_large_counts(self) -> None:
+        """a=1000 → EBGM ≈ N/E (prior é irrelevante)."""
+        table = ContingencyTable(a=1000, b=9000, c=2000, d=88000)
+        result = compute_ebgm(table)
+        n = table.n
+        e_val = (1000 + 9000) * (1000 + 2000) / n
+        raw_ratio = 1000 / e_val
+        assert math.isclose(result.value, raw_ratio, rel_tol=0.05)
+
+    def test_eb05_below_ebgm(self, golden_table: ContingencyTable) -> None:
+        """EB05 < EBGM sempre."""
+        result = compute_ebgm(golden_table)
+        assert result.ci_lower < result.value
+
+    def test_deterministic_100x(self, golden_table: ContingencyTable) -> None:
+        results = [compute_ebgm(golden_table).value for _ in range(100)]
+        assert len(set(results)) == 1
+
+
 class TestBuildTable:
     """Testes para build_table."""
 
@@ -233,6 +301,8 @@ class TestMeasuresDeterminism:
         results_prr = [compute_prr(golden_table).value for _ in range(100)]
         results_ror = [compute_ror(golden_table).value for _ in range(100)]
         results_ic = [compute_ic(golden_table).value for _ in range(100)]
+        results_ebgm = [compute_ebgm(golden_table).value for _ in range(100)]
         assert len(set(results_prr)) == 1
         assert len(set(results_ror)) == 1
         assert len(set(results_ic)) == 1
+        assert len(set(results_ebgm)) == 1

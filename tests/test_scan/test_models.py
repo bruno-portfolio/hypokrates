@@ -28,6 +28,9 @@ def _make_signal() -> SignalResult:
         ic=DisproportionalityResult(
             measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
         ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
+        ),
         signal_detected=True,
         meta=MetaInfo(source="test", retrieved_at=datetime.now(UTC)),
     )

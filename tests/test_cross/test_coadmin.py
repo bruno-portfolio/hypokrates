@@ -83,6 +83,9 @@ def _make_signal_result(
         ic=DisproportionalityResult(
             measure="IC", value=5.0, ci_lower=4.5, ci_upper=5.5, significant=True
         ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM", value=4.0, ci_lower=3.5, ci_upper=4.5, significant=True
+        ),
         signal_detected=signal_detected,
         meta=_make_meta(),
     )

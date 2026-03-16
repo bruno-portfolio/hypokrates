@@ -54,6 +54,9 @@ class SignalResult(BaseModel):
     prr: DisproportionalityResult
     ror: DisproportionalityResult
     ic: DisproportionalityResult = Field(description="IC (BCPNN — Norén et al. 2006)")
+    ebgm: DisproportionalityResult = Field(
+        description="EBGM (GPS/DuMouchel 1999) — informacional, não participa de signal_detected"
+    )
     signal_detected: bool = Field(description="Heurística: >= 2 medidas significantes")
     no_data: bool = Field(
         default=False,

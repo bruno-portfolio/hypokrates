@@ -89,6 +89,13 @@ def _signal(
             ci_upper=1.5,
             significant=detected,
         ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM",
+            value=2.0,
+            ci_lower=1.5 if detected else 0.5,
+            ci_upper=2.5,
+            significant=detected,
+        ),
         signal_detected=detected,
         meta=_meta("OpenFDA/FAERS"),
     )

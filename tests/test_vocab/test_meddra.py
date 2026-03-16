@@ -303,6 +303,7 @@ class TestGroupScanItems:
                 prr=measure,
                 ror=measure,
                 ic=measure,
+                ebgm=measure,
                 meta=MetaInfo(
                     source="test",
                     retrieved_at=datetime.now(UTC),

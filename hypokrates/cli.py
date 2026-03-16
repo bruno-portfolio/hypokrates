@@ -187,7 +187,9 @@ def _print_signal(result: object) -> None:
     typer.echo(f"Signal: {'YES' if detected else 'NO'}")
     typer.echo("")
 
-    for name, m in [("PRR", prr), ("ROR", ror), ("IC", ic)]:
+    ebgm = getattr(result, "ebgm", None)
+
+    for name, m in [("PRR", prr), ("ROR", ror), ("IC", ic), ("EBGM", ebgm)]:
         if m is None:
             continue
         sig = "*" if getattr(m, "significant", False) else ""
