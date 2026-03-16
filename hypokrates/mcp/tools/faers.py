@@ -52,29 +52,46 @@ def register(mcp: FastMCP) -> None:
         return "\n".join(lines)
 
     @mcp.tool()
-    async def drugs_by_event(event: str, limit: int = 10) -> str:
+    async def drugs_by_event(event: str, limit: int = 10, suspect_only: bool = True) -> str:
         """Get top drugs reported for an adverse event from FAERS (reverse lookup).
 
-        Useful for finding which drugs are most associated with a specific
-        adverse event in the FDA spontaneous reporting database.
+        Returns drugs ranked by report count with total drug reports for context.
+        Default suspect_only=True reduces co-administration noise (e.g., propofol
+        appearing in rocuronium anaphylaxis reports as concomitant).
 
         Args:
             event: MedDRA adverse event term (e.g., "anaphylactic shock").
             limit: Number of top drugs to return.
+            suspect_only: Only count reports where drug is suspect (default True).
         """
-        result = await faers_api.drugs_by_event(event, limit=limit)
+        result = await faers_api.drugs_by_event(event, limit=limit, suspect_only=suspect_only)
         if not result.drugs:
             return f"No drugs found for event '{event}' in FAERS."
+        role = "suspect only" if suspect_only else "all roles"
         lines = [
             f"# Top Drugs for: {result.event}",
-            f"**Total:** {len(result.drugs)} drugs",
+            f"**Total:** {len(result.drugs)} drugs | **Role filter:** {role}",
             "",
+            "| # | Drug | Event Reports | Drug Total | % |",
+            "|---|------|--------------|------------|---|",
         ]
         for i, d in enumerate(result.drugs, 1):
-            lines.append(f"{i:2}. **{d.name}**: {d.count:,} reports")
-        lines.append("")
-        lines.append("---")
-        lines.append("*Source: OpenFDA/FAERS — voluntary reporting, counts ≠ risk*")
+            if d.total_drug_reports and d.total_drug_reports > 0:
+                pct = d.count / d.total_drug_reports * 100
+                lines.append(
+                    f"| {i} | **{d.name}** | {d.count:,} | {d.total_drug_reports:,} | {pct:.1f}% |"
+                )
+            else:
+                lines.append(f"| {i} | **{d.name}** | {d.count:,} | — | — |")
+        lines.extend(
+            [
+                "",
+                "---",
+                "*Source: OpenFDA/FAERS — voluntary reporting. "
+                "% = event reports / total drug reports (NOT incidence).*",
+                "*Use `signal(drug, event)` for PRR disproportionality analysis.*",
+            ]
+        )
         return "\n".join(lines)
 
     @mcp.tool()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import statistics
 from collections import Counter
@@ -192,15 +193,18 @@ async def compare(
 async def drugs_by_event(
     event: str,
     *,
-    suspect_only: bool = False,
+    suspect_only: bool = True,
     limit: int = 10,
     use_cache: bool = True,
 ) -> DrugsByEventResult:
     """Retorna os medicamentos mais reportados para um evento adverso (reverse lookup).
 
+    Enriquece cada droga com total_drug_reports para contexto de volume.
+    Default suspect_only=True para reduzir ruído de co-administração.
+
     Args:
         event: Termo MedDRA do evento adverso (e.g., "anaphylactic shock").
-        suspect_only: Se True, apenas reports onde a droga e suspect.
+        suspect_only: Se True, apenas reports onde a droga e suspect (default True).
         limit: Numero de drogas retornadas (top N).
         use_cache: Se deve usar cache.
 
@@ -212,18 +216,41 @@ async def drugs_by_event(
         search = _build_event_search(event, suspect_only=suspect_only)
         count_field = COUNT_FIELDS["drug"]
         data = await client.fetch_count(search, count_field, limit=limit, use_cache=use_cache)
+
+        raw_results: list[dict[str, Any]] = data.get("results", [])
+        drugs = parse_drug_count_results(raw_results)
+
+        # Enrich: total reports per drug (parallel, cached)
+        if drugs:
+            drug_field = SEARCH_FIELDS["drug"]
+
+            async def _fetch_drug_total(drug_name: str) -> int:
+                q = f'{drug_field}:"{drug_name}"'
+                if suspect_only:
+                    q += f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
+                return await client.fetch_total(q, use_cache=use_cache)
+
+            totals = await asyncio.gather(
+                *[_fetch_drug_total(d.name) for d in drugs],
+                return_exceptions=True,
+            )
+            for drug_item, total in zip(drugs, totals, strict=True):
+                if isinstance(total, int):
+                    drug_item.total_drug_reports = total
     finally:
         await client.close()
-
-    raw_results: list[dict[str, Any]] = data.get("results", [])
-    drugs = parse_drug_count_results(raw_results)
 
     return DrugsByEventResult(
         event=event.upper(),
         drugs=drugs,
         meta=MetaInfo(
             source="OpenFDA/FAERS",
-            query={"event": event, "count": "drug", "limit": limit},
+            query={
+                "event": event,
+                "count": "drug",
+                "limit": limit,
+                "suspect_only": suspect_only,
+            },
             total_results=len(drugs),
             retrieved_at=datetime.now(UTC),
         ),

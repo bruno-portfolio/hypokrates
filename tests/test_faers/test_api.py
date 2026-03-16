@@ -178,7 +178,9 @@ class TestDrugsByEvent:
         respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
             return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
         )
-        result = await drugs_by_event("anaphylactic shock", limit=10, use_cache=False)
+        result = await drugs_by_event(
+            "anaphylactic shock", limit=10, suspect_only=False, use_cache=False
+        )
         assert len(result.drugs) == 10
         assert result.drugs[0].name == "PROPOFOL"
         assert result.drugs[0].count == 1969
@@ -189,7 +191,7 @@ class TestDrugsByEvent:
         respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
             return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
         )
-        result = await drugs_by_event("anaphylactic shock", use_cache=False)
+        result = await drugs_by_event("anaphylactic shock", suspect_only=False, use_cache=False)
         assert result.event == "ANAPHYLACTIC SHOCK"
 
     @respx.mock
@@ -198,7 +200,9 @@ class TestDrugsByEvent:
         respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
             return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
         )
-        result = await drugs_by_event("anaphylactic shock", limit=10, use_cache=False)
+        result = await drugs_by_event(
+            "anaphylactic shock", limit=10, suspect_only=False, use_cache=False
+        )
         assert result.meta.query["event"] == "anaphylactic shock"
         assert result.meta.query["count"] == "drug"
         assert result.meta.source == "OpenFDA/FAERS"
@@ -209,8 +213,30 @@ class TestDrugsByEvent:
         respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
             return_value=httpx.Response(200, json=golden_faers_no_results)
         )
-        result = await drugs_by_event("XYZNOTEXIST", use_cache=False)
+        result = await drugs_by_event("XYZNOTEXIST", suspect_only=False, use_cache=False)
         assert len(result.drugs) == 0
+
+    @respx.mock
+    async def test_default_suspect_only(self, golden_faers_drugs_by_event: dict[str, Any]) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
+        )
+        result = await drugs_by_event("anaphylactic shock", use_cache=False)
+        assert result.meta.query["suspect_only"] is True
+
+    @respx.mock
+    async def test_enriches_total_drug_reports(
+        self, golden_faers_drugs_by_event: dict[str, Any]
+    ) -> None:
+        configure(cache_enabled=False)
+        respx.get(url__startswith="https://api.fda.gov/drug/event.json").mock(
+            return_value=httpx.Response(200, json=golden_faers_drugs_by_event)
+        )
+        result = await drugs_by_event("anaphylactic shock", use_cache=False)
+        # All drugs should have total_drug_reports populated
+        for d in result.drugs:
+            assert d.total_drug_reports is not None
 
 
 class TestCompare:

@@ -53,7 +53,10 @@ class DrugCount(BaseModel):
     """Droga com contagem de reports (reverse lookup: evento -> drogas)."""
 
     name: str = Field(description="Nome generico do medicamento")
-    count: int = Field(default=0, description="Contagem de reports")
+    count: int = Field(default=0, description="Contagem de reports drug+event")
+    total_drug_reports: int | None = Field(
+        default=None, description="Total reports da droga (contexto volume)"
+    )
 
 
 class DrugsByEventResult(BaseModel):
