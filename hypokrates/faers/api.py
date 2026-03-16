@@ -9,6 +9,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
 
+from hypokrates.constants import ParamsType  # noqa: TC001 — used in local annotation
 from hypokrates.faers.client import FAERSClient
 from hypokrates.faers.constants import (
     CO_ADMIN_SAMPLE_SIZE,
@@ -73,7 +74,7 @@ async def adverse_events(
     finally:
         await client.close()
 
-    query_params: dict[str, str | int | float | bool | None] = {"drug": drug}
+    query_params: ParamsType = {"drug": drug}
     if age_min is not None:
         query_params["age_min"] = age_min
     if age_max is not None:

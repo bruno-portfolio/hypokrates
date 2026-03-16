@@ -43,6 +43,7 @@ class CacheStore:
         self._conn = duckdb.connect(str(db_path))
         self._db_lock = threading.Lock()
         run_migrations(self._conn)
+        self._cleanup_expired_on_startup()
 
     @classmethod
     def get_instance(cls) -> CacheStore:
@@ -138,6 +139,15 @@ class CacheStore:
             )
             row = result.fetchone()
             return int(row[0]) if row is not None else 0
+
+    def _cleanup_expired_on_startup(self) -> None:
+        """Remove entradas expiradas na inicialização (1x por processo)."""
+        try:
+            removed = self.cleanup_expired()
+            if removed > 0:
+                logger.info("Cache startup: removed %d expired entries", removed)
+        except duckdb.Error as exc:
+            logger.warning("Cache startup cleanup failed: %s", exc)
 
     def close(self) -> None:
         """Fecha conexão DuckDB."""

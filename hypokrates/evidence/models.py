@@ -7,6 +7,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from hypokrates.constants import ParamsType  # noqa: TC001 — Pydantic needs at runtime
+
 
 class Limitation(StrEnum):
     """Limitações conhecidas de fontes de dados."""
@@ -26,7 +28,7 @@ class EvidenceBlock(BaseModel):
 
     source: str = Field(description="Fonte de dados (e.g., 'OpenFDA/FAERS')")
     source_version: str | None = None
-    query: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    query: ParamsType = Field(default_factory=dict)
     retrieved_at: datetime
     cached: bool = False
     data: dict[str, object] = Field(default_factory=dict)

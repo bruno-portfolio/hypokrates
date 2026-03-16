@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
+from hypokrates.constants import ParamsType as ParamsType  # noqa: TC001 — explicit re-export
 from hypokrates.exceptions import ParseError
 from hypokrates.http.rate_limiter import RateLimiter
 from hypokrates.http.retry import retry_request
@@ -16,9 +17,6 @@ if TYPE_CHECKING:
     import httpx
 
 logger = logging.getLogger(__name__)
-
-ParamsType = dict[str, str | int | float | bool | None]
-"""Type alias para query params HTTP (usado em 8+ clients)."""
 
 
 class BaseClient:
@@ -90,11 +88,11 @@ class BaseClient:
         src = cache_source or self._source
         cache_ep = f"{endpoint}{cache_suffix}" if cache_suffix else endpoint
         should_cache = use_cache and get_config().cache_enabled
+        store = CacheStore.get_instance() if should_cache else None
         key = ""
 
-        if should_cache:
+        if store is not None:
             key = cache_key(src, cache_ep, params)
-            store = CacheStore.get_instance()
             cached = await store.aget(key)
             if cached is not None:
                 logger.debug("Cache hit: %s", key)
@@ -113,8 +111,7 @@ class BaseClient:
 
         data = self._parse_response(response)
 
-        if should_cache:
-            store = CacheStore.get_instance()
+        if store is not None:
             await store.aset(key, data, src)
 
         return data

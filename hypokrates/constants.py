@@ -64,6 +64,12 @@ class CacheSettings:
 CACHE_SCHEMA_VERSION: int = 1
 
 
+# --- Type aliases ---
+
+ParamsType = dict[str, str | int | float | bool | None]
+"""Type alias para query/params HTTP e MetaInfo.query (usado em 10+ módulos)."""
+
+
 # --- HTTP settings ---
 
 

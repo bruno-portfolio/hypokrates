@@ -4,18 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TypeVar
 
 import httpx
 
-from hypokrates.constants import HTTPSettings
+from hypokrates.constants import HTTPSettings, ParamsType
 from hypokrates.exceptions import NetworkError, RateLimitError, SourceUnavailableError
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
-
-_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_RETRYABLE_STATUS = {500, 502, 503, 504}
 _PASSTHROUGH_STATUS = {404}
 
 
@@ -24,7 +21,7 @@ async def retry_request(
     method: str,
     url: str,
     *,
-    params: dict[str, str | int | float | bool | None] | None = None,
+    params: ParamsType | None = None,
     headers: dict[str, str] | None = None,
     max_retries: int | None = None,
     source_name: str = "unknown",

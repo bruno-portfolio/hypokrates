@@ -7,7 +7,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from hypokrates.constants import __version__
+from hypokrates.constants import ParamsType, __version__
 
 
 class Sex(StrEnum):
@@ -51,9 +51,7 @@ class MetaInfo(BaseModel):
     """Metadados de proveniência de uma resposta."""
 
     source: str = Field(description="Fonte de dados (e.g., 'OpenFDA/FAERS')")
-    query: dict[str, str | int | float | bool | None] = Field(
-        default_factory=dict, description="Parâmetros da consulta"
-    )
+    query: ParamsType = Field(default_factory=dict, description="Parâmetros da consulta")
     total_results: int = Field(default=0)
     records_count: int = Field(default=0, description="Registros retornados nesta resposta")
     cached: bool = Field(default=False)

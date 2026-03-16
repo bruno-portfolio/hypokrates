@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from hypokrates.constants import ParamsType  # noqa: TC001 — used in function signature
 from hypokrates.models import MetaInfo
 
 
 def build_source_meta(
     source: str,
-    query: dict[str, str | int | float | bool | None],
+    query: ParamsType,
     total: int = 0,
     cached: bool = False,
 ) -> MetaInfo:
