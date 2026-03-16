@@ -356,9 +356,9 @@ async def hypothesis(
         confidence=_confidence_label(classification),
     )
 
-    # 3e. Co-administration analysis (Layer 1 + 2, apenas se sinal detectado)
+    # 3e. Co-administration analysis (Layer 1 sempre, Layer 2 se sinal detectado)
     coadmin_result: CoAdminAnalysis | None = None
-    if check_coadmin and signal_result.signal_detected:
+    if check_coadmin:
         coadmin_profile = await faers_api.co_suspect_profile(
             drug,
             event,
@@ -367,14 +367,21 @@ async def hypothesis(
             _client=_faers_client,
             _drug_search=_drug_search,
         )
-        coadmin_result = await coadmin_analysis(
-            drug,
-            event,
-            coadmin_profile,
-            drug_prr=signal_result.prr.value,
-            suspect_only=suspect_only,
-            use_cache=use_cache,
-        )
+        if signal_result.signal_detected:
+            coadmin_result = await coadmin_analysis(
+                drug,
+                event,
+                coadmin_profile,
+                drug_prr=signal_result.prr.value,
+                suspect_only=suspect_only,
+                use_cache=use_cache,
+            )
+        else:
+            # Sem sinal FAERS → Layer 1 only (profile sem comparative PRR)
+            coadmin_result = CoAdminAnalysis(
+                profile=coadmin_profile,
+                verdict="no_signal",
+            )
 
     return HypothesisResult(
         drug=drug,
@@ -408,6 +415,12 @@ def _classify(
 ) -> HypothesisClassification:
     """Classifica hipótese com base em sinal, literatura e label."""
     if not signal_detected:
+        # Mesmo sem sinal FAERS, literatura substancial + bula = known
+        if in_label is True and literature_count > emerging_max:
+            return HypothesisClassification.KNOWN_ASSOCIATION
+        # Literatura substancial sem bula → emerging (FAERS pode estar diluído)
+        if literature_count > emerging_max:
+            return HypothesisClassification.EMERGING_SIGNAL
         return HypothesisClassification.NO_SIGNAL
 
     if literature_count <= novel_max:

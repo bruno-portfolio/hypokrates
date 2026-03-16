@@ -96,14 +96,24 @@ class TestHypothesisAPI:
 
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
-    async def test_no_signal(self, mock_signal: Any, mock_pubmed: Any) -> None:
-        """Sem sinal → no_signal independente de papers."""
+    async def test_no_signal_no_literature(self, mock_signal: Any, mock_pubmed: Any) -> None:
+        """Sem sinal + 0 papers → no_signal."""
         mock_signal.return_value = _make_signal(detected=False)
-        mock_pubmed.return_value = _make_pubmed_result(50)
+        mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis("aspirin", "HEADACHE", use_cache=False)
         assert result.classification == HypothesisClassification.NO_SIGNAL
         assert "No signal" in result.summary
+
+    @patch("hypokrates.cross.api.pubmed_api.search_papers")
+    @patch("hypokrates.cross.api.stats_api.signal")
+    async def test_no_signal_with_literature(self, mock_signal: Any, mock_pubmed: Any) -> None:
+        """Sem sinal FAERS + literatura substancial → emerging (FAERS diluído)."""
+        mock_signal.return_value = _make_signal(detected=False)
+        mock_pubmed.return_value = _make_pubmed_result(50)
+
+        result = await hypothesis("aspirin", "HEADACHE", use_cache=False)
+        assert result.classification == HypothesisClassification.EMERGING_SIGNAL
 
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")

@@ -48,6 +48,9 @@ _PRESCRIPTION_FORMS: set[str] = {
     "INHALATION",
 }
 
+# Marcadores de produto combinado (múltiplos ingredientes ativos)
+_COMBINATION_MARKERS: list[str] = [" AND ", " WITH ", " / "]
+
 # Formas farmacêuticas OTC tópicas (menos relevantes)
 _OTC_TOPICAL_FORMS: set[str] = {
     "PATCH",
@@ -70,25 +73,33 @@ def _score_spl_candidate(candidate: SPLCandidate) -> int:
     """Pontua um candidato SPL para ranking.
 
     Score mais alto = mais relevante para farmacovigilância.
+    Prioriza: single-ingredient > combo, systemic > topical, prescription > OTC.
     """
     title_upper = candidate["title"].upper()
-    score = candidate["spl_version"]
+    # Cap spl_version para evitar que versões altas dominem o scoring
+    score = min(candidate["spl_version"], 5)
 
     # Filtrar veterinários
     for marker in _VET_MARKERS:
         if marker in title_upper:
             return -100
 
-    # Bonus para formas prescription
+    # Penalty para combinações (múltiplos ingredientes ativos)
+    for pattern in _COMBINATION_MARKERS:
+        if pattern in title_upper:
+            score -= 30
+            break
+
+    # Bonus para formas prescription/sistêmicas
     for form in _PRESCRIPTION_FORMS:
         if form in title_upper:
-            score += 10
+            score += 25
             break
 
     # Penalty para OTC tópicos
     for form in _OTC_TOPICAL_FORMS:
         if form in title_upper:
-            score -= 10
+            score -= 25
             break
 
     return score

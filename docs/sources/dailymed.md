@@ -33,9 +33,22 @@ hypokrates parses **multiple safety sections** of the SPL XML and extracts indiv
 
 ## SPL Selection
 
-When searching for a drug, DailyMed may return multiple SPLs (e.g., injectable, powder, OTC, patch). hypokrates fetches up to **10 candidates** and selects the first SPL that contains at least one safety section (by LOINC code). This avoids picking irrelevant SPLs (like powders for compounding) that have no adverse reactions data.
+When searching for a drug, DailyMed may return multiple SPLs (e.g., injectable, tablet, cream, patch, veterinary). hypokrates fetches up to **100 candidates** and ranks them by heuristic score:
 
-If no SPL has safety sections, the first result is used as fallback.
+| Factor | Score Impact |
+|--------|-------------|
+| Prescription/systemic forms (injection, tablet, capsule, etc.) | **+25** |
+| OTC/topical forms (cream, patch, gel, ointment, etc.) | **-25** |
+| Combination products (" AND ", " WITH ", " / " in title) | **-30** |
+| Veterinary labels (Covetrus, Dechra, Zoetis, etc.) | **-100** |
+| SPL version (revision count, capped at 5) | **+1 to +5** |
+
+Two-pass selection: first prefers SPLs with a formal Adverse Reactions section (LOINC 34084-4), then falls back to any safety section. This ensures:
+
+- **Single-ingredient** labels are preferred over combination products (e.g., acetaminophen alone over acetaminophen+codeine)
+- **Systemic formulations** are preferred over topical (e.g., hydrocortisone injection over hydrocortisone cream)
+- **Veterinary labels** are excluded
+- **Prescription labels** are preferred over OTC
 
 ## Functions
 
@@ -58,6 +71,8 @@ All layers apply to both structured terms extracted from the XML and the raw tex
 
 - Not all drugs have SPL labels in DailyMed
 - Adverse reactions section varies in structure across labels
+- `label_events()` event count may be inflated — narrative text (boilerplate, section references, FDA contact info) can be captured as "events" because the parser splits by commas/semicolons without MedDRA validation
 - MedDRA synonym coverage is limited to 35 static groups (~120 aliases) — terms outside these groups rely on fuzzy matching
 - Generic drugs may have multiple labels from different manufacturers
 - Fuzzy matching may produce rare false positives for very short terms
+- Combination products with " AND " in the title are penalized but some edge cases (e.g., "LIDOCAINE AND EPINEPHRINE") may be incorrectly deprioritized when the combination is the most clinically relevant formulation

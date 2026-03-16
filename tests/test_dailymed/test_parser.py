@@ -109,13 +109,13 @@ class TestScoreSplCandidate:
         score = _score_spl_candidate(
             {"setid": "a", "title": "PROPOFOL INJECTABLE EMULSION", "spl_version": 5}
         )
-        assert score == 15  # 5 (version) + 10 (injection)
+        assert score == 30  # min(5,5) + 25 (injectable)
 
     def test_patch_gets_penalty(self) -> None:
         score = _score_spl_candidate(
             {"setid": "b", "title": "LIDOCAINE PATCHES 4%", "spl_version": 6}
         )
-        assert score == -4  # 6 (version) - 10 (patch)
+        assert score == -20  # min(6,5) - 25 (patch)
 
     def test_veterinary_gets_negative_100(self) -> None:
         score = _score_spl_candidate(
@@ -129,9 +129,20 @@ class TestScoreSplCandidate:
         )
         assert score == -100
 
-    def test_plain_title_uses_version_only(self) -> None:
+    def test_capsule_gets_bonus(self) -> None:
         score = _score_spl_candidate({"setid": "e", "title": "DRUG X CAPSULE", "spl_version": 8})
-        assert score == 18  # 8 (version) + 10 (capsule)
+        assert score == 30  # min(8,5) + 25 (capsule)
+
+    def test_combination_product_penalty(self) -> None:
+        score = _score_spl_candidate(
+            {
+                "setid": "f",
+                "title": "ACETAMINOPHEN AND CODEINE PHOSPHATE TABLET",
+                "spl_version": 10,
+            }
+        )
+        # min(10,5) + 25 (tablet) - 30 (combination " AND ") = 0
+        assert score == 0
 
 
 class TestParseAdverseReactionsXml:

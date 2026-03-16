@@ -53,21 +53,29 @@ print(result.articles)         # PubMedArticle list
 ```mermaid
 flowchart TD
     A[hypothesis drug, event] --> B{FAERS signal detected?}
-    B -- No --> C[no_signal]
+    B -- No --> B2{In FDA label AND papers > emerging_max?}
+    B2 -- Yes --> G[known_association]
+    B2 -- No --> B3{Papers > emerging_max?}
+    B3 -- Yes --> F[emerging_signal]
+    B3 -- No --> C[no_signal]
     B -- Yes --> D{PubMed papers count}
     D -- "papers <= novel_max (0)" --> E[novel_hypothesis]
-    D -- "papers <= emerging_max (5)" --> F[emerging_signal]
-    D -- "papers > emerging_max" --> G[known_association]
+    D -- "papers <= emerging_max (5)" --> F
+    D -- "papers > emerging_max" --> G
 ```
 
 ### Classification Table
 
-| Signal Detected | Papers | Classification | Confidence |
-|:-:|:-:|---|---|
-| No | any | `no_signal` | n/a |
-| Yes | 0 | `novel_hypothesis` | low |
-| Yes | 1–5 | `emerging_signal` | moderate |
-| Yes | > 5 | `known_association` | high |
+| Signal Detected | In Label | Papers | Classification | Confidence |
+|:-:|:-:|:-:|---|---|
+| No | — | 0–5 | `no_signal` | n/a |
+| No | No | > 5 | `emerging_signal` | moderate |
+| No | Yes | > 5 | `known_association` | high |
+| Yes | — | 0 | `novel_hypothesis` | low |
+| Yes | — | 1–5 | `emerging_signal` | moderate |
+| Yes | — | > 5 | `known_association` | high |
+
+> **Note:** Even without a FAERS disproportionality signal, substantial literature and/or FDA label confirmation can indicate a known association. FAERS signals can be absent for well-known adverse events when the drug has very high reporting volume (signal dilution) or when the event is extremely common across all drugs.
 
 ### Custom Thresholds
 

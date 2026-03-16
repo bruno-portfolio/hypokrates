@@ -17,7 +17,17 @@ All notable changes to this project will be documented in this file.
 - **dailymed/parser.py**: `match_event_in_label()` now uses MedDRA synonyms via `expand_event_terms()` — fixes false negatives for clinically equivalent terms (e.g., "anaphylactic shock" now matches "anaphylaxis" in label)
 - **vocab/meddra.py**: `expand_event_terms()` now expands aliases to full group (canonical + all aliases)
 - **MCP**: `scan_drug` gains `role_filter` ("ps_only"/"suspect"/"all") and `check_direction` params; output shows data source, role filter, PS-PRR, and direction
-- 50+ new tests (1132 total)
+- 50+ new tests (1142 total)
+
+#### Bug Fixes (7 bugs from MCP stress test session, 2026-03-15)
+
+- **Hypothesis classification without FAERS signal**: `_classify()` now considers literature and label even when FAERS signal is absent — CBD + hepatotoxicity (45 papers, black box warning) was `no_signal`, now correctly `known_association`
+- **FAERS brand name normalization**: `resolve_drug_field()` now normalizes via RxNorm BEFORE falling back to `brand_name.exact`. Diprivan was getting 9% of propofol's reports.
+- **DailyMed combination product penalty**: `_score_spl_candidate()` now penalizes titles with " AND "/" WITH "/" / " (-30). Fixes acetaminophen picking codeine combination label.
+- **DailyMed systemic vs topical priority**: Prescription +25 (was +10), topical -25 (was -10), spl_version capped at 5. Fixes hydrocortisone picking cream instead of systemic.
+- **Co-admin analysis always runs**: `hypothesis(check_coadmin=True)` now runs Layer 1 even without FAERS signal.
+- **Co-suspect salt form exclusion**: `co_suspect_profile()` excludes drug salt forms (e.g., ONDANSETRON HYDROCHLORIDE) from co-suspect list.
+- **MCP list_tools**: Added 5 missing tools (drugs_by_event, co_suspect_profile, anvisa×3). Tool count 29→34.
 
 #### Bug Fixes (10 bugs from bug hunting session)
 

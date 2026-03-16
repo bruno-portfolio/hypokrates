@@ -290,8 +290,13 @@ async def co_suspect_profile(
         suspects = [d for d in report.drugs if d.role == DRUG_CHARACTERIZATION_SUSPECT]
         suspect_counts.append(len(suspects))
         for d in suspects:
-            if d.name.upper() != drug_upper:
-                co_drug_counter[d.name.upper()] += 1
+            co_name = d.name.upper()
+            # Excluir a droga-índice E salt forms (ex: ONDANSETRON HYDROCHLORIDE)
+            if co_name == drug_upper:
+                continue
+            if co_name.startswith(drug_upper + " ") or drug_upper.startswith(co_name + " "):
+                continue
+            co_drug_counter[co_name] += 1
 
     median_val = statistics.median(suspect_counts)
     mean_val = statistics.mean(suspect_counts)
@@ -337,15 +342,16 @@ async def resolve_drug_field(
     resolved_client = client if client is not None else FAERSClient()
 
     try:
-        for field in DRUG_FIELD_FALLBACK:
-            search = f'{field}:"{drug_upper}"'
-            total = await resolved_client.fetch_total(search, use_cache=use_cache)
-            if total > 0:
-                _drug_field_cache[drug_upper] = search
-                logger.info("Resolved %s -> %s (%d reports)", drug, field, total)
-                return search
+        # 1. Tentar generic_name.exact com o input direto
+        generic_field = SEARCH_FIELDS["drug"]
+        search = f'{generic_field}:"{drug_upper}"'
+        total = await resolved_client.fetch_total(search, use_cache=use_cache)
+        if total > 0:
+            _drug_field_cache[drug_upper] = search
+            logger.info("Resolved %s -> generic_name.exact (%d reports)", drug, total)
+            return search
 
-        # Fallback: normalizar brand→generic via RxNorm e retenta
+        # 2. Normalizar brand→generic via RxNorm ANTES de tentar outros campos
         try:
             from hypokrates.vocab.api import normalize_drug
 
@@ -358,8 +364,8 @@ async def resolve_drug_field(
                     _drug_field_cache[drug_upper] = result
                     logger.info("Resolved %s -> %s (via normalize_drug)", drug, norm.generic_name)
                     return result
-                # Tentar generic_name no FAERS
-                generic_search = f'{SEARCH_FIELDS["drug"]}:"{generic_upper}"'
+                # Tentar generic_name normalizado no FAERS
+                generic_search = f'{generic_field}:"{generic_upper}"'
                 total = await resolved_client.fetch_total(generic_search, use_cache=use_cache)
                 if total > 0:
                     _drug_field_cache[drug_upper] = generic_search
@@ -372,7 +378,16 @@ async def resolve_drug_field(
                     )
                     return generic_search
         except Exception:
-            logger.debug("normalize_drug fallback failed for %s", drug)
+            logger.debug("normalize_drug failed for %s", drug)
+
+        # 3. Fallback: brand_name.exact e medicinalproduct (último recurso)
+        for field in DRUG_FIELD_FALLBACK[1:]:  # skip generic_name (já tentou)
+            search = f'{field}:"{drug_upper}"'
+            total = await resolved_client.fetch_total(search, use_cache=use_cache)
+            if total > 0:
+                _drug_field_cache[drug_upper] = search
+                logger.info("Resolved %s -> %s (%d reports)", drug, field, total)
+                return search
     finally:
         if own_client:
             await resolved_client.close()

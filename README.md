@@ -256,7 +256,7 @@ python -m hypokrates.mcp
 }
 ```
 
-23 tools available: `adverse_events`, `top_events`, `compare_drugs`, `signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`.
+34 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `list_tools`, `version`.
 
 ## Data Sources
 
@@ -276,7 +276,7 @@ python -m hypokrates.mcp
 
 ## Status
 
-**Alpha** — 1132 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1142 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 

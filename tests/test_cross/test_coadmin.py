@@ -282,18 +282,22 @@ class TestHypothesisCoAdminIntegration:
 
         assert result.coadmin is None
 
+    @patch("hypokrates.cross.api.faers_api.co_suspect_profile")
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
-    async def test_coadmin_skipped_when_no_signal(
-        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock
+    async def test_coadmin_layer1_only_when_no_signal(
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_profile: AsyncMock
     ) -> None:
-        """Se sinal não detectado, coadmin não roda mesmo com check_coadmin=True."""
+        """Sem sinal FAERS → coadmin roda Layer 1 only (profile, sem comparative PRR)."""
         mock_signal.return_value = _make_signal_result(signal_detected=False, prr=0.5)
         mock_pubmed.return_value = _make_pubmed()
+        mock_profile.return_value = _make_profile()
 
         result = await hypothesis("propofol", "anaphylactic shock", check_coadmin=True)
 
-        assert result.coadmin is None
+        assert result.coadmin is not None
+        assert result.coadmin.verdict == "no_signal"
+        mock_profile.assert_called_once()
 
     @patch("hypokrates.cross.api.faers_api.drugs_by_event")
     @patch("hypokrates.cross.api.faers_api.co_suspect_profile")

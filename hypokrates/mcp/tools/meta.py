@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 _TOOLS = [
     {"name": "adverse_events", "module": "faers", "description": "Search FAERS adverse events"},
     {"name": "top_events", "module": "faers", "description": "Get top adverse events"},
+    {"name": "drugs_by_event", "module": "faers", "description": "Reverse lookup: drugs by event"},
+    {"name": "co_suspect_profile", "module": "faers", "description": "Co-administration patterns"},
     {"name": "compare_drugs", "module": "faers", "description": "Compare drugs"},
     {"name": "signal", "module": "stats", "description": "Disproportionality signal detection"},
     {
@@ -57,6 +59,21 @@ _TOOLS = [
         "module": "faers_bulk",
         "description": "Quarterly timeline via FAERS Bulk",
     },
+    {
+        "name": "anvisa_buscar",
+        "module": "anvisa",
+        "description": "Search Brazilian drug registry (ANVISA)",
+    },
+    {
+        "name": "anvisa_genericos",
+        "module": "anvisa",
+        "description": "List generics/similars (ANVISA)",
+    },
+    {
+        "name": "anvisa_mapear_nome",
+        "module": "anvisa",
+        "description": "Map PT↔EN drug names",
+    },
     {"name": "list_tools", "module": "meta", "description": "List available tools"},
     {"name": "version", "module": "meta", "description": "Show version info"},
 ]
@@ -81,5 +98,5 @@ def register(mcp: FastMCP) -> None:
             f"**Sprint:** 8 (CASEID dedup + bulk pipeline + PS-only)\n"
             f"**Tools:** {len(_TOOLS)}\n"
             f"**Modules:** faers, stats, pubmed, cross, scan, vocab, "
-            f"dailymed, trials, drugbank, opentargets, chembl, faers_bulk, meta\n"
+            f"dailymed, trials, drugbank, opentargets, chembl, faers_bulk, anvisa, meta\n"
         )
