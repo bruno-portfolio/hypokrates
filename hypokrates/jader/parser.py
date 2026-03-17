@@ -1,70 +1,94 @@
 """Parser para CSVs cp932 do JADER (PMDA).
 
 Arquivos JADER: demoYYYYMM*.csv, drugYYYYMM*.csv, reacYYYYMM*.csv, histYYYYMM*.csv.
-Encoding: cp932 (Shift-JIS). Fallback UTF-8 para golden data / arquivos re-encodados.
+Encoding: cp932 (Shift-JIS). Estrategia: transcode cp932→UTF-8, depois DuckDB read_csv nativo.
+Golden data (ja UTF-8) detectada automaticamente.
 """
 
 from __future__ import annotations
 
-import contextlib
 import logging
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hypokrates.jader.constants import ENCODING, FILE_DEMO, FILE_DRUG, FILE_REAC
-from hypokrates.jader.mappings import translate_drug, translate_event
+from hypokrates.jader.mappings import DRUG_JP_EN, MEDDRA_JP_EN
 
 if TYPE_CHECKING:
-    import io
-
     from hypokrates.jader.store import JADERStore
 
 logger = logging.getLogger(__name__)
 
 
-def _open_csv(path: Path) -> io.TextIOWrapper:
-    """Abre CSV tentando cp932 primeiro, fallback para UTF-8."""
-    try:
-        f = open(path, encoding=ENCODING, errors="strict", newline="")  # noqa: SIM115
-        f.readline()  # testa leitura
-        f.seek(0)
-        return f
-    except (UnicodeDecodeError, UnicodeError):
-        return open(path, encoding="utf-8", errors="replace", newline="")
-
-
 def _find_jader_file(base_path: Path, prefix: str) -> Path | None:
-    """Busca arquivo JADER pelo prefixo (ex: 'demo' → demoYYYYMM*.csv)."""
-    # Tentar pattern glob
+    """Busca arquivo JADER pelo prefixo (ex: 'demo' -> demoYYYYMM*.csv)."""
     matches = sorted(base_path.glob(f"{prefix}*.csv"))
     if matches:
         return matches[0]
-    # Tentar case-insensitive
     matches = sorted(base_path.glob(f"{prefix.upper()}*.csv"))
     if matches:
         return matches[0]
-    # Tentar nome exato simples (golden data)
     simple = base_path / f"{prefix}.csv"
     if simple.exists():
         return simple
     return None
 
 
+def _is_cp932(path: Path) -> bool:
+    """Detecta se arquivo e cp932 (vs UTF-8)."""
+    try:
+        with open(path, encoding="utf-8", errors="strict") as f:
+            f.readline()
+        return False
+    except UnicodeDecodeError:
+        return True
+
+
+def _transcode_to_utf8(path: Path) -> Path:
+    """Transcode cp932 -> UTF-8 via iconv (C nativo) ou fallback Python."""
+    import shutil
+    import subprocess
+
+    tmp = Path(tempfile.mktemp(suffix=".csv"))
+
+    if shutil.which("iconv"):
+        subprocess.run(
+            ["iconv", "-f", "CP932", "-t", "UTF-8", str(path)],
+            stdout=open(tmp, "w", encoding="utf-8"),  # noqa: SIM115
+            check=True,
+        )
+    else:
+        with (
+            open(path, encoding=ENCODING, errors="replace") as fin,
+            open(tmp, "w", encoding="utf-8") as fout,
+        ):
+            for line in fin:
+                fout.write(line)
+    return tmp
+
+
+def _ensure_utf8(path: Path) -> tuple[Path, bool]:
+    """Retorna (path_utf8, is_temp). Se ja e UTF-8, retorna o original."""
+    if _is_cp932(path):
+        logger.info("JADER: transcoding %s cp932 -> utf8...", path.name)
+        return _transcode_to_utf8(path), True
+    return path, False
+
+
 def load_files_to_store(store: JADERStore, csv_dir: str) -> int:
     """Carrega todos os CSVs JADER no DuckDB store.
 
     Returns:
-        Número de reports carregados.
+        Numero de reports deduplicated.
     """
     base_path = Path(csv_dir)
 
-    # Limpar tabelas
     for table in ("jader_dedup", "jader_reac", "jader_drug", "jader_demo"):
         store.execute_in_lock(f"DELETE FROM {table}")
 
     total_reports = 0
 
-    # 1. Demo
     demo_path = _find_jader_file(base_path, FILE_DEMO)
     if demo_path:
         total_reports = _load_demo(store, demo_path)
@@ -72,7 +96,6 @@ def load_files_to_store(store: JADERStore, csv_dir: str) -> int:
     else:
         logger.warning("JADER: demo file not found in %s", csv_dir)
 
-    # 2. Drug (com tradução JP→EN)
     drug_path = _find_jader_file(base_path, FILE_DRUG)
     if drug_path:
         count = _load_drug(store, drug_path)
@@ -80,7 +103,6 @@ def load_files_to_store(store: JADERStore, csv_dir: str) -> int:
     else:
         logger.warning("JADER: drug file not found in %s", csv_dir)
 
-    # 3. Reac (com tradução JP→EN)
     reac_path = _find_jader_file(base_path, FILE_REAC)
     if reac_path:
         count = _load_reac(store, reac_path)
@@ -88,7 +110,6 @@ def load_files_to_store(store: JADERStore, csv_dir: str) -> int:
     else:
         logger.warning("JADER: reac file not found in %s", csv_dir)
 
-    # 4. Build dedup table
     _build_dedup(store)
 
     dedup_count = _count_table(store, "jader_dedup")
@@ -97,132 +118,184 @@ def load_files_to_store(store: JADERStore, csv_dir: str) -> int:
 
 
 def _load_demo(store: JADERStore, path: Path) -> int:
-    """Carrega demo CSV via Python csv.reader (cp932 nativo).
+    """Carrega demo via DuckDB read_csv (transcode se cp932).
 
-    Colunas JADER demo (com header JP):
-    0: 識別番号 (case_id)
-    1: 報告回数 (report_version)
-    2: 性別 (sex)
-    3: 年齢 (age_group)
-    4: 体重 (weight)
-    5: 報告者 (reporter_qual)
+    Colunas: 0:case_id, 1:version, 2:sex, 3:age, 4:weight, 9:reporter_qual
     """
-    import csv
-
-    rows: list[list[object]] = []
-    with _open_csv(path) as f:
-        reader = csv.reader(f)
-        next(reader, None)  # skip header
-
-        for row in reader:
-            if len(row) < 2 or not row[0].strip():
-                continue
-            case_id = row[0].strip()
-            version = 1
-            with contextlib.suppress(ValueError):
-                version = int(row[1].strip()) if row[1].strip() else 1
-            sex = row[2].strip() if len(row) > 2 else ""
-            age_group = row[3].strip() if len(row) > 3 else ""
-            weight = row[4].strip() if len(row) > 4 else ""
-            reporter = row[5].strip() if len(row) > 5 else ""
-            rows.append([case_id, version, sex, age_group, weight, reporter])
-
-    if rows:
-        store.executemany_in_lock(
-            "INSERT INTO jader_demo VALUES ($1, $2, $3, $4, $5, $6)",
-            rows,
-        )
-    return len(rows)
+    utf8_path, is_temp = _ensure_utf8(path)
+    try:
+        escaped = str(utf8_path).replace("'", "''").replace("\\", "/")
+        store.execute_in_lock(f"""
+            INSERT INTO jader_demo (case_id, report_version, sex, age_group, weight, reporter_qual)
+            SELECT
+                TRIM(c0),
+                COALESCE(TRY_CAST(TRIM(c1) AS INTEGER), 1),
+                COALESCE(TRIM(c2), ''),
+                COALESCE(TRIM(c3), ''),
+                COALESCE(TRIM(c4), ''),
+                COALESCE(TRIM(c9), '')
+            FROM read_csv('{escaped}',
+                header=false, skip=1, all_varchar=true,
+                ignore_errors=true, null_padding=true,
+                names=['c0','c1','c2','c3','c4','c5','c6','c7','c8','c9','c10'])
+            WHERE c0 IS NOT NULL AND TRIM(c0) != ''
+        """)
+    finally:
+        if is_temp:
+            utf8_path.unlink(missing_ok=True)
+    return _count_table(store, "jader_demo")
 
 
 def _load_drug(store: JADERStore, path: Path) -> int:
-    """Carrega drug CSV com tradução JP→EN via Python (batch insert).
+    """Carrega drug via DuckDB read_csv + UPDATE para traducao JP->EN.
 
-    Colunas JADER drug (com header JP):
-    0: 識別番号 (case_id)
-    1: 報告回数 (report_version)
-    2: 医薬品(一般名) (drug_name_jp / generic)
-    3: 医薬品(販売名) (brand_name_jp)
-    4: 医薬品の関与 (drug_role)
+    Colunas: 0:case_id, 1:version, 3:role, 4:generic_jp, 5:brand_jp
     """
-    import csv
+    utf8_path, is_temp = _ensure_utf8(path)
+    try:
+        escaped = str(utf8_path).replace("'", "''").replace("\\", "/")
+        store.execute_in_lock(f"""
+            INSERT INTO jader_drug
+                (case_id, report_version, drug_name_jp, drug_name_en,
+                 drug_confidence, brand_name_jp, drug_role)
+            SELECT
+                TRIM(c0),
+                COALESCE(TRY_CAST(TRIM(c1) AS INTEGER), 1),
+                COALESCE(TRIM(c4), ''),
+                '',
+                'unmapped',
+                COALESCE(TRIM(c5), ''),
+                COALESCE(TRIM(c3), '')
+            FROM read_csv('{escaped}',
+                header=false, skip=1, all_varchar=true,
+                ignore_errors=true, null_padding=true,
+                names=['c0','c1','c2','c3','c4','c5','c6','c7','c8','c9',
+                       'c10','c11','c12','c13','c14','c15'])
+            WHERE c0 IS NOT NULL AND TRIM(c0) != ''
+        """)
+    finally:
+        if is_temp:
+            utf8_path.unlink(missing_ok=True)
 
-    rows: list[list[object]] = []
-    with _open_csv(path) as f:
-        reader = csv.reader(f)
-        header = next(reader, None)  # skip header
-        if header is None:
-            return 0
-
-        for row in reader:
-            if len(row) < 5 or not row[0].strip():
-                continue
-            case_id = row[0].strip()
-            version = 1
-            with contextlib.suppress(ValueError):
-                version = int(row[1].strip()) if row[1].strip() else 1
-            drug_jp = row[2].strip()
-            brand_jp = row[3].strip()
-            role = row[4].strip()
-
-            drug_en, confidence = translate_drug(drug_jp)
-            rows.append([case_id, version, drug_jp, drug_en, confidence.value, brand_jp, role])
-
-    if rows:
-        store.executemany_in_lock(
-            "INSERT INTO jader_drug VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            rows,
-        )
-    return len(rows)
+    _apply_drug_translations(store)
+    return _count_table(store, "jader_drug")
 
 
 def _load_reac(store: JADERStore, path: Path) -> int:
-    """Carrega reac CSV com tradução JP→EN via Python (batch insert).
+    """Carrega reac via DuckDB read_csv + UPDATE para traducao JP->EN.
 
-    Colunas JADER reac (com header JP):
-    0: 識別番号 (case_id)
-    1: 報告回数 (report_version)
-    2: 有害事象 (pt_jp — MedDRA/J)
-    3: 転帰 (outcome)
+    Colunas: 0:case_id, 1:version, 3:pt_jp, 4:outcome
     """
-    import csv
+    utf8_path, is_temp = _ensure_utf8(path)
+    try:
+        escaped = str(utf8_path).replace("'", "''").replace("\\", "/")
+        store.execute_in_lock(f"""
+            INSERT INTO jader_reac
+                (case_id, report_version, pt_jp, pt_en, event_confidence, outcome)
+            SELECT
+                TRIM(c0),
+                COALESCE(TRY_CAST(TRIM(c1) AS INTEGER), 1),
+                COALESCE(TRIM(c3), ''),
+                '',
+                'unmapped',
+                COALESCE(TRIM(c4), '')
+            FROM read_csv('{escaped}',
+                header=false, skip=1, all_varchar=true,
+                ignore_errors=true, null_padding=true,
+                names=['c0','c1','c2','c3','c4','c5'])
+            WHERE c0 IS NOT NULL AND TRIM(c0) != ''
+        """)
+    finally:
+        if is_temp:
+            utf8_path.unlink(missing_ok=True)
 
-    rows: list[list[object]] = []
-    with _open_csv(path) as f:
-        reader = csv.reader(f)
-        next(reader, None)  # skip header
+    _apply_event_translations(store)
+    return _count_table(store, "jader_reac")
 
-        for row in reader:
-            if len(row) < 3 or not row[0].strip():
-                continue
-            case_id = row[0].strip()
-            version = 1
-            with contextlib.suppress(ValueError):
-                version = int(row[1].strip()) if row[1].strip() else 1
-            pt_jp = row[2].strip()
-            outcome = row[3].strip() if len(row) > 3 else ""
 
-            pt_en, confidence = translate_event(pt_jp)
-            rows.append([case_id, version, pt_jp, pt_en, confidence.value, outcome])
+def _apply_drug_translations(store: JADERStore) -> None:
+    """Aplica traducoes JP->EN via tabela temporaria + JOIN (1 UPDATE)."""
+    # Criar tabela de mapeamento
+    store.execute_in_lock("DROP TABLE IF EXISTS _tmp_drug_map")
+    store.execute_in_lock(
+        "CREATE TEMP TABLE _tmp_drug_map (jp VARCHAR PRIMARY KEY, en VARCHAR NOT NULL)"
+    )
+    map_rows: list[list[object]] = [[jp, en] for jp, en in DRUG_JP_EN.items()]
+    store.executemany_in_lock("INSERT INTO _tmp_drug_map VALUES ($1, $2)", map_rows)
 
-    if rows:
-        store.executemany_in_lock(
-            "INSERT INTO jader_reac VALUES ($1, $2, $3, $4, $5, $6)",
-            rows,
-        )
-    return len(rows)
+    # 1. Exact: JOIN com tabela de mapeamento
+    store.execute_in_lock("""
+        UPDATE jader_drug SET
+            drug_name_en = m.en,
+            drug_confidence = 'exact'
+        FROM _tmp_drug_map m
+        WHERE jader_drug.drug_name_jp = m.jp
+    """)
+
+    # 2. Inferred: ASCII/romaji (sem caracteres nao-ASCII)
+    store.execute_in_lock("""
+        UPDATE jader_drug SET
+            drug_name_en = UPPER(drug_name_jp),
+            drug_confidence = 'inferred'
+        WHERE drug_confidence = 'unmapped'
+        AND drug_name_jp != ''
+        AND drug_name_jp = regexp_replace(drug_name_jp, '[^ -~]', '', 'g')
+    """)
+
+    # 3. Unmapped: uppercase do original
+    store.execute_in_lock("""
+        UPDATE jader_drug SET drug_name_en = UPPER(drug_name_jp)
+        WHERE drug_confidence = 'unmapped' AND drug_name_jp != ''
+    """)
+
+    store.execute_in_lock("DROP TABLE IF EXISTS _tmp_drug_map")
+
+
+def _apply_event_translations(store: JADERStore) -> None:
+    """Aplica traducoes JP->EN via tabela temporaria + JOIN (1 UPDATE)."""
+    store.execute_in_lock("DROP TABLE IF EXISTS _tmp_event_map")
+    store.execute_in_lock(
+        "CREATE TEMP TABLE _tmp_event_map (jp VARCHAR PRIMARY KEY, en VARCHAR NOT NULL)"
+    )
+    map_rows: list[list[object]] = [[jp, en] for jp, en in MEDDRA_JP_EN.items()]
+    store.executemany_in_lock("INSERT INTO _tmp_event_map VALUES ($1, $2)", map_rows)
+
+    # 1. Exact: JOIN
+    store.execute_in_lock("""
+        UPDATE jader_reac SET
+            pt_en = m.en,
+            event_confidence = 'exact'
+        FROM _tmp_event_map m
+        WHERE jader_reac.pt_jp = m.jp
+    """)
+
+    # 2. Inferred: ASCII/romaji
+    store.execute_in_lock("""
+        UPDATE jader_reac SET
+            pt_en = UPPER(pt_jp),
+            event_confidence = 'inferred'
+        WHERE event_confidence = 'unmapped'
+        AND pt_jp != ''
+        AND pt_jp = regexp_replace(pt_jp, '[^ -~]', '', 'g')
+    """)
+
+    # 3. Unmapped: uppercase do original
+    store.execute_in_lock("""
+        UPDATE jader_reac SET pt_en = UPPER(pt_jp)
+        WHERE event_confidence = 'unmapped' AND pt_jp != ''
+    """)
+
+    store.execute_in_lock("DROP TABLE IF EXISTS _tmp_event_map")
 
 
 def _build_dedup(store: JADERStore) -> None:
-    """Deduplicação: max(report_version) per case_id."""
-    store.execute_in_lock(
-        """
+    """Deduplicacao: max(report_version) per case_id."""
+    store.execute_in_lock("""
         INSERT INTO jader_dedup
         SELECT case_id, MAX(report_version)
         FROM jader_demo
         GROUP BY case_id
-        """
-    )
+    """)
 
 
 def _count_table(store: JADERStore, table: str) -> int:
