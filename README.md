@@ -241,3 +241,5 @@ hypokrates/
 *"First, do no harm." — Hippocratic Oath*
 
 *"First, make the data accessible." — hypokrates*
+
+<!-- mcp-name: io.github.bruno-portfolio/hypokrates -->
