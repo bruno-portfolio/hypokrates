@@ -1,6 +1,49 @@
 # Changelog
 
-## Unreleased
+## [0.7.0] - 2026-03-17
+
+### Sprint 11 — JADER + Stratification + AGPL + Cleanup + Benchmark
+
+### Changed
+- **License MIT → AGPL 3.0**: proteger contra apropriação comercial sem retorno. pyproject.toml + LICENSE atualizados
+- **Version sync**: pyproject.toml (era 0.1.0) e constants.py (era 0.6.0) sincronizados para 0.7.0
+
+### Added
+- **jader/** module: `jader_signal()`, `jader_top_events()`, `jader_bulk_status()` — Japanese Adverse Drug Event Report database (PMDA, 2004-present, ~970K reports)
+  - DuckDB store at `~/.cache/hypokrates/jader.duckdb` (same pattern as Canada Vigilance)
+  - Parses CSV files in cp932 (Shift-JIS) encoding with UTF-8 fallback
+  - JP→EN translation via static mappings (~200 drugs, ~200 MedDRA PTs) with `MappingConfidence` (exact/inferred/unmapped)
+  - Deduplication by max(report_version) per case_id
+  - Drug roles: 被疑薬 (Suspect), 併用薬 (Concomitant), 相互作用 (Interacting)
+  - Source caveat disclaimer on all outputs about translation and cross-country comparison
+  - `check_jader` parameter on `hypothesis()` and `scan_drug()` (opt-in)
+  - `HypothesisResult.jader_reports`, `HypothesisResult.jader_signal` fields
+  - MCP tools: `jader_signal`, `jader_top_events`, `jader_bulk_status`
+  - Sync wrapper: `from hypokrates.sync import jader`
+  - Config: `jader_bulk_path: Path | None` in HypokratesConfig
+  - `Source.JADER` enum value
+  - 39 new tests with golden data (cp932 CSVs)
+
+- **Demographic stratification** (age/sex) on FAERS Bulk and Canada Vigilance
+  - `StrataFilter` model: `sex` ("M"/"F"), `age_group` ("0-17"/"18-44"/"45-64"/"65+"), `reporter_country` (FAERS only)
+  - `four_counts()` and `top_events()` accept optional `strata` parameter on both stores
+  - Stratified SQL uses CTE with JOIN to demo table — zero overhead when strata is None
+  - Insufficient data detection: `MIN_STRATUM_DRUG_EVENT=3`, `MIN_STRATUM_DRUG_TOTAL=10`
+  - `BulkCountResult.insufficient_data` and `insufficient_reason` fields
+  - MCP tools: `faers_bulk_signal` and `canada_signal` expose `sex` and `age_group` params
+
+- **Benchmark suite v1**: curated registry of 19 drug-event pairs across 7 categories
+  - `tests/benchmark/registry.py`: `BenchmarkCase` dataclass with expected direction/strength
+  - Categories: KNOWN_SIGNAL (6), CONFOUNDING (4), EMERGING (1), PROBLEMATIC (1), KNOWN_NOISE (3), REPURPOSING (1), ONTOLOGY (1)
+  - `@pytest.mark.benchmark` marker, excluded from default runs via `addopts`
+  - Gold standards (rocuronium+anaphylaxis, clozapine+agranulocytosis, etc.) MUST be detected
+  - Negative controls (cisatracurium+anhedonia, sevoflurane+agranulocytosis) MUST NOT be detected
+
+### Refactored
+- **Docstring cleanup tier 1**: 52 docstrings removed from private methods, 22 public docstrings simplified to 1-line, 31 obvious comments removed across 9 files (sync.py, faers_bulk/store.py, canada/store.py, drugbank/store.py, onsides/store.py, anvisa/store.py, dailymed/parser.py, canada/parser.py, cache/duckdb_store.py)
+- **Model cleanup**: verbose `Field(description=...)` removed from cross/models.py and canada/models.py where field names are self-explanatory
+
+## Unreleased (Sprint 10)
 
 ### Sprint 10 — Three New Data Sources (OnSIDES, PharmGKB, Canada Vigilance)
 

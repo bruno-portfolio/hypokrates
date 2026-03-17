@@ -2,7 +2,7 @@
 
 > Normalize and cross-reference global public health data for medical hypothesis generation.
 
-Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL, OnSIDES, PharmGKB, Canada Vigilance) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
+Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL, OnSIDES, PharmGKB, Canada Vigilance, JADER) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
 
 ## Install
 
@@ -29,6 +29,7 @@ configure(
     drugbank_path="/path/to/drugbank.xml",  # Optional: offline drug data
     onsides_path="/path/to/onsides/csvs/",  # Optional: international labels
     canada_bulk_path="/path/to/canada/",    # Optional: Canada Vigilance
+    jader_bulk_path="/path/to/jader/csvs/", # Optional: Japanese PMDA
 )
 ```
 
@@ -255,6 +256,42 @@ for ev, count in events:
 
 > Requires Canada Vigilance bulk download (325MB ZIP). ~738K reports from 1965-present.
 
+## Japanese pharmacovigilance (JADER)
+
+```python
+from hypokrates.sync import jader
+
+# Cross-country signal validation (Japan)
+result = jader.jader_signal("propofol", "anaphylactic shock")
+print(f"PRR: {result.prr:.2f}, Reports: {result.drug_event_count}")
+print(f"Drug mapping: {result.drug_confidence}")  # exact/inferred/unmapped
+
+# Top adverse events in Japan
+events = jader.jader_top_events("propofol", limit=10)
+for ev, count in events:
+    print(f"{ev}: {count} reports")
+```
+
+> Requires JADER CSV files from PMDA (free, no registration). ~970K reports from 2004-present. Drug/event names translated from Japanese via built-in mappings.
+
+## Demographic stratification
+
+FAERS Bulk and Canada Vigilance support demographic filtering:
+
+```python
+from hypokrates.faers_bulk.models import StrataFilter
+from hypokrates.sync import faers_bulk
+
+# Signal in females aged 65+
+result = faers_bulk.bulk_signal(
+    "rocuronium", "anaphylactic shock",
+    strata=StrataFilter(sex="F", age_group="65+"),
+)
+print(f"PRR: {result.prr.value:.2f} (stratum: F, 65+)")
+```
+
+> Available age groups: "0-17", "18-44", "45-64", "65+". Minimum stratum size enforced (3 drug+event, 10 drug total).
+
 ## Drug normalization (RxNorm/MeSH)
 
 ```python
@@ -310,6 +347,7 @@ python -m hypokrates.mcp
         "DRUGBANK_PATH": "/path/to/drugbank.xml",
         "ONSIDES_PATH": "/path/to/onsides/csvs/",
         "CANADA_BULK_PATH": "/path/to/canada/extracted/",
+        "JADER_BULK_PATH": "/path/to/jader/csvs/",
         "FAERS_BULK_DIR": "/path/to/faers/quarterly/"
       }
     }
@@ -317,7 +355,7 @@ python -m hypokrates.mcp
 }
 ```
 
-41 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `onsides_events`, `onsides_check_event`, `pgx_drug_info`, `pgx_annotations`, `canada_signal`, `canada_top_events`, `canada_bulk_status`, `list_tools`, `version`.
+44 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `onsides_events`, `onsides_check_event`, `pgx_drug_info`, `pgx_annotations`, `canada_signal`, `canada_top_events`, `canada_bulk_status`, `jader_signal`, `jader_top_events`, `jader_bulk_status`, `list_tools`, `version`.
 
 ## Data Sources
 
@@ -337,11 +375,12 @@ python -m hypokrates.mcp
 | OnSIDES | `onsides` | Local CSVs (313MB) | Offline |
 | PharmGKB | `pharmgkb` | None | 60/min |
 | Canada Vigilance | `canada` | Local bulk (325MB) | Offline |
+| JADER (Japan) | `jader` | Local CSVs (cp932) | Offline |
 
 ## Status
 
-**Alpha** — 1293 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** — 1349 tests, mypy strict, ruff clean. Not for clinical use.
 
 ## License
 
-MIT
+AGPL-3.0-only

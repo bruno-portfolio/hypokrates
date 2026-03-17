@@ -16,10 +16,17 @@ _ENV_MAP: dict[str, str] = {
     "DRUGBANK_PATH": "drugbank_path",
     "ONSIDES_PATH": "onsides_path",
     "CANADA_BULK_PATH": "canada_bulk_path",
+    "JADER_BULK_PATH": "jader_bulk_path",
     "FAERS_BULK_DIR": "faers_bulk_dir",
 }
 
-_PATH_FIELDS = {"drugbank_path", "onsides_path", "canada_bulk_path", "faers_bulk_dir"}
+_PATH_FIELDS = {
+    "drugbank_path",
+    "onsides_path",
+    "canada_bulk_path",
+    "jader_bulk_path",
+    "faers_bulk_dir",
+}
 
 
 def _configure_from_env() -> None:

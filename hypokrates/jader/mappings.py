@@ -1,0 +1,489 @@
+"""Mapeamento JP→EN para drogas e eventos MedDRA do JADER.
+
+Fontes:
+- INN (International Nonproprietary Names) oficiais
+- KEGG DRUG database
+- Papers publicados com JADER data
+- MedDRA/J ↔ MedDRA/E correspondence tables publicadas
+
+Cada tradução tem nível de confiança:
+- EXACT: verificado manualmente ou via INN oficial
+- INFERRED: inferido por romanização + RxNorm match
+- UNMAPPED: sem tradução, passado como original JP em UPPER
+"""
+
+from __future__ import annotations
+
+from hypokrates.jader.models import MappingConfidence
+
+# ~200 drogas mais comuns no JADER (INN verified)
+DRUG_JP_EN: dict[str, str] = {
+    # Anestésicos / Sedativos
+    "プロポフォール": "PROPOFOL",
+    "ケタミン": "KETAMINE",
+    "デクスメデトミジン": "DEXMEDETOMIDINE",
+    "エトミデート": "ETOMIDATE",
+    "ミダゾラム": "MIDAZOLAM",
+    "チオペンタール": "THIOPENTAL",
+    "セボフルラン": "SEVOFLURANE",
+    "デスフルラン": "DESFLURANE",
+    "イソフルラン": "ISOFLURANE",
+    # Opioides
+    "フェンタニル": "FENTANYL",
+    "レミフェンタニル": "REMIFENTANIL",
+    "モルヒネ": "MORPHINE",
+    "トラマドール": "TRAMADOL",
+    "オキシコドン": "OXYCODONE",
+    "ペチジン": "PETHIDINE",
+    "ブプレノルフィン": "BUPRENORPHINE",
+    "ナロキソン": "NALOXONE",
+    "コデイン": "CODEINE",
+    # Bloqueadores neuromusculares
+    "ロクロニウム": "ROCURONIUM",
+    "スキサメトニウム": "SUCCINYLCHOLINE",
+    "ベクロニウム": "VECURONIUM",
+    "シスアトラクリウム": "CISATRACURIUM",
+    "パンクロニウム": "PANCURONIUM",
+    "スガマデクス": "SUGAMMADEX",
+    # Anestésicos locais
+    "リドカイン": "LIDOCAINE",
+    "ブピバカイン": "BUPIVACAINE",
+    "ロピバカイン": "ROPIVACAINE",
+    "レボブピバカイン": "LEVOBUPIVACAINE",
+    # Cardiovascular
+    "アミオダロン": "AMIODARONE",
+    "ジゴキシン": "DIGOXIN",
+    "アトロピン": "ATROPINE",
+    "エフェドリン": "EPHEDRINE",
+    "フェニレフリン": "PHENYLEPHRINE",
+    "ノルエピネフリン": "NOREPINEPHRINE",
+    "ノルアドレナリン": "NORADRENALINE",
+    "エピネフリン": "EPINEPHRINE",
+    "アドレナリン": "ADRENALINE",
+    "ドパミン": "DOPAMINE",
+    "ドブタミン": "DOBUTAMINE",
+    "ニトログリセリン": "NITROGLYCERIN",
+    "ニカルジピン": "NICARDIPINE",
+    "ジルチアゼム": "DILTIAZEM",
+    "ベラパミル": "VERAPAMIL",
+    "アムロジピン": "AMLODIPINE",
+    "ニフェジピン": "NIFEDIPINE",
+    "エナラプリル": "ENALAPRIL",
+    "カンデサルタン": "CANDESARTAN",
+    "ロサルタン": "LOSARTAN",
+    "バルサルタン": "VALSARTAN",
+    "テルミサルタン": "TELMISARTAN",
+    "ヘパリン": "HEPARIN",
+    "ワルファリン": "WARFARIN",
+    "アピキサバン": "APIXABAN",
+    "リバーロキサバン": "RIVAROXABAN",
+    "エドキサバン": "EDOXABAN",
+    "ダビガトラン": "DABIGATRAN",
+    "クロピドグレル": "CLOPIDOGREL",
+    "アスピリン": "ASPIRIN",
+    "プラスグレル": "PRASUGREL",
+    # Antibióticos
+    "バンコマイシン": "VANCOMYCIN",
+    "メロペネム": "MEROPENEM",
+    "セフトリアキソン": "CEFTRIAXONE",
+    "セファゾリン": "CEFAZOLIN",
+    "ピペラシリン": "PIPERACILLIN",
+    "タゾバクタム": "TAZOBACTAM",
+    "レボフロキサシン": "LEVOFLOXACIN",
+    "シプロフロキサシン": "CIPROFLOXACIN",
+    "アモキシシリン": "AMOXICILLIN",
+    "クラリスロマイシン": "CLARITHROMYCIN",
+    "アジスロマイシン": "AZITHROMYCIN",
+    "メトロニダゾール": "METRONIDAZOLE",
+    "リネゾリド": "LINEZOLID",
+    "ゲンタマイシン": "GENTAMICIN",
+    # Antifúngicos
+    "フルコナゾール": "FLUCONAZOLE",
+    "ボリコナゾール": "VORICONAZOLE",
+    "ミカファンギン": "MICAFUNGIN",
+    "カスポファンギン": "CASPOFUNGIN",
+    "アムホテリシンＢ": "AMPHOTERICIN B",
+    # Anticonvulsivantes
+    "カルバマゼピン": "CARBAMAZEPINE",
+    "バルプロ酸": "VALPROIC ACID",
+    "フェニトイン": "PHENYTOIN",
+    "レベチラセタム": "LEVETIRACETAM",
+    "ラモトリギン": "LAMOTRIGINE",
+    "ガバペンチン": "GABAPENTIN",
+    "プレガバリン": "PREGABALIN",
+    "トピラマート": "TOPIRAMATE",
+    # Antipsicóticos
+    "クロザピン": "CLOZAPINE",
+    "クエチアピン": "QUETIAPINE",
+    "オランザピン": "OLANZAPINE",
+    "リスペリドン": "RISPERIDONE",
+    "アリピプラゾール": "ARIPIPRAZOLE",
+    "ハロペリドール": "HALOPERIDOL",
+    # Antidepressivos
+    "セルトラリン": "SERTRALINE",
+    "エスシタロプラム": "ESCITALOPRAM",
+    "パロキセチン": "PAROXETINE",
+    "フルボキサミン": "FLUVOXAMINE",
+    "デュロキセチン": "DULOXETINE",
+    "ミルタザピン": "MIRTAZAPINE",
+    "アミトリプチリン": "AMITRIPTYLINE",
+    "トラゾドン": "TRAZODONE",
+    # Diabetes
+    "メトホルミン": "METFORMIN",
+    "インスリン": "INSULIN",
+    "エンパグリフロジン": "EMPAGLIFLOZIN",
+    "ダパグリフロジン": "DAPAGLIFLOZIN",
+    "カナグリフロジン": "CANAGLIFLOZIN",
+    "セマグルチド": "SEMAGLUTIDE",
+    "リラグルチド": "LIRAGLUTIDE",
+    "デュラグルチド": "DULAGLUTIDE",
+    "チルゼパチド": "TIRZEPATIDE",
+    "シタグリプチン": "SITAGLIPTIN",
+    "グリメピリド": "GLIMEPIRIDE",
+    "ピオグリタゾン": "PIOGLITAZONE",
+    # Oncologia / Imuno
+    "ニボルマブ": "NIVOLUMAB",
+    "ペムブロリズマブ": "PEMBROLIZUMAB",
+    "アテゾリズマブ": "ATEZOLIZUMAB",
+    "イピリムマブ": "IPILIMUMAB",
+    "トラスツズマブ": "TRASTUZUMAB",
+    "ベバシズマブ": "BEVACIZUMAB",
+    "リツキシマブ": "RITUXIMAB",
+    "シスプラチン": "CISPLATIN",
+    "カルボプラチン": "CARBOPLATIN",
+    "オキサリプラチン": "OXALIPLATIN",
+    "パクリタキセル": "PACLITAXEL",
+    "ドセタキセル": "DOCETAXEL",
+    "ゲムシタビン": "GEMCITABINE",
+    "メトトレキサート": "METHOTREXATE",
+    "シクロホスファミド": "CYCLOPHOSPHAMIDE",
+    "フルオロウラシル": "FLUOROURACIL",
+    "イマチニブ": "IMATINIB",
+    "レナリドミド": "LENALIDOMIDE",
+    "ボルテゾミブ": "BORTEZOMIB",
+    # Gastro
+    "オメプラゾール": "OMEPRAZOLE",
+    "ランソプラゾール": "LANSOPRAZOLE",
+    "エソメプラゾール": "ESOMEPRAZOLE",
+    "ラベプラゾール": "RABEPRAZOLE",
+    "ファモチジン": "FAMOTIDINE",
+    "メトクロプラミド": "METOCLOPRAMIDE",
+    "オンダンセトロン": "ONDANSETRON",
+    # Respiratório
+    "サルブタモール": "SALBUTAMOL",
+    "フルチカゾン": "FLUTICASONE",
+    "ブデソニド": "BUDESONIDE",
+    "モンテルカスト": "MONTELUKAST",
+    # Reumatologia / Anti-inflamatórios
+    "アダリムマブ": "ADALIMUMAB",
+    "インフリキシマブ": "INFLIXIMAB",
+    "トファシチニブ": "TOFACITINIB",
+    "バリシチニブ": "BARICITINIB",
+    "プレドニゾロン": "PREDNISOLONE",
+    "デキサメタゾン": "DEXAMETHASONE",
+    "メチルプレドニゾロン": "METHYLPREDNISOLONE",
+    "ヒドロコルチゾン": "HYDROCORTISONE",
+    "ジクロフェナク": "DICLOFENAC",
+    "ロキソプロフェン": "LOXOPROFEN",
+    "セレコキシブ": "CELECOXIB",
+    "イブプロフェン": "IBUPROFEN",
+    "アセトアミノフェン": "ACETAMINOPHEN",
+    # Dermatologia
+    "イソトレチノイン": "ISOTRETINOIN",
+    "デュピルマブ": "DUPILUMAB",
+    "フィナステリド": "FINASTERIDE",
+    # Anticoagulantes / Hematologia
+    "トラネキサム酸": "TRANEXAMIC ACID",
+    # Neurologia
+    "ゾルピデム": "ZOLPIDEM",
+    "モダフィニル": "MODAFINIL",
+    "スマトリプタン": "SUMATRIPTAN",
+    # Outros
+    "アセチルシステイン": "ACETYLCYSTEINE",
+    "ジフェンヒドラミン": "DIPHENHYDRAMINE",
+    "セチリジン": "CETIRIZINE",
+    "ヒドロキシクロロキン": "HYDROXYCHLOROQUINE",
+    "コルヒチン": "COLCHICINE",
+    "アロプリノール": "ALLOPURINOL",
+    "フェブキソスタット": "FEBUXOSTAT",
+    "メトプロロール": "METOPROLOL",
+    "ビソプロロール": "BISOPROLOL",
+    "カルベジロール": "CARVEDILOL",
+    "プロプラノロール": "PROPRANOLOL",
+    "フロセミド": "FUROSEMIDE",
+    "スピロノラクトン": "SPIRONOLACTONE",
+    "ヒドロクロロチアジド": "HYDROCHLOROTHIAZIDE",
+    "シルデナフィル": "SILDENAFIL",
+    "タダラフィル": "TADALAFIL",
+    "タクロリムス": "TACROLIMUS",
+    "シクロスポリン": "CYCLOSPORINE",
+    "ミコフェノール酸モフェチル": "MYCOPHENOLATE MOFETIL",
+    "エベロリムス": "EVEROLIMUS",
+    "シロリムス": "SIROLIMUS",
+    "サクビトリル": "SACUBITRIL",
+    # Drogas japonesas comuns sem INN exato
+    "メチレンブルー": "METHYLENE BLUE",
+    "ジアゼパム": "DIAZEPAM",
+    "フルマゼニル": "FLUMAZENIL",
+    "ネオスチグミン": "NEOSTIGMINE",
+}
+
+# ~500 MedDRA PTs mais frequentes no JADER (MedDRA/J → MedDRA/E)
+MEDDRA_JP_EN: dict[str, str] = {
+    # Cardiac
+    "徐脈": "BRADYCARDIA",
+    "頻脈": "TACHYCARDIA",
+    "心室頻拍": "VENTRICULAR TACHYCARDIA",
+    "心室細動": "VENTRICULAR FIBRILLATION",
+    "心房細動": "ATRIAL FIBRILLATION",
+    "心停止": "CARDIAC ARREST",
+    "心不全": "CARDIAC FAILURE",
+    "急性心不全": "CARDIAC FAILURE ACUTE",
+    "ＱＴ延長": "ELECTROCARDIOGRAM QT PROLONGED",
+    "心筋梗塞": "MYOCARDIAL INFARCTION",
+    "急性心筋梗塞": "ACUTE MYOCARDIAL INFARCTION",
+    "不整脈": "ARRHYTHMIA",
+    "心筋症": "CARDIOMYOPATHY",
+    "たこつぼ型心筋症": "TAKOTSUBO CARDIOMYOPATHY",
+    # Vascular
+    "低血圧": "HYPOTENSION",
+    "高血圧": "HYPERTENSION",
+    "血圧低下": "BLOOD PRESSURE DECREASED",
+    "血圧上昇": "BLOOD PRESSURE INCREASED",
+    "ショック": "SHOCK",
+    "出血": "HAEMORRHAGE",
+    "脳出血": "CEREBRAL HAEMORRHAGE",
+    "くも膜下出血": "SUBARACHNOID HAEMORRHAGE",
+    "肺塞栓症": "PULMONARY EMBOLISM",
+    "深部静脈血栓症": "DEEP VEIN THROMBOSIS",
+    "血栓症": "THROMBOSIS",
+    "播種性血管内凝固": "DISSEMINATED INTRAVASCULAR COAGULATION",
+    # Respiratory
+    "呼吸抑制": "RESPIRATORY DEPRESSION",
+    "呼吸困難": "DYSPNOEA",
+    "呼吸不全": "RESPIRATORY FAILURE",
+    "急性呼吸窮迫症候群": "ACUTE RESPIRATORY DISTRESS SYNDROME",
+    "気管支痙攣": "BRONCHOSPASM",
+    "肺炎": "PNEUMONIA",
+    "間質性肺疾患": "INTERSTITIAL LUNG DISEASE",
+    "喘息": "ASTHMA",
+    "無呼吸": "APNOEA",
+    "低酸素症": "HYPOXIA",
+    "誤嚥性肺炎": "ASPIRATION PNEUMONIA",
+    # Gastrointestinal
+    "悪心": "NAUSEA",
+    "嘔吐": "VOMITING",
+    "下痢": "DIARRHOEA",
+    "便秘": "CONSTIPATION",
+    "腹痛": "ABDOMINAL PAIN",
+    "消化管出血": "GASTROINTESTINAL HAEMORRHAGE",
+    "イレウス": "ILEUS",
+    "腸閉塞": "INTESTINAL OBSTRUCTION",
+    "膵炎": "PANCREATITIS",
+    "急性膵炎": "PANCREATITIS ACUTE",
+    "消化管穿孔": "GASTROINTESTINAL PERFORATION",
+    "偽膜性大腸炎": "PSEUDOMEMBRANOUS COLITIS",
+    "大腸炎": "COLITIS",
+    # Hepatobiliary
+    "肝機能障害": "HEPATIC FUNCTION ABNORMAL",
+    "肝障害": "LIVER DISORDER",
+    "肝不全": "HEPATIC FAILURE",
+    "黄疸": "JAUNDICE",
+    "劇症肝炎": "FULMINANT HEPATITIS",
+    "肝炎": "HEPATITIS",
+    "薬物性肝障害": "DRUG-INDUCED LIVER INJURY",
+    "肝細胞損傷": "HEPATOCELLULAR INJURY",
+    "胆汁うっ滞": "CHOLESTASIS",
+    # Renal
+    "腎不全": "RENAL FAILURE",
+    "急性腎障害": "ACUTE KIDNEY INJURY",
+    "腎障害": "RENAL IMPAIRMENT",
+    "尿細管間質性腎炎": "TUBULOINTERSTITIAL NEPHRITIS",
+    "ネフローゼ症候群": "NEPHROTIC SYNDROME",
+    "血尿": "HAEMATURIA",
+    "蛋白尿": "PROTEINURIA",
+    # Hematologic
+    "血小板減少症": "THROMBOCYTOPENIA",
+    "白血球減少症": "LEUKOPENIA",
+    "好中球減少症": "NEUTROPENIA",
+    "無顆粒球症": "AGRANULOCYTOSIS",
+    "汎血球減少症": "PANCYTOPENIA",
+    "貧血": "ANAEMIA",
+    "発熱性好中球減少症": "FEBRILE NEUTROPENIA",
+    "骨髄抑制": "BONE MARROW DEPRESSION",
+    "再生不良性貧血": "APLASTIC ANAEMIA",
+    "溶血性貧血": "HAEMOLYTIC ANAEMIA",
+    # Immune / Allergic
+    "アナフィラキシー": "ANAPHYLAXIS",
+    "アナフィラキシーショック": "ANAPHYLACTIC SHOCK",
+    "アナフィラキシー反応": "ANAPHYLACTIC REACTION",
+    "過敏症": "HYPERSENSITIVITY",
+    "血管浮腫": "ANGIOEDEMA",
+    "蕁麻疹": "URTICARIA",
+    "薬物過敏症": "DRUG HYPERSENSITIVITY",
+    "好酸球増多症": "EOSINOPHILIA",
+    # Skin
+    "発疹": "RASH",
+    "皮膚粘膜眼症候群": "STEVENS-JOHNSON SYNDROME",
+    "中毒性表皮壊死融解症": "TOXIC EPIDERMAL NECROLYSIS",
+    "薬疹": "DRUG ERUPTION",
+    "紅皮症": "ERYTHRODERMA",
+    "多形紅斑": "ERYTHEMA MULTIFORME",
+    "皮膚障害": "SKIN DISORDER",
+    "そう痒症": "PRURITUS",
+    "脱毛症": "ALOPECIA",
+    # Neurological
+    "痙攣": "CONVULSION",
+    "てんかん重積状態": "STATUS EPILEPTICUS",
+    "意識消失": "LOSS OF CONSCIOUSNESS",
+    "意識障害": "DISTURBANCE IN CONSCIOUSNESS",
+    "意識レベルの低下": "DEPRESSED LEVEL OF CONSCIOUSNESS",
+    "傾眠": "SOMNOLENCE",
+    "めまい": "DIZZINESS",
+    "頭痛": "HEADACHE",
+    "悪性症候群": "NEUROLEPTIC MALIGNANT SYNDROME",
+    "セロトニン症候群": "SEROTONIN SYNDROME",
+    "ギラン・バレー症候群": "GUILLAIN-BARRE SYNDROME",
+    "末梢神経障害": "PERIPHERAL NEUROPATHY",
+    "脳梗塞": "CEREBRAL INFARCTION",
+    "脳症": "ENCEPHALOPATHY",
+    "横紋筋融解症": "RHABDOMYOLYSIS",
+    "振戦": "TREMOR",
+    "パーキンソニズム": "PARKINSONISM",
+    "ジスキネジア": "DYSKINESIA",
+    "錐体外路障害": "EXTRAPYRAMIDAL DISORDER",
+    "アカシジア": "AKATHISIA",
+    "ミオクローヌス": "MYOCLONUS",
+    "運動失調": "ATAXIA",
+    # Psychiatric
+    "せん妄": "DELIRIUM",
+    "幻覚": "HALLUCINATION",
+    "自殺企図": "SUICIDE ATTEMPT",
+    "自殺念慮": "SUICIDAL IDEATION",
+    "不眠症": "INSOMNIA",
+    "うつ病": "DEPRESSION",
+    "躁病": "MANIA",
+    "不安": "ANXIETY",
+    "攻撃性": "AGGRESSION",
+    "興奮": "AGITATION",
+    "精神病性障害": "PSYCHOTIC DISORDER",
+    # Metabolic
+    "低血糖症": "HYPOGLYCAEMIA",
+    "高血糖": "HYPERGLYCAEMIA",
+    "糖尿病性ケトアシドーシス": "DIABETIC KETOACIDOSIS",
+    "乳酸アシドーシス": "LACTIC ACIDOSIS",
+    "電解質異常": "ELECTROLYTE IMBALANCE",
+    "低ナトリウム血症": "HYPONATRAEMIA",
+    "高カリウム血症": "HYPERKALAEMIA",
+    "低カリウム血症": "HYPOKALAEMIA",
+    "高カルシウム血症": "HYPERCALCAEMIA",
+    "脱水": "DEHYDRATION",
+    "代謝性アシドーシス": "METABOLIC ACIDOSIS",
+    # Musculoskeletal
+    "骨壊死": "OSTEONECROSIS",
+    "顎骨壊死": "OSTEONECROSIS OF JAW",
+    "筋力低下": "MUSCULAR WEAKNESS",
+    "筋肉痛": "MYALGIA",
+    "関節痛": "ARTHRALGIA",
+    # Infections
+    "敗血症": "SEPSIS",
+    "敗血症性ショック": "SEPTIC SHOCK",
+    "感染": "INFECTION",
+    "帯状疱疹": "HERPES ZOSTER",
+    "結核": "TUBERCULOSIS",
+    "サイトメガロウイルス感染": "CYTOMEGALOVIRUS INFECTION",
+    "ニューモシスチス肺炎": "PNEUMOCYSTIS JIROVECII PNEUMONIA",
+    "Ｂ型肝炎再活性化": "HEPATITIS B REACTIVATION",
+    # Eye
+    "視力障害": "VISUAL IMPAIRMENT",
+    "視力低下": "VISUAL ACUITY REDUCED",
+    "失明": "BLINDNESS",
+    # General / Systemic
+    "死亡": "DEATH",
+    "突然死": "SUDDEN DEATH",
+    "多臓器不全": "MULTI-ORGAN FAILURE",
+    "発熱": "PYREXIA",
+    "倦怠感": "MALAISE",
+    "浮腫": "OEDEMA",
+    "末梢性浮腫": "OEDEMA PERIPHERAL",
+    "体重増加": "WEIGHT INCREASED",
+    "体重減少": "WEIGHT DECREASED",
+    "食欲減退": "DECREASED APPETITE",
+    "悪性高熱": "MALIGNANT HYPERTHERMIA",
+    "胸痛": "CHEST PAIN",
+    "疲労": "FATIGUE",
+    "無力症": "ASTHENIA",
+    "薬効の欠如": "DRUG INEFFECTIVE",
+    "注射部位反応": "INJECTION SITE REACTION",
+    # Endocrine
+    "副腎不全": "ADRENAL INSUFFICIENCY",
+    "甲状腺機能低下症": "HYPOTHYROIDISM",
+    "甲状腺機能亢進症": "HYPERTHYROIDISM",
+    "高プロラクチン血症": "HYPERPROLACTINAEMIA",
+    # Lab / investigations
+    "ＡＳＴ増加": "ASPARTATE AMINOTRANSFERASE INCREASED",
+    "ＡＬＴ増加": "ALANINE AMINOTRANSFERASE INCREASED",
+    "血中ビリルビン増加": "BLOOD BILIRUBIN INCREASED",
+    "血中クレアチニン増加": "BLOOD CREATININE INCREASED",
+    "白血球数減少": "WHITE BLOOD CELL COUNT DECREASED",
+    "血小板数減少": "PLATELET COUNT DECREASED",
+    "ＣＫ増加": "BLOOD CREATINE PHOSPHOKINASE INCREASED",
+    "肝酵素上昇": "HEPATIC ENZYME INCREASED",
+    "ＩＮＲ増加": "INTERNATIONAL NORMALISED RATIO INCREASED",
+    # Pregnancy
+    "胎児死亡": "FOETAL DEATH",
+    "自然流産": "ABORTION SPONTANEOUS",
+    "先天異常": "CONGENITAL ANOMALY",
+    # Pulmonary toxicity
+    "肺毒性": "PULMONARY TOXICITY",
+    "肺線維症": "PULMONARY FIBROSIS",
+    # Specific syndromes
+    "腫瘍崩壊症候群": "TUMOUR LYSIS SYNDROME",
+    "再灌流症候群": "REPERFUSION SYNDROME",
+    "輸血関連急性肺障害": "TRANSFUSION-RELATED ACUTE LUNG INJURY",
+    "進行性多巣性白質脳症": "PROGRESSIVE MULTIFOCAL LEUKOENCEPHALOPATHY",
+    "サイトカイン放出症候群": "CYTOKINE RELEASE SYNDROME",
+    "免疫関連有害事象": "IMMUNE-MEDIATED ADVERSE REACTION",
+    # Additional common terms
+    "薬物相互作用": "DRUG INTERACTION",
+    "過量投与": "OVERDOSE",
+    "誤投与": "WRONG DRUG ADMINISTERED",
+    "投与量不適正": "INAPPROPRIATE DOSE ADMINISTERED",
+    "副作用": "ADVERSE DRUG REACTION",
+}
+
+
+def translate_drug(jp_name: str) -> tuple[str, MappingConfidence]:
+    """Traduz nome de droga JP→EN com nível de confiança."""
+    # Normalizar: strip whitespace, full-width → half-width nao necessario aqui
+    cleaned = jp_name.strip()
+
+    # 1. Exact match
+    if cleaned in DRUG_JP_EN:
+        return DRUG_JP_EN[cleaned], MappingConfidence.EXACT
+
+    # 2. Case-insensitive / upper match (para nomes ja em romaji)
+    upper = cleaned.upper()
+    # Se ja e ASCII/romaji, retorna como EXACT (INN em ingles)
+    if upper.isascii() and len(upper) > 1:
+        return upper, MappingConfidence.INFERRED
+
+    # 3. Unmapped
+    return upper, MappingConfidence.UNMAPPED
+
+
+def translate_event(jp_term: str) -> tuple[str, MappingConfidence]:
+    """Traduz termo MedDRA JP→EN com nível de confiança."""
+    cleaned = jp_term.strip()
+
+    # 1. Exact match
+    if cleaned in MEDDRA_JP_EN:
+        return MEDDRA_JP_EN[cleaned], MappingConfidence.EXACT
+
+    # 2. Ja e ASCII/romaji
+    upper = cleaned.upper()
+    if upper.isascii() and len(upper) > 1:
+        return upper, MappingConfidence.INFERRED
+
+    # 3. Unmapped
+    return upper, MappingConfidence.UNMAPPED

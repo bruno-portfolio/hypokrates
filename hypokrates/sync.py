@@ -19,6 +19,7 @@ from hypokrates.dailymed import api as dailymed_api
 from hypokrates.drugbank import api as drugbank_api
 from hypokrates.faers import api as faers_api
 from hypokrates.faers_bulk import api as faers_bulk_api
+from hypokrates.jader import api as jader_api
 from hypokrates.onsides import api as onsides_api
 from hypokrates.opentargets import api as opentargets_api
 from hypokrates.pharmgkb import api as pharmgkb_api
@@ -36,7 +37,6 @@ T = TypeVar("T")
 
 
 def _run_sync(coro: Coroutine[Any, Any, T]) -> T:
-    """Executa coroutine de forma síncrona."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -53,8 +53,6 @@ def _run_sync(coro: Coroutine[Any, Any, T]) -> T:
 
 
 def _make_sync(fn: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., T]:
-    """Transforma função async em sync."""
-
     @functools.wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> T:
         return _run_sync(fn(*args, **kwargs))
@@ -63,8 +61,6 @@ def _make_sync(fn: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., T]:
 
 
 class _SyncFAERS:
-    """Wrapper síncrono para hypokrates.faers."""
-
     adverse_events = staticmethod(_make_sync(faers_api.adverse_events))
     top_events = staticmethod(_make_sync(faers_api.top_events))
     compare = staticmethod(_make_sync(faers_api.compare))
@@ -73,65 +69,47 @@ class _SyncFAERS:
 
 
 class _SyncStats:
-    """Wrapper síncrono para hypokrates.stats."""
-
     signal = staticmethod(_make_sync(stats_api.signal))
     signal_timeline = staticmethod(_make_sync(stats_api.signal_timeline))
 
 
 class _SyncPubMed:
-    """Wrapper síncrono para hypokrates.pubmed."""
-
     count_papers = staticmethod(_make_sync(pubmed_api.count_papers))
     search_papers = staticmethod(_make_sync(pubmed_api.search_papers))
 
 
 class _SyncCross:
-    """Wrapper síncrono para hypokrates.cross."""
-
     hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
     compare_signals = staticmethod(_make_sync(cross_api.compare_signals))
     coadmin_analysis = staticmethod(_make_sync(cross_api.coadmin_analysis))
 
 
 class _SyncScan:
-    """Wrapper síncrono para hypokrates.scan."""
-
     scan_drug = staticmethod(_make_sync(scan_api.scan_drug))
     compare_class = staticmethod(_make_sync(class_compare_api.compare_class))
 
 
 class _SyncVocab:
-    """Wrapper síncrono para hypokrates.vocab."""
-
     normalize_drug = staticmethod(_make_sync(vocab_api.normalize_drug))
     map_to_mesh = staticmethod(_make_sync(vocab_api.map_to_mesh))
 
 
 class _SyncDailyMed:
-    """Wrapper síncrono para hypokrates.dailymed."""
-
     label_events = staticmethod(_make_sync(dailymed_api.label_events))
     check_label = staticmethod(_make_sync(dailymed_api.check_label))
 
 
 class _SyncTrials:
-    """Wrapper síncrono para hypokrates.trials."""
-
     search_trials = staticmethod(_make_sync(trials_api.search_trials))
 
 
 class _SyncDrugBank:
-    """Wrapper síncrono para hypokrates.drugbank."""
-
     drug_info = staticmethod(_make_sync(drugbank_api.drug_info))
     drug_interactions = staticmethod(_make_sync(drugbank_api.drug_interactions))
     drug_mechanism = staticmethod(_make_sync(drugbank_api.drug_mechanism))
 
 
 class _SyncOpenTargets:
-    """Wrapper síncrono para hypokrates.opentargets."""
-
     drug_adverse_events = staticmethod(_make_sync(opentargets_api.drug_adverse_events))
     drug_safety_score = staticmethod(_make_sync(opentargets_api.drug_safety_score))
 
@@ -147,16 +125,12 @@ trials = _SyncTrials()
 
 
 class _SyncChEMBL:
-    """Wrapper síncrono para hypokrates.chembl."""
-
     drug_mechanism = staticmethod(_make_sync(chembl_api.drug_mechanism))
     drug_targets = staticmethod(_make_sync(chembl_api.drug_targets))
     drug_metabolism = staticmethod(_make_sync(chembl_api.drug_metabolism))
 
 
 class _SyncFAERSBulk:
-    """Wrapper síncrono para hypokrates.faers_bulk."""
-
     is_bulk_available = staticmethod(_make_sync(faers_bulk_api.is_bulk_available))
     bulk_store_status = staticmethod(_make_sync(faers_bulk_api.bulk_store_status))
     bulk_signal = staticmethod(_make_sync(faers_bulk_api.bulk_signal))
@@ -165,8 +139,6 @@ class _SyncFAERSBulk:
 
 
 class _SyncAnvisa:
-    """Wrapper sincrono para hypokrates.anvisa."""
-
     buscar_medicamento = staticmethod(_make_sync(anvisa_api.buscar_medicamento))
     buscar_por_substancia = staticmethod(_make_sync(anvisa_api.buscar_por_substancia))
     listar_apresentacoes = staticmethod(_make_sync(anvisa_api.listar_apresentacoes))
@@ -174,8 +146,6 @@ class _SyncAnvisa:
 
 
 class _SyncOnSIDES:
-    """Wrapper síncrono para hypokrates.onsides."""
-
     onsides_events = staticmethod(_make_sync(onsides_api.onsides_events))
     onsides_check_event = staticmethod(_make_sync(onsides_api.onsides_check_event))
 
@@ -186,8 +156,6 @@ opentargets = _SyncOpenTargets()
 
 
 class _SyncPharmGKB:
-    """Wrapper síncrono para hypokrates.pharmgkb."""
-
     pgx_annotations = staticmethod(_make_sync(pharmgkb_api.pgx_annotations))
     pgx_guidelines = staticmethod(_make_sync(pharmgkb_api.pgx_guidelines))
     pgx_drug_info = staticmethod(_make_sync(pharmgkb_api.pgx_drug_info))
@@ -199,12 +167,17 @@ faers_bulk = _SyncFAERSBulk()
 
 
 class _SyncCanada:
-    """Wrapper síncrono para hypokrates.canada."""
-
     canada_signal = staticmethod(_make_sync(canada_api.canada_signal))
     canada_top_events = staticmethod(_make_sync(canada_api.canada_top_events))
     canada_bulk_status = staticmethod(_make_sync(canada_api.canada_bulk_status))
 
 
+class _SyncJADER:
+    jader_signal = staticmethod(_make_sync(jader_api.jader_signal))
+    jader_top_events = staticmethod(_make_sync(jader_api.jader_top_events))
+    jader_bulk_status = staticmethod(_make_sync(jader_api.jader_bulk_status))
+
+
 anvisa = _SyncAnvisa()
 canada = _SyncCanada()
+jader = _SyncJADER()

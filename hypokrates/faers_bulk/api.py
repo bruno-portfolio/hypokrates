@@ -12,7 +12,10 @@ from datetime import UTC, datetime
 
 from hypokrates.faers_bulk.constants import RoleCodFilter
 from hypokrates.faers_bulk.drug_resolver import resolve_bulk_drug
-from hypokrates.faers_bulk.models import BulkStoreStatus  # noqa: TC001 — used at runtime
+from hypokrates.faers_bulk.models import (  # noqa: TC001 — used at runtime
+    BulkStoreStatus,
+    StrataFilter,
+)
 from hypokrates.faers_bulk.store import FAERSBulkStore
 from hypokrates.models import MetaInfo
 from hypokrates.stats.constants import (
@@ -52,6 +55,7 @@ async def bulk_top_events(
     *,
     role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
     limit: int = 60,
+    strata: StrataFilter | None = None,
 ) -> list[tuple[str, int]]:
     """Retorna top eventos adversos de uma droga via bulk store (deduplicado).
 
@@ -59,6 +63,7 @@ async def bulk_top_events(
         drug: Nome genérico do medicamento.
         role_filter: Filtro de role (PS_ONLY, SUSPECT, ALL).
         limit: Máximo de eventos.
+        strata: Filtro demográfico opcional (sex/age_group/reporter_country).
 
     Returns:
         Lista de (event_term, count) ordenada por count DESC.
@@ -67,7 +72,7 @@ async def bulk_top_events(
     resolved = await resolve_bulk_drug(drug, store=store)
     drug_name = resolved if resolved is not None else drug.strip().upper()
     return await asyncio.to_thread(
-        store.top_events, drug_name, role_filter=role_filter, limit=limit
+        store.top_events, drug_name, role_filter=role_filter, limit=limit, strata=strata
     )
 
 
@@ -96,6 +101,7 @@ async def bulk_signal(
     event: str,
     *,
     role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+    strata: StrataFilter | None = None,
 ) -> SignalResult:
     """Calcula sinal de desproporcionalidade usando FAERS Bulk (deduplicado).
 
@@ -103,6 +109,7 @@ async def bulk_signal(
         drug: Nome genérico do medicamento.
         event: Preferred term MedDRA do evento.
         role_filter: Filtro de role (PS_ONLY, SUSPECT, ALL).
+        strata: Filtro demográfico opcional (sex/age_group/reporter_country).
 
     Returns:
         SignalResult com PRR, ROR, IC — mesmo modelo do API path.
@@ -120,7 +127,7 @@ async def bulk_signal(
 
     # Query bulk store (thread para não bloquear event loop)
     counts = await asyncio.to_thread(
-        store.four_counts, drug_name, event_terms, role_filter=role_filter
+        store.four_counts, drug_name, event_terms, role_filter=role_filter, strata=strata
     )
 
     # Construir sinal com mesma lógica do API path

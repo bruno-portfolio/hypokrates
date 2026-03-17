@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from hypokrates.models import MetaInfo  # noqa: TC001 — Pydantic needs at runtime
 from hypokrates.stats.models import ContingencyTable  # noqa: TC001 — Pydantic needs at runtime
@@ -24,44 +24,14 @@ class CanadaSignalResult(BaseModel):
 
     drug: str
     event: str
-    drug_event_count: int = Field(
-        default=0,
-        description="Reports com droga + evento no Canada Vigilance.",
-    )
-    drug_total: int = Field(
-        default=0,
-        description="Total de reports com a droga.",
-    )
-    event_total: int = Field(
-        default=0,
-        description="Total de reports com o evento.",
-    )
-    total_reports: int = Field(
-        default=0,
-        description="Total de reports no banco.",
-    )
-    prr: float = Field(
-        default=0.0,
-        description="PRR calculado no Canada Vigilance.",
-    )
-    ror: float = Field(
-        default=0.0,
-        description="ROR calculado no Canada Vigilance.",
-    )
-    ic: float = Field(
-        default=0.0,
-        description="IC (Information Component) calculado no Canada Vigilance.",
-    )
-    ebgm: float = Field(
-        default=0.0,
-        description="EBGM (GPS/DuMouchel 1999) calculado no Canada Vigilance.",
-    )
-    signal_detected: bool = Field(
-        default=False,
-        description="Heurística: >= 2 medidas significantes (PRR/ROR/IC).",
-    )
-    table: ContingencyTable | None = Field(
-        default=None,
-        description="Tabela de contingência 2x2 para cálculos adicionais.",
-    )
+    drug_event_count: int = 0
+    drug_total: int = 0
+    event_total: int = 0
+    total_reports: int = 0
+    prr: float = 0.0
+    ror: float = 0.0
+    ic: float = 0.0
+    ebgm: float = 0.0
+    signal_detected: bool = False
+    table: ContingencyTable | None = None
     meta: MetaInfo

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from hypokrates.canada.models import CanadaBulkStatus, CanadaSignalResult
 from hypokrates.canada.store import CanadaVigilanceStore
@@ -13,6 +14,9 @@ from hypokrates.exceptions import ConfigurationError
 from hypokrates.models import MetaInfo
 from hypokrates.stats.measures import compute_ebgm, compute_ic, compute_ror
 from hypokrates.stats.models import ContingencyTable
+
+if TYPE_CHECKING:
+    from hypokrates.faers_bulk.models import StrataFilter
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +54,7 @@ async def canada_signal(
     event: str,
     *,
     suspect_only: bool = False,
+    strata: StrataFilter | None = None,
     _store: CanadaVigilanceStore | None = None,
 ) -> CanadaSignalResult:
     """Calcula PRR para drug-event no Canada Vigilance.
@@ -60,13 +65,16 @@ async def canada_signal(
         drug: Nome do ingrediente ativo.
         event: Termo MedDRA (PT) do evento adverso.
         suspect_only: Se True, conta apenas reports onde a droga é Suspect.
+        strata: Filtro demográfico opcional (sex/age_group).
         _store: Store injetado (para testes).
 
     Returns:
         CanadaSignalResult com PRR e flag de sinal.
     """
     store = await _ensure_loaded(_store)
-    a, b, c, n = await asyncio.to_thread(store.four_counts, drug, event, suspect_only=suspect_only)
+    a, b, c, n = await asyncio.to_thread(
+        store.four_counts, drug, event, suspect_only=suspect_only, strata=strata
+    )
 
     # Tabela de contingência 2x2
     d = n - a - b - c
@@ -117,6 +125,7 @@ async def canada_top_events(
     *,
     limit: int = 10,
     suspect_only: bool = False,
+    strata: StrataFilter | None = None,
     _store: CanadaVigilanceStore | None = None,
 ) -> list[tuple[str, int]]:
     """Retorna top eventos adversos para uma droga no Canada Vigilance.
@@ -125,13 +134,16 @@ async def canada_top_events(
         drug: Nome do ingrediente ativo.
         limit: Máximo de eventos.
         suspect_only: Se True, conta apenas Suspect.
+        strata: Filtro demográfico opcional (sex/age_group).
         _store: Store injetado (para testes).
 
     Returns:
         Lista de (event_term, count) ordenada por count DESC.
     """
     store = await _ensure_loaded(_store)
-    return await asyncio.to_thread(store.top_events, drug, suspect_only=suspect_only, limit=limit)
+    return await asyncio.to_thread(
+        store.top_events, drug, suspect_only=suspect_only, limit=limit, strata=strata
+    )
 
 
 async def canada_bulk_status(

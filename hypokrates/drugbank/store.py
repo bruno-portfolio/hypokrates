@@ -115,19 +115,11 @@ class DrugBankStore:
         return self._loaded
 
     def _check_loaded(self) -> bool:
-        """Verifica se já existem dados no store."""
         result = self._conn.execute("SELECT COUNT(*) FROM drugbank_drugs").fetchone()
         return result is not None and result[0] > 0
 
     def load_from_xml(self, xml_path: str) -> int:
-        """Carrega dados do DrugBank XML para o DuckDB.
-
-        Args:
-            xml_path: Caminho para o arquivo DrugBank XML.
-
-        Returns:
-            Número de drogas carregadas.
-        """
+        """Carrega dados do DrugBank XML para o DuckDB."""
         logger.info("Loading DrugBank XML: %s", xml_path)
         drugs = iterparse_drugbank(xml_path)
 
@@ -136,7 +128,6 @@ class DrugBankStore:
             return 0
 
         with self._db_lock:
-            # Limpar tabelas antes de carregar
             self._conn.execute("DELETE FROM drugbank_name_index")
             self._conn.execute("DELETE FROM drugbank_enzymes")
             self._conn.execute("DELETE FROM drugbank_targets")
@@ -150,10 +141,6 @@ class DrugBankStore:
         return len(drugs)
 
     def _batch_insert(self, drugs: list[dict[str, Any]]) -> None:
-        """Insere todas as drogas em batch (executemany).
-
-        NOTA: Chamado de dentro de ``load_from_xml`` que já detém ``_db_lock``.
-        """
         drug_rows: list[list[object]] = []
         name_rows: list[list[str]] = []
         interaction_rows: list[list[str]] = []
@@ -237,13 +224,8 @@ class DrugBankStore:
             )
 
     def find_drug(self, name: str) -> DrugBankInfo | None:
-        """Busca droga por nome ou sinônimo (case-insensitive).
-
-        Returns:
-            DrugBankInfo ou None se não encontrado.
-        """
+        """Busca droga por nome ou sinonimo (case-insensitive)."""
         with self._db_lock:
-            # Lookup na name_index
             result = self._conn.execute(
                 "SELECT drugbank_id FROM drugbank_name_index WHERE name_lower = ? LIMIT 1",
                 [name.lower()],
@@ -256,16 +238,11 @@ class DrugBankStore:
             return self._get_drug_unlocked(drug_id)
 
     def get_drug(self, drug_id: str) -> DrugBankInfo | None:
-        """Busca droga pelo DrugBank ID.
-
-        Returns:
-            DrugBankInfo ou None se não encontrado.
-        """
+        """Busca droga pelo DrugBank ID."""
         with self._db_lock:
             return self._get_drug_unlocked(drug_id)
 
     def _get_drug_unlocked(self, drug_id: str) -> DrugBankInfo | None:
-        """Busca droga pelo ID (sem lock — chamador deve deter ``_db_lock``)."""
         row = self._conn.execute(
             "SELECT * FROM drugbank_drugs WHERE drugbank_id = ?",
             [drug_id],
@@ -305,7 +282,6 @@ class DrugBankStore:
             return self._get_interactions(result[0])
 
     def _get_targets(self, drug_id: str) -> list[DrugTarget]:
-        """Busca targets de uma droga."""
         rows = self._conn.execute(
             "SELECT name, gene_name, actions, organism FROM drugbank_targets WHERE drug_id = ?",
             [drug_id],
@@ -322,7 +298,6 @@ class DrugBankStore:
         ]
 
     def _get_enzymes(self, drug_id: str) -> list[DrugEnzyme]:
-        """Busca enzimas de uma droga."""
         rows = self._conn.execute(
             "SELECT name, gene_name FROM drugbank_enzymes WHERE drug_id = ?",
             [drug_id],
@@ -331,7 +306,6 @@ class DrugBankStore:
         return [DrugEnzyme(name=row[0], gene_name=row[1]) for row in rows]
 
     def _get_interactions(self, drug_id: str) -> list[DrugInteraction]:
-        """Busca interações de uma droga."""
         rows = self._conn.execute(
             "SELECT partner_id, partner_name, description "
             "FROM drugbank_interactions WHERE drug_id = ?",

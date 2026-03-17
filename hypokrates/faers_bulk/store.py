@@ -18,7 +18,15 @@ from hypokrates.faers_bulk.constants import (
     FAERS_BULK_DB_FILENAME,
     RoleCodFilter,
 )
-from hypokrates.faers_bulk.models import BulkCountResult, BulkStoreStatus, QuarterInfo
+from hypokrates.faers_bulk.models import (
+    AGE_GROUPS,
+    MIN_STRATUM_DRUG_EVENT,
+    MIN_STRATUM_DRUG_TOTAL,
+    BulkCountResult,
+    BulkStoreStatus,
+    QuarterInfo,
+    StrataFilter,
+)
 from hypokrates.faers_bulk.parser import parse_quarter_zip
 
 if TYPE_CHECKING:
@@ -79,7 +87,6 @@ CREATE INDEX IF NOT EXISTS idx_demo_primaryid ON faers_demo (primaryid);
 CREATE INDEX IF NOT EXISTS idx_demo_caseid ON faers_demo (caseid);
 """
 
-# SQL para four_counts com dedup e role filter
 _FOUR_COUNTS_SQL = """
 WITH deduped AS (
     SELECT primaryid FROM faers_dedup
@@ -195,21 +202,10 @@ class FAERSBulkStore:
             return result is not None and result[0] > 0
 
     def load_quarter(self, zip_path: str | Path, *, force: bool = False) -> int:
-        """Carrega um quarter FAERS ASCII ZIP para o DuckDB.
-
-        Idempotente: se o quarter já está carregado e ``force=False``, skip.
-
-        Args:
-            zip_path: Caminho para o ZIP (e.g., ``faers_ascii_2024Q3.zip``).
-            force: Se True, recarrega mesmo se já existir.
-
-        Returns:
-            Número de demo rows inseridas (0 se skip).
-        """
+        """Carrega um quarter FAERS ASCII ZIP para o DuckDB (idempotente)."""
         quarter_key = _extract_quarter_key(str(zip_path))
 
         with self._db_lock:
-            # Check se já carregado
             if not force:
                 existing = self._conn.execute(
                     "SELECT 1 FROM faers_quarters WHERE quarter_key = $1",
@@ -219,25 +215,17 @@ class FAERSBulkStore:
                     logger.info("Quarter %s already loaded, skipping", quarter_key)
                     return 0
 
-        # Parse fora do lock (I/O bound)
         logger.info("Loading quarter %s from %s", quarter_key, zip_path)
         demo_rows, drug_rows, reac_rows = parse_quarter_zip(zip_path)
 
         with self._db_lock:
-            # Se force, deletar dados antigos do quarter
             if force:
                 self._delete_quarter_unlocked(quarter_key)
 
-            # Insert demo
             self._batch_insert_demo(demo_rows, quarter_key)
-
-            # Insert drug
             self._batch_insert_drug(drug_rows)
-
-            # Insert reac
             self._batch_insert_reac(reac_rows)
 
-            # Registrar quarter
             self._conn.execute(
                 "INSERT OR REPLACE INTO faers_quarters VALUES ($1, $2, $3, $4, $5, $6, $7)",
                 [
@@ -251,7 +239,6 @@ class FAERSBulkStore:
                 ],
             )
 
-            # Rebuild dedup
             dedup_count = self._rebuild_dedup_unlocked()
 
         logger.info(
@@ -265,18 +252,11 @@ class FAERSBulkStore:
         return len(demo_rows)
 
     def rebuild_dedup(self) -> int:
-        """Full rebuild do índice de deduplicação.
-
-        Mantém apenas o primaryid com maior caseversion para cada caseid.
-
-        Returns:
-            Número de cases únicos.
-        """
+        """Rebuild do índice de deduplicação (mantém maior caseversion por caseid)."""
         with self._db_lock:
             return self._rebuild_dedup_unlocked()
 
     def _rebuild_dedup_unlocked(self) -> int:
-        """Rebuild dedup (sem lock — chamador deve deter ``_db_lock``)."""
         self._conn.execute("DELETE FROM faers_dedup")
         self._conn.execute(
             """
@@ -302,23 +282,18 @@ class FAERSBulkStore:
         event: str | list[str],
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
+        strata: StrataFilter | None = None,
     ) -> BulkCountResult:
-        """Calcula 4-count deduplicado para um par droga-evento.
-
-        Args:
-            drug: Nome da droga (matched por UPPER contra drug_name_norm).
-            event: Preferred term ou lista de termos MedDRA expandidos.
-            role_filter: Filtro de role (PS_ONLY, SUSPECT, ALL).
-
-        Returns:
-            BulkCountResult com as 4 contagens.
-        """
+        """Calcula 4-count deduplicado para um par droga-evento."""
         drug_upper = drug.strip().upper()
         if isinstance(event, list):
             events_list = [e.strip().upper() for e in event]
         else:
             events_list = [event.strip().upper()]
         role_value = role_filter.value
+
+        if strata is not None and not strata.is_empty:
+            return self._four_counts_stratified(drug_upper, events_list, role_value, strata)
 
         with self._db_lock:
             result = self._conn.execute(
@@ -336,25 +311,102 @@ class FAERSBulkStore:
             n_total=result[3],
         )
 
+    def _four_counts_stratified(
+        self,
+        drug: str,
+        events: list[str],
+        role: str,
+        strata: StrataFilter,
+    ) -> BulkCountResult:
+        where_clauses: list[str] = []
+        params: dict[str, object] = {"drug": drug, "events": events, "role": role}
+
+        if strata.sex is not None:
+            where_clauses.append("dm.sex = $sex")
+            params["sex"] = strata.sex.upper()
+
+        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
+            lo, hi = AGE_GROUPS[strata.age_group]
+            where_clauses.append(
+                "TRY_CAST(dm.age AS INTEGER) >= $age_lo AND TRY_CAST(dm.age AS INTEGER) < $age_hi"
+            )
+            params["age_lo"] = lo
+            params["age_hi"] = hi
+
+        if strata.reporter_country is not None:
+            where_clauses.append("dm.reporter_country = $country")
+            params["country"] = strata.reporter_country.upper()
+
+        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        sql = f"""
+        WITH strata_pids AS (
+            SELECT dd.primaryid
+            FROM faers_dedup dd
+            JOIN faers_demo dm ON dd.primaryid = dm.primaryid
+            WHERE {strata_where}
+        ),
+        drug_pids AS (
+            SELECT DISTINCT d.primaryid
+            FROM faers_drug d
+            INNER JOIN strata_pids sp ON d.primaryid = sp.primaryid
+            WHERE d.drug_name_norm = $drug
+            AND (
+                $role = 'all'
+                OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
+                OR ($role = 'ps_only' AND d.role_cod = 'PS')
+            )
+        ),
+        event_pids AS (
+            SELECT DISTINCT r.primaryid
+            FROM faers_reac r
+            INNER JOIN strata_pids sp ON r.primaryid = sp.primaryid
+            WHERE r.pt_upper = ANY($events)
+        )
+        SELECT
+            (SELECT COUNT(*) FROM drug_pids dp
+             INNER JOIN event_pids ep ON dp.primaryid = ep.primaryid) AS a,
+            (SELECT COUNT(*) FROM drug_pids) AS ab,
+            (SELECT COUNT(*) FROM event_pids) AS ac,
+            (SELECT COUNT(*) FROM strata_pids) AS n
+        """
+
+        with self._db_lock:
+            result = self._conn.execute(sql, params).fetchone()
+
+        if result is None:
+            return BulkCountResult(drug_event=0, drug_total=0, event_total=0, n_total=0)
+
+        a, ab, ac, n = int(result[0]), int(result[1]), int(result[2]), int(result[3])
+
+        if a < MIN_STRATUM_DRUG_EVENT or ab < MIN_STRATUM_DRUG_TOTAL:
+            return BulkCountResult(
+                drug_event=a,
+                drug_total=ab,
+                event_total=ac,
+                n_total=n,
+                insufficient_data=True,
+                insufficient_reason=(
+                    f"Stratum too small: {a} drug+event reports, {ab} drug total"
+                ),
+            )
+
+        return BulkCountResult(drug_event=a, drug_total=ab, event_total=ac, n_total=n)
+
     def top_events(
         self,
         drug: str,
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
         limit: int = 60,
+        strata: StrataFilter | None = None,
     ) -> list[tuple[str, int]]:
-        """Retorna os eventos mais reportados para uma droga (deduplicado).
-
-        Args:
-            drug: Nome da droga (UPPER).
-            role_filter: Filtro de role.
-            limit: Máximo de eventos retornados.
-
-        Returns:
-            Lista de (event_term, count) ordenada por count DESC.
-        """
+        """Retorna os eventos mais reportados para uma droga (deduplicado)."""
         drug_upper = drug.strip().upper()
         role_value = role_filter.value
+
+        if strata is not None and not strata.is_empty:
+            return self._top_events_stratified(drug_upper, role_value, limit, strata)
 
         with self._db_lock:
             rows = self._conn.execute(
@@ -364,21 +416,72 @@ class FAERSBulkStore:
 
         return [(row[0], row[1]) for row in rows]
 
+    def _top_events_stratified(
+        self,
+        drug: str,
+        role: str,
+        limit: int,
+        strata: StrataFilter,
+    ) -> list[tuple[str, int]]:
+        where_clauses: list[str] = []
+        params: dict[str, object] = {"drug": drug, "role": role, "limit": limit}
+
+        if strata.sex is not None:
+            where_clauses.append("dm.sex = $sex")
+            params["sex"] = strata.sex.upper()
+
+        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
+            lo, hi = AGE_GROUPS[strata.age_group]
+            where_clauses.append(
+                "TRY_CAST(dm.age AS INTEGER) >= $age_lo AND TRY_CAST(dm.age AS INTEGER) < $age_hi"
+            )
+            params["age_lo"] = lo
+            params["age_hi"] = hi
+
+        if strata.reporter_country is not None:
+            where_clauses.append("dm.reporter_country = $country")
+            params["country"] = strata.reporter_country.upper()
+
+        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        sql = f"""
+        WITH strata_pids AS (
+            SELECT dd.primaryid
+            FROM faers_dedup dd
+            JOIN faers_demo dm ON dd.primaryid = dm.primaryid
+            WHERE {strata_where}
+        ),
+        drug_pids AS (
+            SELECT DISTINCT d.primaryid
+            FROM faers_drug d
+            INNER JOIN strata_pids sp ON d.primaryid = sp.primaryid
+            WHERE d.drug_name_norm = $drug
+            AND (
+                $role = 'all'
+                OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
+                OR ($role = 'ps_only' AND d.role_cod = 'PS')
+            )
+        )
+        SELECT r.pt_upper AS event, COUNT(DISTINCT dp.primaryid) AS cnt
+        FROM drug_pids dp
+        INNER JOIN faers_reac r ON dp.primaryid = r.primaryid
+        GROUP BY r.pt_upper
+        ORDER BY cnt DESC
+        LIMIT $limit
+        """
+
+        with self._db_lock:
+            rows = self._conn.execute(sql, params).fetchall()
+
+        return [(row[0], row[1]) for row in rows]
+
     def drug_total(
         self,
         drug: str,
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
     ) -> int:
-        """Total de cases deduplicados que mencionam a droga com o role dado.
-
-        Args:
-            drug: Nome da droga (UPPER).
-            role_filter: Filtro de role.
-
-        Returns:
-            Contagem de primaryids distintos.
-        """
+        """Total de cases deduplicados que mencionam a droga com o role dado."""
         drug_upper = drug.strip().upper()
         role_value = role_filter.value
 
@@ -446,8 +549,6 @@ class FAERSBulkStore:
         ]
 
     def _delete_quarter_unlocked(self, quarter_key: str) -> None:
-        """Deleta dados de um quarter (sem lock)."""
-        # Buscar primaryids deste quarter
         self._conn.execute(
             "DELETE FROM faers_drug WHERE primaryid IN "
             "(SELECT primaryid FROM faers_demo WHERE quarter_key = $1)",
@@ -468,7 +569,6 @@ class FAERSBulkStore:
         )
 
     def _batch_insert_demo(self, rows: list[dict[str, str]], quarter_key: str) -> None:
-        """Insert demo rows em batch (sem lock — chamador detém ``_db_lock``)."""
         batch: list[list[str | int]] = []
         for row in rows:
             caseversion_str = row.get("caseversion", "0")
@@ -504,7 +604,6 @@ class FAERSBulkStore:
             )
 
     def _batch_insert_drug(self, rows: list[dict[str, str]]) -> None:
-        """Insert drug rows em batch (sem lock)."""
         batch: list[list[str]] = []
         for row in rows:
             batch.append(
@@ -533,7 +632,6 @@ class FAERSBulkStore:
             )
 
     def _batch_insert_reac(self, rows: list[dict[str, str]]) -> None:
-        """Insert reac rows em batch (sem lock)."""
         batch: list[list[str]] = []
         for row in rows:
             batch.append(
@@ -566,32 +664,21 @@ class FAERSBulkStore:
 
 
 def _extract_quarter_key(zip_path: str) -> str:
-    """Extrai quarter_key (e.g., '2024Q3') do nome do ZIP.
-
-    Suporta formatos:
-    - faers_ascii_2024Q3.zip
-    - faers_ascii_2024q3.zip
-    - qualquer path com 4 dígitos + Q + 1 dígito
-
-    Falls back para o basename sem extensão se não conseguir extrair.
-    """
+    """Extrai quarter_key (e.g., '2024Q3') do nome do ZIP; fallback para stem."""
     import re
 
     match = re.search(r"(\d{4})[qQ](\d)", zip_path)
     if match:
         return f"{match.group(1)}Q{match.group(2)}"
 
-    # Fallback: usar basename
     from pathlib import Path
 
     return Path(zip_path).stem
 
 
 def _year_from_key(quarter_key: str) -> int:
-    """Extrai ano de quarter_key (e.g., '2024Q3' → 2024)."""
     return int(quarter_key[:4])
 
 
 def _quarter_from_key(quarter_key: str) -> int:
-    """Extrai quarter de quarter_key (e.g., '2024Q3' → 3)."""
     return int(quarter_key[-1])

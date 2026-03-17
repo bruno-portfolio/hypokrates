@@ -87,7 +87,6 @@ CREATE INDEX IF NOT EXISTS idx_product_to_rxnorm
     ON product_to_rxnorm (rxnorm_product_id);
 """
 
-# Query principal: dado um ingredient name, retorna todos os AEs com country sources
 _EVENTS_QUERY = """
 SELECT
     m.meddra_id,
@@ -174,19 +173,11 @@ class OnSIDESStore:
         return self._loaded
 
     def _check_loaded(self) -> bool:
-        """Verifica se já existem dados no store."""
         result = self._conn.execute("SELECT COUNT(*) FROM product_label").fetchone()
         return result is not None and result[0] > 0
 
     def load_from_csvs(self, csv_dir: str) -> int:
-        """Carrega CSVs do OnSIDES para o DuckDB.
-
-        Args:
-            csv_dir: Diretório contendo os CSVs extraídos do ZIP.
-
-        Returns:
-            Número de labels carregados.
-        """
+        """Carrega CSVs do OnSIDES para o DuckDB."""
         from hypokrates.onsides.parser import load_csvs_to_store
 
         count = load_csvs_to_store(self, csv_dir)
@@ -196,15 +187,7 @@ class OnSIDESStore:
     def query_events(
         self, drug: str, *, min_confidence: float = DEFAULT_MIN_CONFIDENCE
     ) -> list[OnSIDESEvent]:
-        """Busca eventos adversos para uma droga.
-
-        Args:
-            drug: Nome genérico do ingrediente (RxNorm).
-            min_confidence: Confiança mínima (pred1) para filtrar.
-
-        Returns:
-            Lista de OnSIDESEvent ordenada por confiança descendente.
-        """
+        """Busca eventos adversos para uma droga."""
         from hypokrates.onsides.models import OnSIDESEvent
 
         with self._db_lock:
@@ -223,15 +206,7 @@ class OnSIDESStore:
         ]
 
     def check_event(self, drug: str, event: str) -> OnSIDESEvent | None:
-        """Verifica se um evento específico está nas bulas da droga.
-
-        Args:
-            drug: Nome genérico do ingrediente.
-            event: Termo MedDRA do evento adverso.
-
-        Returns:
-            OnSIDESEvent ou None se não encontrado.
-        """
+        """Verifica se um evento especifico esta nas bulas da droga."""
         from hypokrates.onsides.models import OnSIDESEvent
 
         with self._db_lock:

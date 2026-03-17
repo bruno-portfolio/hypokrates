@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from hypokrates.canada import api as canada_api
 from hypokrates.exceptions import HypokratesError
+from hypokrates.faers_bulk.models import StrataFilter
 from hypokrates.mcp.tools._shared import format_measure
 from hypokrates.stats.measures import compute_ebgm, compute_ic, compute_prr, compute_ror
 
@@ -17,11 +18,19 @@ def register(mcp: FastMCP) -> None:
     """Registra tools de Canada Vigilance no MCP server."""
 
     @mcp.tool()
-    async def canada_signal(drug: str, event: str, suspect_only: bool = False) -> str:
+    async def canada_signal(
+        drug: str,
+        event: str,
+        suspect_only: bool = False,
+        sex: str | None = None,
+        age_group: str | None = None,
+    ) -> str:
         """Calculate PRR signal for a drug-event pair in Canada Vigilance database.
 
         Canada Vigilance contains ~738K adverse reaction reports from 1965 to present.
         Cross-country validation with FAERS increases confidence in detected signals.
+
+        Supports demographic stratification via sex and age_group parameters.
 
         Requires Canada Vigilance bulk data configured via
         configure(canada_bulk_path='/path/to/extracted/').
@@ -30,9 +39,17 @@ def register(mcp: FastMCP) -> None:
             drug: Active ingredient name (e.g., "propofol").
             event: MedDRA PT term (e.g., "Anaphylactic shock").
             suspect_only: Only count reports where drug role is Suspect.
+            sex: Filter by sex: "M" or "F" (optional).
+            age_group: Filter by age group: "0-17", "18-44", "45-64", "65+" (optional).
         """
+        strata = None
+        if sex is not None or age_group is not None:
+            strata = StrataFilter(sex=sex, age_group=age_group)
+
         try:
-            result = await canada_api.canada_signal(drug, event, suspect_only=suspect_only)
+            result = await canada_api.canada_signal(
+                drug, event, suspect_only=suspect_only, strata=strata
+            )
         except HypokratesError as exc:
             return (
                 f"Canada Vigilance not available: {exc}. "

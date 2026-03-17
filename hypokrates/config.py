@@ -37,6 +37,9 @@ class HypokratesConfig:
     # Canada Vigilance (bulk download)
     canada_bulk_path: Path | None = None
 
+    # JADER (Japanese Adverse Drug Event Report)
+    jader_bulk_path: Path | None = None
+
     # FAERS Bulk (quarterly ASCII files)
     faers_bulk_dir: Path | None = None
 

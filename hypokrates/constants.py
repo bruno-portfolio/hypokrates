@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import ClassVar
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 USER_AGENT = f"hypokrates/{__version__}"
 
@@ -26,6 +26,7 @@ class Source(StrEnum):
     ONSIDES = "onsides"
     PHARMGKB = "pharmgkb"
     CANADA = "canada"
+    JADER = "jader"
 
 
 # --- URLs base ---

@@ -70,33 +70,24 @@ _OTC_TOPICAL_FORMS: set[str] = {
 
 
 def _score_spl_candidate(candidate: SPLCandidate) -> int:
-    """Pontua um candidato SPL para ranking.
-
-    Score mais alto = mais relevante para farmacovigilância.
-    Prioriza: single-ingredient > combo, systemic > topical, prescription > OTC.
-    """
+    # Higher score = more relevant for PV. Favors single-ingredient, systemic, prescription.
     title_upper = candidate["title"].upper()
-    # Cap spl_version para evitar que versões altas dominem o scoring
     score = min(candidate["spl_version"], 5)
 
-    # Filtrar veterinários
     for marker in _VET_MARKERS:
         if marker in title_upper:
             return -100
 
-    # Penalty para combinações (múltiplos ingredientes ativos)
     for pattern in _COMBINATION_MARKERS:
         if pattern in title_upper:
             score -= 50
             break
 
-    # Bonus para formas prescription/sistêmicas
     for form in _PRESCRIPTION_FORMS:
         if form in title_upper:
             score += 25
             break
 
-    # Penalty para OTC tópicos
     for form in _OTC_TOPICAL_FORMS:
         if form in title_upper:
             score -= 25
@@ -106,25 +97,12 @@ def _score_spl_candidate(candidate: SPLCandidate) -> int:
 
 
 def _is_combination_title(title: str) -> bool:
-    """Verifica se o título indica produto combinado (múltiplos ingredientes)."""
     title_upper = title.upper()
     return any(marker in title_upper for marker in _COMBINATION_MARKERS)
 
 
 def parse_spl_search(data: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """Extrai SET IDs de uma resposta de busca DailyMed, rankeados.
-
-    Prioriza labels prescription sobre OTC e filtra veterinários.
-    Separa single-ingredient de combos para que o caller possa
-    tentar singles primeiro (evita selecionar acetaminophen+codeine
-    quando buscando acetaminophen).
-
-    Args:
-        data: JSON response de /spls.json.
-
-    Returns:
-        Tupla (single_ids, combo_ids), ambas ordenadas por relevância.
-    """
+    """Extrai SET IDs rankeados, separando singles de combos."""
     results = data.get("data", [])
     candidates: list[SPLCandidate] = []
     for item in results:
@@ -140,7 +118,6 @@ def parse_spl_search(data: dict[str, Any]) -> tuple[list[str], list[str]]:
                 )
             )
 
-    # Ordenar por score decrescente
     candidates.sort(key=_score_spl_candidate, reverse=True)
 
     singles: list[str] = []
@@ -155,17 +132,7 @@ def parse_spl_search(data: dict[str, Any]) -> tuple[list[str], list[str]]:
 
 
 def parse_adverse_reactions_xml(xml_text: str) -> tuple[list[str], str]:
-    """Extrai termos de safety sections de um SPL XML.
-
-    Busca seções de Adverse Reactions, Boxed Warning, Warnings, e
-    Warnings and Precautions pelo LOINC code e extrai termos textuais.
-
-    Args:
-        xml_text: XML completo do SPL.
-
-    Returns:
-        Tupla (lista de termos normalizados, texto raw combinado das seções).
-    """
+    """Extrai termos de safety sections (LOINC) de um SPL XML."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
@@ -194,30 +161,13 @@ def match_event_in_label(
     terms: list[str],
     raw_text: str = "",
 ) -> tuple[bool, list[str]]:
-    """Verifica se um evento adverso está presente nos termos da bula.
-
-    3 camadas de matching:
-    1. Substring case-insensitive (rápido, sem falsos positivos)
-    2. MedDRA synonyms — expande para canonical+aliases e retenta substring
-    3. Fuzzy — rapidfuzz token_sort_ratio >= 85 (pega ordem invertida,
-       grafias BrE/AmE como apnoea/apnea, variações menores)
-
-    Args:
-        event: Termo do evento adverso (e.g., "bradycardia").
-        terms: Lista de termos extraídos da bula.
-        raw_text: Texto raw da seção (fallback).
-
-    Returns:
-        Tupla (encontrado, lista de termos matched).
-    """
+    """Multi-layer matching: substring, MedDRA synonyms, fuzzy (token_sort_ratio>=85)."""
     from hypokrates.vocab.meddra import expand_event_terms
 
-    # Expandir evento para incluir sinônimos MedDRA (canonical + aliases)
     search_terms = expand_event_terms(event)
 
     matched: list[str] = []
 
-    # Layer 1 + 2: substring match (original + MedDRA synonyms)
     for search_event in search_terms:
         event_lower = search_event.lower()
         for term in terms:
@@ -229,7 +179,6 @@ def match_event_in_label(
     if matched:
         return True, matched
 
-    # Layer 1.5: all-words-present match (non-contiguous)
     for search_event in search_terms:
         event_words = set(search_event.lower().split())
         if len(event_words) < 2:
@@ -241,7 +190,6 @@ def match_event_in_label(
     if matched:
         return True, matched
 
-    # Layer 2 fallback: buscar no texto raw com todos os sinônimos
     if raw_text:
         raw_lower = raw_text.lower()
         for search_event in search_terms:
@@ -249,9 +197,7 @@ def match_event_in_label(
                 matched.append(search_event)
                 return True, matched
 
-    # Layer 2.5: all-words-present in full raw_text (cross-section)
-    # Catches multi-word events where words appear in different sections
-    # (e.g., "febrile" in one paragraph, "neutropenia" in another)
+    # All-words-present in raw_text (catches cross-section multi-word events)
     if raw_text:
         raw_lower = raw_text.lower()
         for search_event in search_terms:
@@ -260,7 +206,6 @@ def match_event_in_label(
                 matched.append(search_event)
                 return True, matched
 
-    # Layer 3: fuzzy matching com rapidfuzz
     try:
         from rapidfuzz.fuzz import token_sort_ratio  # type: ignore[import-not-found,unused-ignore]
     except ImportError:
@@ -272,7 +217,6 @@ def match_event_in_label(
             if score >= _FUZZY_THRESHOLD and term not in matched:
                 matched.append(term)
 
-    # Fuzzy no raw_text: split em sentenças e comparar
     if not matched and raw_text:
         sentences = re.split(r"[.;,\n]+", raw_text)
         for search_event in search_terms:
@@ -291,18 +235,7 @@ def match_event_in_label(
 
 
 def parse_indications_text(xml_text: str) -> str:
-    """Extrai texto da seção INDICATIONS AND USAGE (LOINC 34067-9).
-
-    Usado para detectar confounding por indicação — se o evento adverso
-    aparece na seção de indicações, o PRR alto pode refletir o perfil
-    de uso da droga, não toxicidade.
-
-    Args:
-        xml_text: XML completo do SPL.
-
-    Returns:
-        Texto raw da seção de indicações, ou string vazia.
-    """
+    """Extrai texto da secao INDICATIONS AND USAGE (LOINC 34067-9)."""
     from hypokrates.dailymed.constants import INDICATIONS_LOINC
 
     try:
@@ -314,18 +247,7 @@ def parse_indications_text(xml_text: str) -> str:
 
 
 def has_adverse_reactions_section(xml_text: str) -> bool:
-    """Verifica se um SPL XML contém seção Adverse Reactions (LOINC 34084-4).
-
-    Mais restritivo que has_safety_sections(). Labels OTC/vet geralmente
-    têm apenas Warnings, não Adverse Reactions formais. Usar como primeiro
-    filtro para priorizar labels prescription com AR completa.
-
-    Args:
-        xml_text: XML completo do SPL.
-
-    Returns:
-        True se a seção Adverse Reactions (34084-4) foi encontrada com conteúdo.
-    """
+    """Verifica se SPL contem secao Adverse Reactions (LOINC 34084-4)."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
@@ -338,17 +260,7 @@ def has_adverse_reactions_section(xml_text: str) -> bool:
 
 
 def has_safety_sections(xml_text: str) -> bool:
-    """Verifica se um SPL XML contém pelo menos uma seção de segurança (LOINC).
-
-    Usado para filtrar SPLs irrelevantes (ex: powder, OTC, patch) que não
-    têm seções de Adverse Reactions ou Warnings.
-
-    Args:
-        xml_text: XML completo do SPL.
-
-    Returns:
-        True se pelo menos um LOINC de segurança foi encontrado.
-    """
+    """Verifica se SPL contem pelo menos uma secao de seguranca (LOINC)."""
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
@@ -362,7 +274,6 @@ def has_safety_sections(xml_text: str) -> bool:
 
 
 def _find_section_by_loinc(root: ET.Element, loinc_code: str) -> str:
-    """Busca seção SPL por LOINC code."""
     ns = SPL_NAMESPACE
 
     for component in root.iter(f"{ns}component"):
@@ -377,7 +288,6 @@ def _find_section_by_loinc(root: ET.Element, loinc_code: str) -> str:
 
 
 def _extract_text_from_section(section: ET.Element) -> str:
-    """Extrai todo o texto de uma seção SPL (incluindo sub-elementos)."""
     ns = SPL_NAMESPACE
     parts: list[str] = []
 
@@ -386,7 +296,6 @@ def _extract_text_from_section(section: ET.Element) -> str:
         if raw:
             parts.append(raw.strip())
 
-    # Fallback: pegar paragraphs apenas se <text> não produziu conteúdo
     if not parts:
         for para in section.iter(f"{ns}paragraph"):
             raw = ET.tostring(para, encoding="unicode", method="text")
@@ -397,19 +306,12 @@ def _extract_text_from_section(section: ET.Element) -> str:
 
 
 def _extract_terms(text: str) -> list[str]:
-    """Extrai termos individuais de adverse reactions do texto da bula.
-
-    Estratégia: split por vírgulas, ponto-e-vírgula, e newlines.
-    Filtra tokens muito curtos ou numéricos.
-    """
-    # Normalizar separadores
     normalized = re.sub(r"[;,\n\r]+", "|", text)
     raw_terms = normalized.split("|")
 
     terms: list[str] = []
     for raw in raw_terms:
         term = raw.strip()
-        # Filtrar tokens muito curtos, numéricos, ou boilerplate
         if len(term) < 3:
             continue
         if term.replace(".", "").replace("%", "").isdigit():

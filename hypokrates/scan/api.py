@@ -69,6 +69,7 @@ async def scan_drug(
     check_onsides: bool = False,
     check_pharmgkb: bool = False,
     check_canada: bool = False,
+    check_jader: bool = False,
     check_direction: bool = False,
     use_bulk: bool | None = None,
     on_progress: Callable[[int, int, str], None] | None = None,
@@ -102,6 +103,7 @@ async def scan_drug(
         check_onsides: Se True, verifica bulas internacionais via OnSIDES (US/EU/UK/JP).
         check_pharmgkb: Se True, busca farmacogenômica via PharmGKB.
         check_canada: Se True, verifica sinal no Canada Vigilance.
+        check_jader: Se True, verifica sinal no JADER (Japão).
         check_direction: Se True + bulk, compara PRR base vs PS-only para cada sinal.
             "strengthens" se PS PRR > 1.2x base, "weakens" se < 0.8x.
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
@@ -255,6 +257,7 @@ async def scan_drug(
                     check_onsides=check_onsides,
                     check_pharmgkb=check_pharmgkb,
                     check_canada=check_canada,
+                    check_jader=check_jader,
                     _label_cache=label_cache,
                     _drugbank_cache=drugbank_cache,
                     _ot_safety_cache=ot_safety_cache,

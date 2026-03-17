@@ -181,6 +181,7 @@ async def hypothesis(
     check_onsides: bool = False,
     check_pharmgkb: bool = False,
     check_canada: bool = False,
+    check_jader: bool = False,
     suspect_only: bool = False,
     use_bulk: bool | None = None,
     _label_cache: LabelEventsResult | None = None,
@@ -211,6 +212,7 @@ async def hypothesis(
         check_onsides: Se deve verificar bulas internacionais via OnSIDES (US/EU/UK/JP).
         check_pharmgkb: Se deve buscar farmacogenômica via PharmGKB.
         check_canada: Se deve verificar sinal no Canada Vigilance.
+        check_jader: Se deve verificar sinal no JADER (Japão).
         suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
         use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
 
@@ -372,7 +374,21 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: Canada Vigilance unavailable", drug, event)
 
-    # 3e3. PharmGKB (drug-level pharmacogenomics)
+    # 3e3. JADER (Japanese cross-country validation)
+    jader_reports: int | None = None
+    jader_signal_detected: bool | None = None
+
+    if check_jader:
+        from hypokrates.jader import api as jader_api_mod
+
+        try:
+            jader_result = await jader_api_mod.jader_signal(drug, event, suspect_only=suspect_only)
+            jader_reports = jader_result.drug_event_count
+            jader_signal_detected = jader_result.signal_detected
+        except Exception:
+            logger.warning("hypothesis %s + %s: JADER unavailable", drug, event)
+
+    # 3e4. PharmGKB (drug-level pharmacogenomics)
     pharmacogenomics: list[str] = []
 
     if check_pharmgkb:
@@ -502,6 +518,8 @@ async def hypothesis(
         pharmacogenomics=pharmacogenomics,
         canada_reports=canada_reports,
         canada_signal=canada_signal_detected,
+        jader_reports=jader_reports,
+        jader_signal=jader_signal_detected,
     )
 
 

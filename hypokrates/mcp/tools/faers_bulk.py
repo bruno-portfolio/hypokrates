@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from hypokrates.faers_bulk import api as bulk_api
 from hypokrates.faers_bulk.constants import RoleCodFilter
+from hypokrates.faers_bulk.models import StrataFilter
 from hypokrates.faers_bulk.timeline import bulk_signal_timeline
 from hypokrates.mcp.tools._shared import format_measure as _format_measure
 
@@ -59,16 +60,22 @@ def register(mcp: FastMCP) -> None:
         drug: str,
         event: str,
         role_filter: str = "suspect",
+        sex: str | None = None,
+        age_group: str | None = None,
     ) -> str:
         """Detect disproportionality signal using FAERS Bulk data (deduplicated by CASEID).
 
         Unlike the API-based signal, this uses locally stored quarterly ASCII files
         with proper CASEID deduplication. Supports PS-only analysis (impossible via API).
 
+        Supports demographic stratification via sex and age_group parameters.
+
         Args:
             drug: Generic drug name (e.g., "propofol").
             event: Adverse event MedDRA term (e.g., "BRADYCARDIA").
             role_filter: Drug role filter: "suspect" (PS+SS), "ps_only" (PS only), "all".
+            sex: Filter by sex: "M" or "F" (optional).
+            age_group: Filter by age group: "0-17", "18-44", "45-64", "65+" (optional).
         """
         available = await bulk_api.is_bulk_available()
         if not available:
@@ -82,7 +89,11 @@ def register(mcp: FastMCP) -> None:
         except ValueError:
             return f"Invalid role_filter: {role_filter}. Use: suspect, ps_only, all."
 
-        result = await bulk_api.bulk_signal(drug, event, role_filter=rf)
+        strata = None
+        if sex is not None or age_group is not None:
+            strata = StrataFilter(sex=sex, age_group=age_group)
+
+        result = await bulk_api.bulk_signal(drug, event, role_filter=rf, strata=strata)
         detected = "YES" if result.signal_detected else "NO"
         lines = [
             f"# Bulk Signal: {drug.upper()} + {event.upper()}",

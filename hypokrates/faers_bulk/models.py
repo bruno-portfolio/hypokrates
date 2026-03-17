@@ -31,6 +31,32 @@ class BulkStoreStatus(BaseModel):
     newest_quarter: str | None = None
 
 
+class StrataFilter(BaseModel):
+    """Filtro de estratificação demográfica para análise subgrupo."""
+
+    sex: str | None = None  # "M", "F"
+    age_group: str | None = None  # "0-17", "18-44", "45-64", "65+"
+    reporter_country: str | None = None  # FAERS only
+
+    @property
+    def is_empty(self) -> bool:
+        """True se nenhum filtro está ativo."""
+        return self.sex is None and self.age_group is None and self.reporter_country is None
+
+
+# Mínimos para strata (subgrupos pequenos produzem PRR absurdo)
+MIN_STRATUM_DRUG_EVENT = 3
+MIN_STRATUM_DRUG_TOTAL = 10
+
+# Age group ranges
+AGE_GROUPS: dict[str, tuple[int, int]] = {
+    "0-17": (0, 18),
+    "18-44": (18, 45),
+    "45-64": (45, 65),
+    "65+": (65, 200),
+}
+
+
 class BulkCountResult(BaseModel):
     """Resultado de 4-count deduplicado para um par droga-evento."""
 
@@ -39,3 +65,5 @@ class BulkCountResult(BaseModel):
     event_total: int  # a+c
     n_total: int  # N
     deduped: bool = True
+    insufficient_data: bool = False
+    insufficient_reason: str | None = None

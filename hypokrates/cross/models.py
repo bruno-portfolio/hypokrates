@@ -26,9 +26,9 @@ class HypothesisClassification(StrEnum):
 class CoSignalItem(BaseModel):
     """Sinal de uma co-drug para o mesmo evento."""
 
-    drug: str = Field(description="Nome da co-drug")
-    prr: float = Field(description="PRR da co-drug para o evento")
-    signal_detected: bool = Field(description="Se sinal detectado para a co-drug")
+    drug: str
+    prr: float
+    signal_detected: bool
 
 
 class CoAdminAnalysis(BaseModel):
@@ -39,24 +39,11 @@ class CoAdminAnalysis(BaseModel):
     """
 
     profile: CoSuspectProfile
-    overlap_ratio: float = Field(
-        default=0.0,
-        description="Fração dos top drugs para o evento que são co-suspects (0-1)",
-    )
-    specificity_ratio: float | None = Field(
-        default=None,
-        description="PRR da droga-índice / mediana PRR das co-drugs. "
-        "Calculado apenas quando overlap e co_admin_flag são altos.",
-    )
-    is_specific: bool = Field(
-        default=True,
-        description="True = sinal específico da droga, False = provável co-admin artifact",
-    )
+    overlap_ratio: float = 0.0
+    specificity_ratio: float | None = None
+    is_specific: bool = True
     co_signals: list[CoSignalItem] = Field(default_factory=list)
-    verdict: str = Field(
-        default="inconclusive",
-        description="'specific', 'co_admin_artifact', ou 'inconclusive'",
-    )
+    verdict: str = "inconclusive"
 
 
 class HypothesisResult(BaseModel):
@@ -85,6 +72,8 @@ class HypothesisResult(BaseModel):
     pharmacogenomics: list[str] = Field(default_factory=list)
     canada_reports: int | None = None
     canada_signal: bool | None = None
+    jader_reports: int | None = None
+    jader_signal: bool | None = None
 
 
 class CompareSignalItem(BaseModel):
@@ -93,14 +82,12 @@ class CompareSignalItem(BaseModel):
     event: str
     drug_prr: float
     control_prr: float
-    drug_ebgm: float = Field(default=0.0, description="EBGM da droga-índice")
-    control_ebgm: float = Field(default=0.0, description="EBGM da droga-controle")
+    drug_ebgm: float = 0.0
+    control_ebgm: float = 0.0
     drug_detected: bool
     control_detected: bool
-    ratio: float = Field(
-        description="drug_prr / control_prr. inf se control=0 e drug>0.",
-    )
-    stronger: str = Field(description="'drug', 'control', ou 'equal'")
+    ratio: float
+    stronger: str
 
 
 class CompareResult(BaseModel):

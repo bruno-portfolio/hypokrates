@@ -119,11 +119,7 @@ class AnvisaStore:
             return row[0] if row else None
 
     def load_from_csv(self, csv_path: str | Path) -> int:
-        """Carrega dados do CSV da ANVISA para o DuckDB.
-
-        Returns:
-            Numero de medicamentos carregados.
-        """
+        """Carrega dados do CSV da ANVISA para o DuckDB."""
         logger.info("Loading ANVISA CSV: %s", csv_path)
         rows = parse_medicamentos_csv(csv_path)
 
@@ -150,7 +146,6 @@ class AnvisaStore:
         return len(rows)
 
     def _batch_insert(self, rows: list[dict[str, object]]) -> None:
-        """Insere medicamentos em batch. Chamador deve deter _db_lock."""
         med_rows: list[list[object]] = []
         name_rows: list[list[str]] = []
 
@@ -175,12 +170,10 @@ class AnvisaStore:
                 ]
             )
 
-            # Indexar nome do produto
             nome_norm = normalize_text(nome)
             if nome_norm:
                 name_rows.append([nome_norm, registro, "produto"])
 
-            # Indexar cada substância ativa
             for sub in split_substancias(substancias_raw):
                 sub_norm = normalize_text(sub)
                 if sub_norm:
@@ -199,7 +192,6 @@ class AnvisaStore:
             )
 
     def _load_nome_mapping(self) -> None:
-        """Carrega mapeamento estatico PT<->EN. Chamador deve deter _db_lock."""
         mapping_rows = [[normalize_text(pt), en.upper()] for pt, en in NOME_PT_EN.items()]
         if mapping_rows:
             self._conn.executemany(
@@ -213,20 +205,11 @@ class AnvisaStore:
         *,
         limit: int = 20,
     ) -> AnvisaSearchResult:
-        """Busca por nome ou substancia (accent-insensitive, partial match).
-
-        Args:
-            query: Termo de busca.
-            limit: Maximo de resultados.
-
-        Returns:
-            AnvisaSearchResult com medicamentos encontrados.
-        """
+        """Busca por nome ou substancia (accent-insensitive, partial match)."""
         query_norm = normalize_text(query)
         if not query_norm:
             return AnvisaSearchResult(query=query, total=0)
 
-        # Tentar mapear EN->PT se for nome em ingles
         mapped_norm = self._try_en_to_pt(query_norm)
         search_terms = [query_norm]
         if mapped_norm and mapped_norm != query_norm:
@@ -263,7 +246,6 @@ class AnvisaStore:
         if not sub_norm:
             return AnvisaSearchResult(query=substancia, total=0)
 
-        # Tentar mapear EN->PT
         mapped = self._try_en_to_pt(sub_norm)
         search_terms = [sub_norm]
         if mapped and mapped != sub_norm:
@@ -299,7 +281,6 @@ class AnvisaStore:
             return None
 
         with self._db_lock:
-            # PT -> EN
             row = self._conn.execute(
                 "SELECT nome_en FROM anvisa_nome_mapping WHERE nome_pt = ?",
                 [nome_norm],
@@ -307,7 +288,6 @@ class AnvisaStore:
             if row:
                 return AnvisaNomeMapping(nome_pt=nome_norm, nome_en=row[0], source="static")
 
-            # EN -> PT (reverso)
             row = self._conn.execute(
                 "SELECT nome_pt FROM anvisa_nome_mapping WHERE nome_en = ?",
                 [nome_norm],
@@ -318,7 +298,6 @@ class AnvisaStore:
         return None
 
     def _try_en_to_pt(self, nome_norm: str) -> str | None:
-        """Tenta mapear nome EN normalizado para PT normalizado."""
         en_upper = nome_norm.upper()
         pt = NOME_EN_PT.get(en_upper)
         if pt:
@@ -326,7 +305,6 @@ class AnvisaStore:
         return None
 
     def _fetch_medicamentos(self, registros: set[str], limit: int) -> list[AnvisaMedicamento]:
-        """Busca medicamentos por conjunto de registros. Chamador deve deter _db_lock."""
         if not registros:
             return []
 

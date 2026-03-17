@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, ClassVar
 import duckdb
 
 from hypokrates.canada.constants import CANADA_DB_FILENAME
+from hypokrates.faers_bulk.models import AGE_GROUPS, StrataFilter
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -161,7 +162,6 @@ class CanadaVigilanceStore:
         return self._loaded
 
     def _check_loaded(self) -> bool:
-        """Verifica se já existem dados no store (reports + drugs + reactions)."""
         for table in ("canada_reports", "canada_drugs", "canada_reactions"):
             result = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             if result is None or result[0] == 0:
@@ -169,14 +169,7 @@ class CanadaVigilanceStore:
         return True
 
     def load_from_csvs(self, csv_dir: str) -> int:
-        """Carrega arquivos $-delimited do Canada Vigilance.
-
-        Args:
-            csv_dir: Diretório contendo os arquivos extraídos do ZIP.
-
-        Returns:
-            Número de reports carregados.
-        """
+        """Carrega arquivos $-delimited do Canada Vigilance."""
         from hypokrates.canada.parser import load_files_to_store
 
         count = load_files_to_store(self, csv_dir)
@@ -184,15 +177,17 @@ class CanadaVigilanceStore:
         return count
 
     def four_counts(
-        self, drug: str, event: str, *, suspect_only: bool = False
+        self,
+        drug: str,
+        event: str,
+        *,
+        suspect_only: bool = False,
+        strata: StrataFilter | None = None,
     ) -> tuple[int, int, int, int]:
-        """Retorna (a, b, c, n) para cálculo de PRR.
+        """Retorna (a, b, c, n) para calculo de PRR."""
+        if strata is not None and not strata.is_empty:
+            return self._four_counts_stratified(drug, event, suspect_only, strata)
 
-        a = drug + event
-        b = drug + NOT event
-        c = NOT drug + event
-        n = total reports
-        """
         role = "suspect" if suspect_only else "all"
         with self._db_lock:
             row = self._conn.execute(_FOUR_COUNTS_SQL, [drug, event, role]).fetchone()
@@ -200,11 +195,77 @@ class CanadaVigilanceStore:
         if row is None:
             return 0, 0, 0, 0
 
-        a_count = int(row[0])
-        b_count = int(row[1])
-        c_count = int(row[2])
-        n_count = int(row[3])
-        return a_count, b_count, c_count, n_count
+        return int(row[0]), int(row[1]), int(row[2]), int(row[3])
+
+    def _four_counts_stratified(
+        self,
+        drug: str,
+        event: str,
+        suspect_only: bool,
+        strata: StrataFilter,
+    ) -> tuple[int, int, int, int]:
+        where_clauses: list[str] = []
+        params: list[object] = [drug, event, "suspect" if suspect_only else "all"]
+
+        if strata.sex is not None:
+            where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
+            params.append(strata.sex.upper())
+
+        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
+            lo, hi = AGE_GROUPS[strata.age_group]
+            where_clauses.append(
+                f"TRY_CAST(rpt.age AS INTEGER) >= ${len(params) + 1} "
+                f"AND TRY_CAST(rpt.age AS INTEGER) < ${len(params) + 2}"
+            )
+            params.extend([lo, hi])
+
+        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        sql = f"""
+        WITH strata_reports AS (
+            SELECT report_id FROM canada_reports rpt WHERE {strata_where}
+        ),
+        drug_reports AS (
+            SELECT DISTINCT d.report_id
+            FROM canada_drugs d
+            JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
+            JOIN strata_reports sr ON d.report_id = sr.report_id
+            WHERE UPPER(i.ingredient_name) = UPPER($1)
+            AND ($3 = 'all' OR d.drug_role = 'Suspect')
+        ),
+        event_reports AS (
+            SELECT DISTINCT r.report_id
+            FROM canada_reactions r
+            JOIN strata_reports sr ON r.report_id = sr.report_id
+            WHERE UPPER(r.pt_name) = UPPER($2)
+        ),
+        a AS (
+            SELECT COUNT(*) AS cnt FROM drug_reports dr
+            JOIN event_reports er ON dr.report_id = er.report_id
+        ),
+        b AS (
+            SELECT COUNT(*) AS cnt FROM drug_reports dr
+            WHERE dr.report_id NOT IN (SELECT report_id FROM event_reports)
+        ),
+        c AS (
+            SELECT COUNT(*) AS cnt FROM event_reports er
+            WHERE er.report_id NOT IN (SELECT report_id FROM drug_reports)
+        ),
+        total AS (SELECT COUNT(*) AS cnt FROM strata_reports)
+        SELECT
+            (SELECT cnt FROM a) AS a_count,
+            (SELECT cnt FROM b) AS b_count,
+            (SELECT cnt FROM c) AS c_count,
+            (SELECT cnt FROM total) AS total_count
+        """
+
+        with self._db_lock:
+            row = self._conn.execute(sql, params).fetchone()
+
+        if row is None:
+            return 0, 0, 0, 0
+
+        return int(row[0]), int(row[1]), int(row[2]), int(row[3])
 
     def top_events(
         self,
@@ -212,15 +273,62 @@ class CanadaVigilanceStore:
         *,
         suspect_only: bool = False,
         limit: int = 10,
+        strata: StrataFilter | None = None,
     ) -> list[tuple[str, int]]:
-        """Retorna top eventos adversos para uma droga.
-
-        Returns:
-            Lista de (event_term, count).
-        """
+        """Retorna top eventos adversos para uma droga."""
         role = "suspect" if suspect_only else "all"
+
+        if strata is not None and not strata.is_empty:
+            return self._top_events_stratified(drug, suspect_only, limit, strata)
+
         with self._db_lock:
             rows = self._conn.execute(_TOP_EVENTS_SQL, [drug, role, limit]).fetchall()
+
+        return [(row[0], int(row[1])) for row in rows]
+
+    def _top_events_stratified(
+        self,
+        drug: str,
+        suspect_only: bool,
+        limit: int,
+        strata: StrataFilter,
+    ) -> list[tuple[str, int]]:
+        where_clauses: list[str] = []
+        params: list[object] = [drug, "suspect" if suspect_only else "all", limit]
+
+        if strata.sex is not None:
+            where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
+            params.append(strata.sex.upper())
+
+        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
+            lo, hi = AGE_GROUPS[strata.age_group]
+            where_clauses.append(
+                f"TRY_CAST(rpt.age AS INTEGER) >= ${len(params) + 1} "
+                f"AND TRY_CAST(rpt.age AS INTEGER) < ${len(params) + 2}"
+            )
+            params.extend([lo, hi])
+
+        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+        sql = f"""
+        WITH strata_reports AS (
+            SELECT report_id FROM canada_reports rpt WHERE {strata_where}
+        )
+        SELECT r.pt_name, COUNT(DISTINCT r.report_id) AS cnt
+        FROM canada_reactions r
+        JOIN canada_drugs d ON r.report_id = d.report_id
+        JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
+        JOIN strata_reports sr ON r.report_id = sr.report_id
+        WHERE UPPER(i.ingredient_name) = UPPER($1)
+        AND ($2 = 'all' OR d.drug_role = 'Suspect')
+        AND r.pt_name != ''
+        GROUP BY r.pt_name
+        ORDER BY cnt DESC
+        LIMIT $3
+        """
+
+        with self._db_lock:
+            rows = self._conn.execute(sql, params).fetchall()
 
         return [(row[0], int(row[1])) for row in rows]
 

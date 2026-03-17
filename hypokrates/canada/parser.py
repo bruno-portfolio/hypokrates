@@ -29,11 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 def _find_file(base_path: Path, primary: str, *alternates: str) -> Path | None:
-    """Busca arquivo por nome, tentando alternativas (case-insensitive no Windows).
-
-    Alguns extracts do Canada Vigilance usam nomes diferentes
-    (e.g., ``Drug_Product.txt`` vs ``drug_products.txt``).
-    """
     for name in (primary, *alternates):
         candidate = base_path / name
         if candidate.exists():
@@ -42,7 +37,6 @@ def _find_file(base_path: Path, primary: str, *alternates: str) -> Path | None:
 
 
 def _csv_opts(path: Path, *, null_padding: bool = False) -> str:
-    """Monta opções comuns do read_csv para arquivos $-delimited."""
     escaped = str(path).replace("'", "''")
     extra = ""
     if null_padding:
@@ -55,20 +49,9 @@ def _csv_opts(path: Path, *, null_padding: bool = False) -> str:
 
 
 def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
-    """Carrega todos os arquivos do Canada Vigilance no DuckDB store.
-
-    Usa DuckDB read_csv() nativo para máxima performance.
-
-    Args:
-        store: CanadaVigilanceStore instance.
-        csv_dir: Diretório contendo os arquivos extraídos do ZIP.
-
-    Returns:
-        Número de reports carregados.
-    """
+    """Carrega arquivos do Canada Vigilance no DuckDB store via read_csv()."""
     base_path = Path(csv_dir)
 
-    # Limpar tabelas
     for table in (
         "canada_ingredients",
         "canada_products",
@@ -81,7 +64,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
 
     total_reports = 0
 
-    # 1. Reports
     reports_path = _find_file(base_path, FILE_REPORTS, "reports.txt")
     if reports_path:
         total_reports = _load_reports(store, reports_path)
@@ -89,7 +71,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     else:
         logger.warning("Canada: Reports file not found in %s", csv_dir)
 
-    # 2. Report_Drug
     drugs_path = _find_file(base_path, FILE_REPORT_DRUG, "report_drug.txt")
     if drugs_path:
         count = _load_report_drugs(store, drugs_path)
@@ -97,7 +78,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     else:
         logger.warning("Canada: Report_Drug file not found in %s", csv_dir)
 
-    # 3. Reactions
     reactions_path = _find_file(base_path, FILE_REACTIONS, "reactions.txt")
     if reactions_path:
         count = _load_reactions(store, reactions_path)
@@ -105,7 +85,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     else:
         logger.warning("Canada: Reactions file not found in %s", csv_dir)
 
-    # 4. Drug_Product
     products_path = _find_file(
         base_path, FILE_DRUG_PRODUCT, "drug_products.txt", "Drug_Products.txt"
     )
@@ -115,7 +94,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
     else:
         logger.warning("Canada: Drug_Product file not found in %s", csv_dir)
 
-    # 5. Drug_Product_Ingredients
     ingredients_path = _find_file(base_path, FILE_DRUG_INGREDIENTS, "drug_product_ingredients.txt")
     if ingredients_path:
         count = _load_ingredients(store, ingredients_path)
@@ -133,10 +111,6 @@ def load_files_to_store(store: CanadaVigilanceStore, csv_dir: str) -> int:
 
 
 def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Reports.txt via DuckDB read_csv().
-
-    42 colunas → DuckDB zero-pads: column00..column41.
-    """
     src = _csv_opts(path)
     sql = f"""
         INSERT INTO canada_reports
@@ -161,10 +135,6 @@ def _load_reports(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Report_Drug.txt via DuckDB read_csv().
-
-    22 colunas → DuckDB zero-pads: column00..column21.
-    """
     src = _csv_opts(path)
     sql = f"""
         INSERT INTO canada_drugs
@@ -188,7 +158,6 @@ def _load_report_drugs(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Reactions.txt via DuckDB read_csv()."""
     src = _csv_opts(path)
     sql = f"""
         INSERT INTO canada_reactions
@@ -211,7 +180,6 @@ def _load_reactions(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Drug_Product.txt via DuckDB read_csv()."""
     src = _csv_opts(path, null_padding=True)
     sql = f"""
         INSERT INTO canada_products
@@ -232,7 +200,6 @@ def _load_products(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _load_ingredients(store: CanadaVigilanceStore, path: Path) -> int:
-    """Carrega Drug_Product_Ingredients.txt via DuckDB read_csv()."""
     src = _csv_opts(path, null_padding=True)
     sql = f"""
         INSERT INTO canada_ingredients
@@ -248,7 +215,6 @@ def _load_ingredients(store: CanadaVigilanceStore, path: Path) -> int:
 
 
 def _count_table(store: CanadaVigilanceStore, table: str) -> int:
-    """Conta registros em uma tabela."""
     rows = store.query_in_lock(f"SELECT COUNT(*) FROM {table}")
     if rows and rows[0]:
         count = rows[0][0]

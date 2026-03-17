@@ -63,7 +63,7 @@ class CacheStore:
                 cls._instance = None
 
     def get(self, key: str) -> dict[str, object] | None:
-        """Busca valor no cache. Retorna None se ausente ou expirado."""
+        """Busca valor no cache (None se ausente ou expirado)."""
         with self._db_lock:
             try:
                 result = self._conn.execute(
@@ -77,7 +77,6 @@ class CacheStore:
                 if result is None:
                     return None
 
-                # Incrementa hit count
                 self._conn.execute(
                     "UPDATE cache_entries SET hit_count = hit_count + 1 WHERE key = ?",
                     [key],
@@ -141,7 +140,6 @@ class CacheStore:
             return int(row[0]) if row is not None else 0
 
     def _cleanup_expired_on_startup(self) -> None:
-        """Remove entradas expiradas na inicialização (1x por processo)."""
         try:
             removed = self.cleanup_expired()
             if removed > 0:
