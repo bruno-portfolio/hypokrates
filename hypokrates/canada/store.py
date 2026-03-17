@@ -208,8 +208,10 @@ class CanadaVigilanceStore:
         params: list[object] = [drug, event, "suspect" if suspect_only else "all"]
 
         if strata.sex is not None:
+            # Canada uses "1"=Male, "2"=Female
+            sex_code = {"M": "1", "F": "2"}.get(strata.sex.upper(), strata.sex)
             where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
-            params.append(strata.sex.upper())
+            params.append(sex_code)
 
         if strata.age_group is not None and strata.age_group in AGE_GROUPS:
             lo, hi = AGE_GROUPS[strata.age_group]
@@ -297,8 +299,10 @@ class CanadaVigilanceStore:
         params: list[object] = [drug, "suspect" if suspect_only else "all", limit]
 
         if strata.sex is not None:
+            # Canada uses "1"=Male, "2"=Female
+            sex_code = {"M": "1", "F": "2"}.get(strata.sex.upper(), strata.sex)
             where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
-            params.append(strata.sex.upper())
+            params.append(sex_code)
 
         if strata.age_group is not None and strata.age_group in AGE_GROUPS:
             lo, hi = AGE_GROUPS[strata.age_group]
