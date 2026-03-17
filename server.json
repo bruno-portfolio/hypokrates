@@ -2,34 +2,20 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bruno-portfolio/hypokrates",
   "title": "hypokrates",
-  "description": "Pharmacovigilance hypothesis generation — cross-references 15 global drug safety databases (FAERS, JADER, Canada Vigilance, PubMed, DailyMed, DrugBank, OpenTargets, ChEMBL, OnSIDES, PharmGKB) via 44 MCP tools",
+  "description": "Pharmacovigilance hypothesis generation from 15 public drug safety databases",
   "repository": {
     "url": "https://github.com/brunoescalhao/hypokrates",
     "source": "github"
   },
-  "version": "0.7.0",
+  "version": "0.7.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "hypokrates",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "transport": {
         "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "OPENFDA_API_KEY",
-          "description": "OpenFDA API key (raises rate limit from 40 to 240 req/min)",
-          "isRequired": false,
-          "isSecret": true
-        },
-        {
-          "name": "NCBI_API_KEY",
-          "description": "NCBI/PubMed API key (raises rate limit from 180 to 600 req/min)",
-          "isRequired": false,
-          "isSecret": true
-        }
-      ]
+      }
     }
   ]
 }

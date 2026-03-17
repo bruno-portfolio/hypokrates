@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hypokrates"
-version = "0.7.0"
+version = "0.7.1"
 description = "Normalize and cross-reference global public health data for medical hypothesis generation"
 readme = "README.md"
 license = "AGPL-3.0-only"
