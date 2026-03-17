@@ -1,19 +1,36 @@
 # hypokrates
 
-> Normalize and cross-reference global public health data for medical hypothesis generation.
+[![PyPI version](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
+[![Python](https://img.shields.io/pypi/pyversions/hypokrates)](https://pypi.org/project/hypokrates/)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Tests](https://img.shields.io/badge/tests-1349_passing-brightgreen)]()
+[![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue)]()
+[![MCP](https://img.shields.io/badge/MCP-44_tools-purple)]()
 
-Open-source Python library that normalizes and cross-references public health datasets (FAERS, PubMed, DailyMed, ClinicalTrials.gov, DrugBank, OpenTargets, ChEMBL, OnSIDES, PharmGKB, Canada Vigilance, JADER) and exposes them via MCP so any person with access to an LLM can generate medical hypotheses.
+> Democratizing pharmacovigilance through open public health data.
+
+**hypokrates** is an open-source Python library that normalizes and cross-references 15 global pharmacovigilance and drug safety databases, exposing them via [MCP](https://modelcontextprotocol.io/) so that any person with access to an LLM can generate medical hypotheses.
+
+*Hippocrates observed a few patients. Today we can observe millions. What's missing is the tool to ask better questions.*
+
+The name comes from the original Greek spelling of Hippocrates (*Hippokrates*) — who broke the model of his era by making medical knowledge open instead of guarded by temple priests. The "hypo" prefix also evokes "hypothesis". Public health data collected with public money, normalized and cross-referenced in an open library, so any doctor in the world can generate hypotheses that save lives.
+
+## The problem
+
+Medical knowledge discovery has a bottleneck: **hypothesis generation**.
+
+Tools like OpenEvidence and PubMed solve literature search — finding what has been studied. But they cannot find what **has not been studied yet**. Signals that exist in pharmacovigilance data (20M+ adverse event reports across 3 countries), molecular mechanism databases, and drug labels — but that no one has cross-referenced because the data lives in silos with different formats, vocabularies, and access patterns.
+
+**hypokrates** cross-references FAERS + JADER + Canada Vigilance + PubMed + DailyMed + DrugBank + OpenTargets + ChEMBL + OnSIDES + PharmGKB + ClinicalTrials.gov + ANVISA — and returns a structured hypothesis with evidence level, in seconds.
 
 ## Install
 
 ```bash
 pip install hypokrates
 
-# Optional: ClinicalTrials.gov support (Cloudflare bypass)
-pip install hypokrates[trials]
-
-# Optional: MCP server
-pip install hypokrates[mcp]
+# Optional extras
+pip install hypokrates[trials]   # ClinicalTrials.gov (Cloudflare bypass via curl_cffi)
+pip install hypokrates[mcp]      # MCP server (typer + mcp)
 ```
 
 ## Quick start
@@ -26,33 +43,12 @@ configure(
     openfda_api_key="your-key",     # 40 -> 240 req/min
     ncbi_api_key="your-key",        # 180 -> 600 req/min
     ncbi_email="you@example.com",
-    drugbank_path="/path/to/drugbank.xml",  # Optional: offline drug data
-    onsides_path="/path/to/onsides/csvs/",  # Optional: international labels
-    canada_bulk_path="/path/to/canada/",    # Optional: Canada Vigilance
-    jader_bulk_path="/path/to/jader/csvs/", # Optional: Japanese PMDA
 )
 ```
 
-## Adverse events (FAERS)
+### Signal detection
 
-```python
-from hypokrates.sync import faers
-
-# Top reported events
-top = faers.top_events("sugammadex", limit=10)
-for e in top.events:
-    print(f"{e.term}: {e.count}")
-
-# Individual reports with filters
-events = faers.adverse_events("propofol", age_min=65, sex="M", serious=True)
-
-# Compare drugs
-comparison = faers.compare(["propofol", "etomidate"], outcome="hypotension")
-```
-
-## Signal detection
-
-Disproportionality analysis (PRR, ROR, IC) for drug-event pairs:
+Disproportionality analysis (PRR, ROR, IC, EBGM) for any drug-event pair:
 
 ```python
 from hypokrates.sync import stats
@@ -62,20 +58,9 @@ print(f"PRR: {result.prr.value:.2f}")
 print(f"Signal: {result.signal_detected}")  # >= 2/3 measures significant
 ```
 
-## Literature search (PubMed)
+### Hypothesis generation
 
-```python
-from hypokrates.sync import pubmed
-
-result = pubmed.search_papers("sugammadex", "cardiac arrest", limit=5)
-print(f"Total: {result.total_count} papers")
-for a in result.articles:
-    print(f"  [{a.pmid}] {a.title}")
-```
-
-## Hypothesis generation
-
-Cross-reference FAERS signal + PubMed + optional sources:
+Cross-reference FAERS signal + PubMed + up to 10 optional sources:
 
 ```python
 from hypokrates.sync import cross
@@ -85,16 +70,17 @@ result = cross.hypothesis(
     check_label=True,        # DailyMed FDA label
     check_trials=True,       # ClinicalTrials.gov
     check_chembl=True,       # ChEMBL mechanism
-    check_opentargets=True,  # OpenTargets LRT
+    check_opentargets=True,  # OpenTargets LRT score
+    check_canada=True,       # Canada Vigilance cross-validation
+    check_jader=True,        # JADER (Japan) cross-validation
 )
-print(result.classification)    # novel_hypothesis | emerging_signal | known_association | no_signal | protective_signal
+print(result.classification)  # novel_hypothesis | emerging_signal | known_association | no_signal
 print(result.summary)
-print(result.literature_count)
 ```
 
-## Drug scanning
+### Automated drug scanning
 
-Automated scan of top adverse events with classification:
+Scan top adverse events with parallel hypothesis generation:
 
 ```python
 from hypokrates.sync import scan
@@ -103,237 +89,73 @@ result = scan.scan_drug(
     "sugammadex",
     top_n=15,
     check_labels=True,
-    check_trials=True,
     check_chembl=True,
-    check_opentargets=True,
-    group_events=True,       # MedDRA synonym grouping (default)
-    primary_suspect_only=True,  # PS-only role filter (bulk only)
-    check_direction=True,    # compare base PRR vs PS-only PRR
+    primary_suspect_only=True,  # PS-only role filter (bulk data)
+    check_direction=True,       # base PRR vs PS-only comparison
 )
 for item in result.items:
-    direction = f" ({item.direction})" if item.direction else ""
-    print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f}){direction}")
-print(f"Novel: {result.novel_count}, Emerging: {result.emerging_count}")
-print(f"Data source: {'Bulk (dedup)' if result.bulk_mode else 'API'}")
+    print(f"#{item.rank} {item.event}: {item.classification.value} (score={item.score:.1f})")
 ```
 
-When FAERS Bulk quarterly files are loaded, `scan_drug()` automatically uses deduplicated data with role filtering (PS-only, suspect, or all). Direction analysis compares base PRR vs PS-only PRR per signal: `"strengthens"` means the signal is pharmacological, `"weakens"` means confounding is probable.
+## Data sources
 
-## FDA drug labels (DailyMed)
+15 sources across 3 countries, all publicly accessible:
 
-```python
-from hypokrates.sync import dailymed
+| Source | Module | Coverage | Auth |
+|--------|--------|----------|------|
+| OpenFDA/FAERS | `faers` | USA, 20M+ reports | Optional API key |
+| FAERS Bulk | `faers_bulk` | USA, deduplicated | Local quarterly ZIPs |
+| Canada Vigilance | `canada` | Canada, 738K+ reports | Local bulk download |
+| JADER (PMDA) | `jader` | Japan, 1M+ reports | Local CSVs (free) |
+| PubMed | `pubmed` | Global, 36M+ papers | Optional API key |
+| DailyMed | `dailymed` | USA FDA labels | None |
+| ClinicalTrials.gov | `trials` | Global | None (needs curl_cffi) |
+| DrugBank | `drugbank` | Global | Local XML (free academic) |
+| OpenTargets | `opentargets` | Global | None |
+| ChEMBL | `chembl` | Global | None |
+| OnSIDES | `onsides` | US/EU/UK/JP labels | Local CSVs (free) |
+| PharmGKB | `pharmgkb` | Global pharmacogenomics | None |
+| ANVISA | `anvisa` | Brazil drug registry | None (auto-download) |
+| RxNorm | `vocab` | Drug name normalization | None |
+| MeSH | `vocab` | Medical term mapping | None |
 
-# All adverse events in the label
-events = dailymed.label_events("sugammadex")
-print(events.events)  # ["bradycardia", "anaphylaxis", ...]
+### Demographic stratification
 
-# Check if specific event is in label
-check = dailymed.check_label("sugammadex", "bradycardia")
-print(check.in_label)  # True/False
-```
-
-## Clinical trials
-
-```python
-from hypokrates.sync import trials
-
-result = trials.search_trials("sugammadex", "bradycardia")
-print(f"Total: {result.total_count}, Active: {result.active_count}")
-for t in result.trials:
-    print(f"  {t.nct_id}: {t.title} [{t.status}]")
-```
-
-> Requires `curl_cffi`: `pip install hypokrates[trials]`
-
-## Drug info (DrugBank)
-
-```python
-from hypokrates.sync import drugbank
-
-# Mechanism, targets, enzymes, interactions
-info = drugbank.drug_info("sugammadex")
-print(info.mechanism)
-print(info.interactions[:5])
-
-# Drug-drug interactions
-interactions = drugbank.drug_interactions("sugammadex")
-```
-
-> Requires DrugBank XML (free academic license).
-
-## Mechanism of action (ChEMBL)
-
-```python
-from hypokrates.sync import chembl
-
-mech = chembl.drug_mechanism("sugammadex")
-print(mech.mechanisms)  # action type, targets, gene names
-```
-
-## Adverse events (OpenTargets)
-
-```python
-from hypokrates.sync import opentargets
-
-# All adverse events with LRT scores
-events = opentargets.drug_adverse_events("sugammadex")
-for e in events.events[:10]:
-    print(f"{e.event}: logLR={e.llr:.1f}, count={e.count}")
-
-# Specific drug-event LRT score
-score = opentargets.drug_safety_score("sugammadex", "bradycardia")
-print(f"logLR: {score.llr}")
-```
-
-## Brazilian drug registry (ANVISA)
-
-```python
-from hypokrates.sync import anvisa
-
-# Search by name (partial, accent-insensitive)
-result = anvisa.buscar_medicamento("dipirona")
-for med in result.medicamentos:
-    print(f"{med.nome_produto} ({', '.join(med.substancias)}) — {med.categoria}")
-
-# List generics for an active ingredient
-genericos = anvisa.buscar_por_substancia("metformina", categoria="Genérico")
-
-# Map Brazilian ↔ international drug names
-mapping = anvisa.mapear_nome("dipirona")
-print(f"{mapping.nome_pt} → {mapping.nome_en}")  # DIPIRONA → METAMIZOLE
-```
-
-> Auto-downloads ~5 MB CSV on first call. No setup required. Data: CC BY-ND 3.0, Fonte: ANVISA.
-
-## International drug labels (OnSIDES)
-
-```python
-from hypokrates.sync import onsides
-
-# All adverse events from US/EU/UK/JP labels (NLP-extracted)
-result = onsides.onsides_events("propofol", min_confidence=0.5)
-for ev in result.events[:10]:
-    print(f"{ev.meddra_name}: conf={ev.confidence:.2f}, sources={', '.join(ev.sources)}")
-
-# Check specific event across countries
-check = onsides.onsides_check_event("propofol", "bradycardia")
-if check:
-    print(f"Found in {check.num_sources}/4 country labels")
-```
-
-> Requires OnSIDES CSV files (313MB ZIP, free download). 7.1M drug-ADE pairs from 51,460 labels via PubMedBERT (F1=0.935).
-
-## Pharmacogenomics (PharmGKB)
-
-```python
-from hypokrates.sync import pharmgkb
-
-# Gene-drug associations
-info = pharmgkb.pgx_drug_info("warfarin")
-for ann in info.annotations:
-    print(f"{ann.gene_symbol}: Level {ann.level_of_evidence}")
-
-# Dosing guidelines (CPIC/DPWG)
-for gl in info.guidelines:
-    print(f"{gl.source}: {gl.name}")
-```
-
-## Canadian pharmacovigilance (Canada Vigilance)
-
-```python
-from hypokrates.sync import canada
-
-# Cross-country signal validation
-result = canada.canada_signal("propofol", "anaphylactic shock")
-print(f"PRR: {result.prr:.2f}, Reports: {result.drug_event_count}")
-
-# Top adverse events in Canada
-events = canada.canada_top_events("propofol", limit=10)
-for ev, count in events:
-    print(f"{ev}: {count} reports")
-```
-
-> Requires Canada Vigilance bulk download (325MB ZIP). ~738K reports from 1965-present.
-
-## Japanese pharmacovigilance (JADER)
-
-```python
-from hypokrates.sync import jader
-
-# Cross-country signal validation (Japan)
-result = jader.jader_signal("propofol", "anaphylactic shock")
-print(f"PRR: {result.prr:.2f}, Reports: {result.drug_event_count}")
-print(f"Drug mapping: {result.drug_confidence}")  # exact/inferred/unmapped
-
-# Top adverse events in Japan
-events = jader.jader_top_events("propofol", limit=10)
-for ev, count in events:
-    print(f"{ev}: {count} reports")
-```
-
-> Requires JADER CSV files from PMDA (free, no registration). ~970K reports from 2004-present. Drug/event names translated from Japanese via built-in mappings.
-
-## Demographic stratification
-
-FAERS Bulk and Canada Vigilance support demographic filtering:
+FAERS Bulk and Canada Vigilance support filtering by sex and age group:
 
 ```python
 from hypokrates.faers_bulk.models import StrataFilter
 from hypokrates.sync import faers_bulk
 
-# Signal in females aged 65+
 result = faers_bulk.bulk_signal(
     "rocuronium", "anaphylactic shock",
     strata=StrataFilter(sex="F", age_group="65+"),
 )
-print(f"PRR: {result.prr.value:.2f} (stratum: F, 65+)")
 ```
 
-> Available age groups: "0-17", "18-44", "45-64", "65+". Minimum stratum size enforced (3 drug+event, 10 drug total).
+### Cross-country validation
 
-## Drug normalization (RxNorm/MeSH)
-
-```python
-from hypokrates.sync import vocab
-
-# Brand -> generic (3-step fallback: /drugs → /rxcui+allrelated → PT↔EN mapping)
-norm = vocab.normalize_drug("Diprivan")
-print(f"{norm.original} -> {norm.generic_name}")  # Diprivan -> propofol
-
-norm = vocab.normalize_drug("dipirona")
-print(f"{norm.original} -> {norm.generic_name}")  # dipirona -> metamizole
-
-# MeSH mapping
-mesh = vocab.map_to_mesh("aspirin")
-print(f"{mesh.mesh_term} ({mesh.mesh_id})")  # Aspirin (D001241)
-```
-
-## Async API
-
-All functions are async-first. The sync wrapper is for convenience:
+The same drug-event pair checked across USA, Canada, and Japan:
 
 ```python
-import asyncio
-from hypokrates.cross import api as cross
-from hypokrates.scan import api as scan
+from hypokrates.sync import stats, canada, jader
 
-async def main():
-    hyp = await cross.hypothesis("sugammadex", "bradycardia", check_label=True)
-    result = await scan.scan_drug("sugammadex", top_n=10)
-
-asyncio.run(main())
+usa = stats.signal("rocuronium", "anaphylactic shock")
+can = canada.canada_signal("rocuronium", "anaphylactic shock")
+jpn = jader.jader_signal("rocuronium", "anaphylactic shock")
 ```
 
 ## MCP Server
 
-hypokrates exposes all functions as MCP tools for LLM integration:
+44 tools available for LLM integration via [Model Context Protocol](https://modelcontextprotocol.io/):
 
 ```bash
-# Run standalone
 python -m hypokrates.mcp
+```
 
-# Or configure in .mcp.json (env vars are auto-detected on startup)
+Configure in Claude Desktop, Cursor, or any MCP client:
+
+```json
 {
   "mcpServers": {
     "hypokrates": {
@@ -355,32 +177,67 @@ python -m hypokrates.mcp
 }
 ```
 
-44 tools available: `adverse_events`, `top_events`, `drugs_by_event`, `co_suspect_profile`, `compare_drugs`, `signal`, `batch_signal`, `signal_timeline`, `search_papers`, `count_papers`, `hypothesis`, `compare_signals`, `scan_drug`, `compare_class`, `normalize_drug`, `map_to_mesh`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_metabolism`, `drug_adverse_events`, `drug_safety_score`, `faers_bulk_status`, `faers_bulk_signal`, `faers_bulk_load`, `faers_bulk_timeline`, `anvisa_buscar`, `anvisa_genericos`, `anvisa_mapear_nome`, `onsides_events`, `onsides_check_event`, `pgx_drug_info`, `pgx_annotations`, `canada_signal`, `canada_top_events`, `canada_bulk_status`, `jader_signal`, `jader_top_events`, `jader_bulk_status`, `list_tools`, `version`.
+**Core tools:** `signal`, `hypothesis`, `scan_drug`, `compare_signals`, `compare_class`
 
-## Data Sources
+**Source tools:** `adverse_events`, `top_events`, `drugs_by_event`, `search_papers`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_adverse_events`, `drug_safety_score`, `onsides_events`, `pgx_annotations`, `normalize_drug`, `map_to_mesh`
 
-| Source | Module | Auth | Rate Limit |
-|--------|--------|------|------------|
-| OpenFDA/FAERS | `faers` | Optional key | 40-240/min |
-| FAERS Bulk | `faers_bulk` | Local quarterly ZIPs | Offline (dedup) |
-| PubMed | `pubmed` | Optional key | 180-600/min |
-| RxNorm | `vocab` | None | 120/min |
-| MeSH | `vocab` | Shared w/ PubMed | Shared |
-| DailyMed | `dailymed` | None | 60/min |
-| ClinicalTrials.gov | `trials` | None (needs curl_cffi) | 50/min |
-| DrugBank | `drugbank` | Local XML | Offline |
-| OpenTargets | `opentargets` | None | 30/min |
-| ChEMBL | `chembl` | None | 30/min |
-| ANVISA | `anvisa` | None (auto-download) | Local |
-| OnSIDES | `onsides` | Local CSVs (313MB) | Offline |
-| PharmGKB | `pharmgkb` | None | 60/min |
-| Canada Vigilance | `canada` | Local bulk (325MB) | Offline |
-| JADER (Japan) | `jader` | Local CSVs (cp932) | Offline |
+**Bulk tools:** `faers_bulk_signal`, `faers_bulk_load`, `canada_signal`, `canada_top_events`, `jader_signal`, `jader_top_events`
+
+## Architecture
+
+```
+hypokrates/
+├── faers/          # OpenFDA FAERS API (adverse events, co-suspect detection)
+├── faers_bulk/     # FAERS quarterly ASCII (dedup, role filter, strata)
+├── stats/          # Disproportionality measures (PRR, ROR, IC, EBGM)
+├── cross/          # Hypothesis generation (signal + literature + enrichments)
+├── scan/           # Automated drug scanning with scoring
+├── evidence/       # Evidence blocks with provenance and limitations
+├── pubmed/         # PubMed/NCBI E-utilities
+├── vocab/          # RxNorm normalization + MedDRA synonym grouping
+├── dailymed/       # FDA label parsing (SPL XML)
+├── trials/         # ClinicalTrials.gov (curl_cffi for Cloudflare)
+├── drugbank/       # DrugBank XML (mechanism, interactions, enzymes)
+├── opentargets/    # OpenTargets Platform (GraphQL, LRT scores)
+├── chembl/         # ChEMBL (mechanism, targets, metabolism)
+├── onsides/        # OnSIDES international labels (NLP-extracted)
+├── pharmgkb/       # PharmGKB pharmacogenomics (CPIC/DPWG guidelines)
+├── canada/         # Canada Vigilance (cross-country validation)
+├── jader/          # JADER/PMDA Japan (cross-country, JP→EN translation)
+├── anvisa/         # ANVISA Brazil (drug registry, PT↔EN mapping)
+├── cache/          # DuckDB HTTP cache (thread-safe singleton)
+├── http/           # BaseClient with retry, rate limiting, auth
+└── mcp/            # MCP server (44 tools)
+```
+
+**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1349 tests.
+
+## Who is this for
+
+- The anesthesiologist who saw a pattern in patients and wants to know if it's real
+- The researcher at a public university without a bioinformatics team
+- The resident who disagrees with a protocol and wants data to support their case
+- The doctor in rural Brazil who can't access institutional research infrastructure
+- Any medical professional with access to an LLM who wants to generate evidence-based hypotheses
+
+## Important disclaimers
+
+- **Not for clinical use.** hypokrates generates hypotheses, not diagnoses.
+- **PRR is not absolute risk.** Disproportionality measures detect reporting patterns, not causation.
+- **FAERS is voluntary reporting.** Underreporting is systematic. Absence of signal does not mean absence of risk.
+- **Cross-country comparison requires caution.** Different reporting cultures, populations, and healthcare systems.
+- Every output includes explicit limitations and confidence levels.
 
 ## Status
 
-**Alpha** — 1349 tests, mypy strict, ruff clean. Not for clinical use.
+**Alpha** (v0.7.0) — 1349 tests, mypy strict, ruff clean. Under active development.
 
 ## License
 
-AGPL-3.0-only
+[AGPL-3.0-only](LICENSE) — Public data, public code, public benefit.
+
+---
+
+*"First, do no harm." — Hippocratic Oath*
+
+*"First, make the data accessible." — hypokrates*

@@ -20,6 +20,13 @@ keywords = [
     "medical-data",
     "mcp",
     "hypothesis-generation",
+    "disproportionality",
+    "signal-detection",
+    "jader",
+    "canada-vigilance",
+    "drugbank",
+    "opentargets",
+    "pubmed",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -68,6 +75,8 @@ docs = [
 [project.urls]
 Homepage = "https://github.com/brunoescalhao/hypokrates"
 Repository = "https://github.com/brunoescalhao/hypokrates"
+Issues = "https://github.com/brunoescalhao/hypokrates/issues"
+Changelog = "https://github.com/brunoescalhao/hypokrates/blob/main/CHANGELOG.md"
 
 [project.scripts]
 hypokrates = "hypokrates.cli:app"
