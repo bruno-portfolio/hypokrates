@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hypokrates"
-version = "0.1.0"
+version = "0.7.0"
 description = "Normalize and cross-reference global public health data for medical hypothesis generation"
 readme = "README.md"
-license = "MIT"
+license = "AGPL-3.0-only"
 requires-python = ">=3.11"
 authors = [
     { name = "Bruno Escalhão" },
@@ -25,7 +25,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Healthcare Industry",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -154,6 +154,8 @@ disallow_untyped_decorators = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-m 'not benchmark'"
 markers = [
     "integration: marks tests that hit real APIs (deselect with '-m \"not integration\"')",
+    "benchmark: marks benchmark cases that hit real APIs (deselect with '-m \"not benchmark\"')",
 ]
