@@ -112,26 +112,24 @@ class TestSyncPubMed:
                 },
             )
         )
+        efetch_xml = """<?xml version="1.0" ?>
+        <PubmedArticleSet>
+          <PubmedArticle>
+            <MedlineCitation>
+              <PMID>111</PMID>
+              <Article>
+                <Journal><Title>J</Title>
+                  <JournalIssue><PubDate><Year>2024</Year></PubDate></JournalIssue>
+                </Journal>
+                <ArticleTitle>Test</ArticleTitle>
+                <AuthorList CompleteYN="N"/>
+              </Article>
+            </MedlineCitation>
+          </PubmedArticle>
+        </PubmedArticleSet>"""
         respx.get(
-            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "result": {
-                        "uids": ["111"],
-                        "111": {
-                            "uid": "111",
-                            "title": "Test",
-                            "pubdate": "2024",
-                            "source": "J",
-                            "authors": [],
-                            "articleids": [],
-                        },
-                    }
-                },
-            )
-        )
+            url__startswith="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        ).mock(return_value=httpx.Response(200, text=efetch_xml))
         from hypokrates.sync import pubmed
 
         result = pubmed.search_papers("propofol", "bradycardia", limit=1, use_cache=False)

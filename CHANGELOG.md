@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **PubMed abstracts via EFetch XML**: `search_papers()` now returns full abstracts. Replaced ESummary with EFetch (same number of requests, superset of data). Supports structured abstracts (labeled sections like BACKGROUND/METHODS/RESULTS/CONCLUSIONS) and simple abstracts. `PubMedArticle.abstract` field added (`str | None`). MCP `search_papers` tool shows 200-char snippet
+- **`investigate()` with demographic stratification**: new high-level function combining `hypothesis()` (all enrichments) + FAERS Bulk strata (sex M/F + age 0-17/18-44/45-64/65+) + Canada Vigilance strata (sex M/F), all in parallel via `asyncio.gather()`. Cross-country comparison from FAERS/Canada/JADER. Demographic summary flags notable PRR differences (sex >1.5x, age >2x average). New models: `StratumSignal`, `InvestigationResult`
+- MCP tool `investigate`: one-shot deep investigation with markdown tables (hypothesis + sex/age/country strata + summary + literature with abstracts). MCP tools: 44 → 46
+
 ## [0.7.0] - 2026-03-17
 
 ### Sprint 11 — JADER + Stratification + AGPL + Cleanup + Benchmark

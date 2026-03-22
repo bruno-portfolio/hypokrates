@@ -42,4 +42,7 @@ def register(mcp: FastMCP) -> None:
         for art in result.articles:
             doi = f" | doi:{art.doi}" if art.doi else ""
             lines.append(f"- [{art.pmid}] {art.title}{doi}")
+            if art.abstract:
+                snippet = art.abstract[:200] + "..." if len(art.abstract) > 200 else art.abstract
+                lines.append(f"  > {snippet}")
         return "\n".join(lines)

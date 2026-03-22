@@ -32,8 +32,17 @@ def _mock_search_ids(data: dict[str, Any]) -> AsyncMock:
     return AsyncMock(side_effect=_side_effect)
 
 
+def _mock_fetch_articles(xml_text: str) -> AsyncMock:
+    """Mock para PubMedClient.fetch_articles."""
+
+    async def _side_effect(pmids: list[str], *, use_cache: bool = True) -> str:
+        return xml_text
+
+    return AsyncMock(side_effect=_side_effect)
+
+
 def _mock_fetch_summaries(data: dict[str, Any]) -> AsyncMock:
-    """Mock para PubMedClient.fetch_summaries."""
+    """Mock para PubMedClient.fetch_summaries (legacy)."""
 
     async def _side_effect(pmids: list[str], *, use_cache: bool = True) -> dict[str, Any]:
         return data
@@ -103,6 +112,35 @@ class TestSearchPapers:
 
     @patch("hypokrates.pubmed.api.PubMedClient")
     async def test_search_papers_with_articles(self, mock_client_cls: Any) -> None:
+        xml = """<?xml version="1.0" ?>
+        <PubmedArticleSet>
+          <PubmedArticle>
+            <MedlineCitation>
+              <PMID>111</PMID>
+              <Article>
+                <Journal><Title>J Test</Title>
+                  <JournalIssue><PubDate><Year>2024</Year></PubDate></JournalIssue>
+                </Journal>
+                <ArticleTitle>Article A</ArticleTitle>
+                <Abstract><AbstractText>Test abstract A.</AbstractText></Abstract>
+                <AuthorList><Author><LastName>Author</LastName><ForeName>X</ForeName></Author></AuthorList>
+              </Article>
+            </MedlineCitation>
+          </PubmedArticle>
+          <PubmedArticle>
+            <MedlineCitation>
+              <PMID>222</PMID>
+              <Article>
+                <Journal><Title>J Test 2</Title>
+                  <JournalIssue><PubDate><Year>2023</Year></PubDate></JournalIssue>
+                </Journal>
+                <ArticleTitle>Article B</ArticleTitle>
+                <AuthorList CompleteYN="N"/>
+              </Article>
+            </MedlineCitation>
+          </PubmedArticle>
+        </PubmedArticleSet>"""
+
         instance = mock_client_cls.return_value
         instance.search_ids = _mock_search_ids(
             {
@@ -113,29 +151,7 @@ class TestSearchPapers:
                 }
             }
         )
-        instance.fetch_summaries = _mock_fetch_summaries(
-            {
-                "result": {
-                    "uids": ["111", "222"],
-                    "111": {
-                        "uid": "111",
-                        "title": "Article A",
-                        "pubdate": "2024",
-                        "source": "J Test",
-                        "authors": [{"name": "Author X", "authtype": "Author"}],
-                        "articleids": [],
-                    },
-                    "222": {
-                        "uid": "222",
-                        "title": "Article B",
-                        "pubdate": "2023",
-                        "source": "J Test 2",
-                        "authors": [],
-                        "articleids": [],
-                    },
-                }
-            }
-        )
+        instance.fetch_articles = _mock_fetch_articles(xml)
         instance.close = AsyncMock()
 
         result = await search_papers("propofol", "hepatotoxicity", limit=2, use_cache=False)
@@ -144,6 +160,7 @@ class TestSearchPapers:
         assert len(result.articles) == 2
         assert result.articles[0].pmid == "111"
         assert result.articles[0].title == "Article A"
+        assert result.articles[0].abstract == "Test abstract A."
 
     @patch("hypokrates.pubmed.api.PubMedClient")
     async def test_search_papers_no_results(self, mock_client_cls: Any) -> None:
@@ -154,6 +171,35 @@ class TestSearchPapers:
         result = await search_papers("xyzdrug", "xyzevent", use_cache=False)
         assert result.total_count == 0
         assert result.articles == []
+
+    @patch("hypokrates.pubmed.api.PubMedClient")
+    async def test_search_papers_with_abstract(self, mock_client_cls: Any) -> None:
+        """Abstract é None quando artigo não tem."""
+        xml = """<?xml version="1.0" ?>
+        <PubmedArticleSet>
+          <PubmedArticle>
+            <MedlineCitation>
+              <PMID>333</PMID>
+              <Article>
+                <Journal><Title>J</Title>
+                  <JournalIssue><PubDate><Year>2024</Year></PubDate></JournalIssue>
+                </Journal>
+                <ArticleTitle>No Abstract</ArticleTitle>
+                <AuthorList CompleteYN="N"/>
+              </Article>
+            </MedlineCitation>
+          </PubmedArticle>
+        </PubmedArticleSet>"""
+
+        instance = mock_client_cls.return_value
+        instance.search_ids = _mock_search_ids(
+            {"esearchresult": {"count": "1", "idlist": ["333"], "querytranslation": "t"}}
+        )
+        instance.fetch_articles = _mock_fetch_articles(xml)
+        instance.close = AsyncMock()
+
+        result = await search_papers("drug", "event", use_cache=False)
+        assert result.articles[0].abstract is None
 
     @patch("hypokrates.pubmed.api.PubMedClient")
     async def test_search_papers_closes_client(self, mock_client_cls: Any) -> None:

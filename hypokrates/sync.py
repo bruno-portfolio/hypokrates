@@ -15,6 +15,7 @@ from hypokrates.anvisa import api as anvisa_api
 from hypokrates.canada import api as canada_api
 from hypokrates.chembl import api as chembl_api
 from hypokrates.cross import api as cross_api
+from hypokrates.cross.investigate import investigate as cross_investigate
 from hypokrates.dailymed import api as dailymed_api
 from hypokrates.drugbank import api as drugbank_api
 from hypokrates.faers import api as faers_api
@@ -82,6 +83,7 @@ class _SyncCross:
     hypothesis = staticmethod(_make_sync(cross_api.hypothesis))
     compare_signals = staticmethod(_make_sync(cross_api.compare_signals))
     coadmin_analysis = staticmethod(_make_sync(cross_api.coadmin_analysis))
+    investigate = staticmethod(_make_sync(cross_investigate))
 
 
 class _SyncScan:

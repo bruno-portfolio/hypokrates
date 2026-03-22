@@ -4,6 +4,7 @@ from __future__ import annotations
 
 ESEARCH_ENDPOINT = "/esearch.fcgi"
 ESUMMARY_ENDPOINT = "/esummary.fcgi"
+EFETCH_ENDPOINT = "/efetch.fcgi"
 DATABASE = "pubmed"
 TOOL_NAME = "hypokrates"
 

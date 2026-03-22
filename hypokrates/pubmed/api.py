@@ -9,7 +9,7 @@ from hypokrates.models import MetaInfo
 from hypokrates.pubmed.client import PubMedClient
 from hypokrates.pubmed.constants import PUBMED_DISCLAIMER
 from hypokrates.pubmed.models import PubMedSearchResult
-from hypokrates.pubmed.parser import parse_search_result, parse_summaries
+from hypokrates.pubmed.parser import parse_efetch_xml, parse_search_result
 from hypokrates.pubmed.search import build_search_term
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ async def search_papers(
     use_mesh: bool = False,
     use_cache: bool = True,
 ) -> PubMedSearchResult:
-    """Busca papers com metadados. Duas requests: ESearch + ESummary.
+    """Busca papers com metadados. Duas requests: ESearch + EFetch.
 
     Args:
         drug: Nome da droga.
@@ -85,8 +85,8 @@ async def search_papers(
 
         articles = []
         if pmids:
-            summary_data = await client.fetch_summaries(pmids, use_cache=use_cache)
-            articles = parse_summaries(summary_data)
+            xml_text = await client.fetch_articles(pmids, use_cache=use_cache)
+            articles = parse_efetch_xml(xml_text)
     finally:
         await client.close()
 

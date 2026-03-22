@@ -1,0 +1,83 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2024//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_240101.dtd">
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">38901234</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <Title>Anesthesiology</Title>
+          <JournalIssue CitedMedium="Internet">
+            <PubDate>
+              <Year>2024</Year>
+              <Month>Jan</Month>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Propofol-related hepatotoxicity: a systematic review.</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">Propofol is widely used for anesthesia induction.</AbstractText>
+          <AbstractText Label="METHODS" NlmCategory="METHODS">We searched PubMed and Embase for relevant studies.</AbstractText>
+          <AbstractText Label="RESULTS" NlmCategory="RESULTS">A total of 23 studies met inclusion criteria.</AbstractText>
+          <AbstractText Label="CONCLUSIONS" NlmCategory="CONCLUSIONS">Propofol hepatotoxicity is rare but clinically significant.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Silva</LastName>
+            <ForeName>Ana B</ForeName>
+          </Author>
+          <Author ValidYN="Y">
+            <LastName>Santos</LastName>
+            <ForeName>Carlos D</ForeName>
+          </Author>
+        </AuthorList>
+        <ELocationID EIdType="doi" ValidYN="Y">10.1234/anes.2024.001</ELocationID>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">37654321</PMID>
+      <Article PubModel="Print-Electronic">
+        <Journal>
+          <Title>British Journal of Anaesthesia</Title>
+          <JournalIssue CitedMedium="Internet">
+            <PubDate>
+              <Year>2023</Year>
+              <Month>Jun</Month>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Hepatic effects of propofol infusion syndrome.</ArticleTitle>
+        <Abstract>
+          <AbstractText>Propofol infusion syndrome is a rare but life-threatening complication associated with prolonged propofol administration at high doses. We report three cases of hepatic failure following propofol infusion in the ICU setting.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Johnson</LastName>
+            <ForeName>Emily F</ForeName>
+          </Author>
+        </AuthorList>
+        <ELocationID EIdType="doi" ValidYN="Y">10.5678/bja.2023.042</ELocationID>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">36543210</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <Title>Clinical Pharmacology and Therapeutics</Title>
+          <JournalIssue CitedMedium="Internet">
+            <PubDate>
+              <Year>2022</Year>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Drug-induced liver injury: an updated review.</ArticleTitle>
+        <AuthorList CompleteYN="N"/>
+        <ELocationID EIdType="pii" ValidYN="Y">S0009-9236(22)00123-4</ELocationID>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>

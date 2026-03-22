@@ -5,7 +5,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Tests](https://img.shields.io/badge/tests-1349_passing-brightgreen)]()
 [![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue)]()
-[![MCP](https://img.shields.io/badge/MCP-44_tools-purple)]()
+[![MCP](https://img.shields.io/badge/MCP-46_tools-purple)]()
 
 > Democratizing pharmacovigilance through open public health data.
 
@@ -147,7 +147,7 @@ jpn = jader.jader_signal("rocuronium", "anaphylactic shock")
 
 ## MCP Server
 
-44 tools available for LLM integration via [Model Context Protocol](https://modelcontextprotocol.io/):
+46 tools available for LLM integration via [Model Context Protocol](https://modelcontextprotocol.io/):
 
 ```bash
 python -m hypokrates.mcp

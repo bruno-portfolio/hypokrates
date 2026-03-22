@@ -21,6 +21,12 @@ def load_golden(source: str, filename: str) -> dict[str, Any]:
     return json.loads(path.read_text())  # type: ignore[no-any-return]
 
 
+def load_golden_text(source: str, filename: str) -> str:
+    """Carrega golden data como texto (XML, CSV, etc.)."""
+    path = GOLDEN_DATA / source / filename
+    return path.read_text(encoding="utf-8")
+
+
 def mock_openfda_response(
     data: dict[str, Any],
     *,

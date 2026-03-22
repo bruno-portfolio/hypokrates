@@ -35,7 +35,12 @@ from hypokrates.canada import CanadaBulkStatus, CanadaSignalResult
 from hypokrates.chembl import ChEMBLMechanism, ChEMBLMetabolism, ChEMBLTarget
 from hypokrates.config import configure
 from hypokrates.constants import __version__
-from hypokrates.cross import HypothesisClassification, HypothesisResult
+from hypokrates.cross import (
+    HypothesisClassification,
+    HypothesisResult,
+    InvestigationResult,
+    StratumSignal,
+)
 from hypokrates.dailymed import LabelCheckResult, LabelEventsResult
 from hypokrates.drugbank import DrugBankInfo, DrugInteraction, DrugTarget
 from hypokrates.evidence import EvidenceBlock, Limitation
@@ -80,6 +85,7 @@ __all__ = [
     "HypokratesError",
     "HypothesisClassification",
     "HypothesisResult",
+    "InvestigationResult",
     "LabelCheckResult",
     "LabelEventsResult",
     "Limitation",
@@ -102,6 +108,7 @@ __all__ = [
     "ScanResult",
     "Sex",
     "SourceUnavailableError",
+    "StratumSignal",
     "TrialsResult",
     "ValidationError",
     "__version__",

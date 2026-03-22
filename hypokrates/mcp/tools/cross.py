@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hypokrates.cross import api as cross_api
-from hypokrates.mcp.tools._shared import format_measure
+from hypokrates.cross.investigate import investigate as investigate_fn
+from hypokrates.mcp.tools._shared import format_measure, format_strata_table
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -158,6 +159,82 @@ def register(mcp: FastMCP) -> None:
                 "---",
                 "**Note:** PRR/EBGM measure disproportionality of reporting, NOT absolute risk. "
                 "Clinical significance requires validation with meta-analyses and guidelines.",
+            ]
+        )
+        return "\n".join(lines)
+
+    @mcp.tool()
+    async def investigate(
+        drug: str,
+        event: str,
+        suspect_only: bool = False,
+    ) -> str:
+        """Deep investigation: full hypothesis + demographic stratification.
+
+        Runs all enrichments (DailyMed, Trials, DrugBank, OpenTargets, ChEMBL,
+        OnSIDES, PharmGKB, Canada, JADER, co-admin) plus FAERS Bulk and Canada
+        stratification by sex and age group.
+
+        Args:
+            drug: Generic drug name.
+            event: Adverse event term (MedDRA preferred term).
+            suspect_only: Only count reports where drug is suspect.
+        """
+        result = await investigate_fn(drug, event, suspect_only=suspect_only)
+        hyp = result.hypothesis
+
+        lines = [
+            f"# Investigation: {drug.upper()} + {event.upper()}",
+            "",
+            "## Hypothesis",
+            f"**Classification:** {hyp.classification.value}",
+            f"**Signal detected:** {'YES' if hyp.signal.signal_detected else 'NO'}",
+            f"**Literature count:** {hyp.literature_count}",
+            format_measure("PRR", hyp.signal.prr),
+            format_measure("ROR", hyp.signal.ror),
+            format_measure("IC ", hyp.signal.ic),
+        ]
+
+        if hyp.in_label is not None:
+            lines.append(f"**In FDA label:** {'YES' if hyp.in_label else 'NO'}")
+        lines.extend(["", "## Summary", hyp.summary])
+
+        lines.extend(format_strata_table("By Sex", "Sex", result.sex_strata))
+        lines.extend(format_strata_table("By Age Group", "Age", result.age_strata))
+
+        # Country strata
+        if result.country_strata:
+            lines.extend(["", "## Cross-Country Comparison"])
+            lines.append("| Database | Reports | PRR | Signal |")
+            lines.append("|----------|---------|-----|--------|")
+            for s in result.country_strata:
+                prr_str = f"{s.prr:.2f}" if s.prr > 0 else "n/a"
+                sig_str = "YES" if s.signal_detected else "NO"
+                lines.append(
+                    f"| {s.stratum_value} | {s.drug_event_count} | {prr_str} | {sig_str} |"
+                )
+
+        # Summary
+        if result.demographic_summary:
+            lines.extend(["", "## Demographic Summary", result.demographic_summary])
+
+        # Key literature
+        if hyp.articles:
+            lines.extend(["", "## Key Literature"])
+            for art in hyp.articles[:5]:
+                lines.append(f"- [{art.pmid}] {art.title}")
+                if art.abstract:
+                    snippet = (
+                        art.abstract[:200] + "..." if len(art.abstract) > 200 else art.abstract
+                    )
+                    lines.append(f"  > {snippet}")
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** PRR/EBGM measure disproportionality of reporting, NOT absolute risk. "
+                "Stratification may have insufficient data in some subgroups.",
             ]
         )
         return "\n".join(lines)

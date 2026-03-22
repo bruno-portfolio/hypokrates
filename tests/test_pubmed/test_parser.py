@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from hypokrates.pubmed.parser import parse_search_result, parse_summaries
-from tests.helpers import load_golden
+from hypokrates.pubmed.parser import parse_efetch_xml, parse_search_result, parse_summaries
+from tests.helpers import load_golden, load_golden_text
 
 
 @pytest.fixture()
@@ -71,6 +71,71 @@ class TestParseSearchResult:
         data: dict[str, Any] = {"esearchresult": {"count": "abc"}}
         count, _, _ = parse_search_result(data)
         assert count == 0
+
+
+class TestParseEfetchXml:
+    """parse_efetch_xml — parser de XML EFetch com abstracts."""
+
+    @pytest.fixture()
+    def golden_xml(self) -> str:
+        return load_golden_text("pubmed", "efetch_sample.xml")
+
+    def test_parses_three_articles(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert len(articles) == 3
+
+    def test_structured_abstract(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[0].abstract is not None
+        assert "BACKGROUND:" in articles[0].abstract
+        assert "CONCLUSIONS:" in articles[0].abstract
+
+    def test_structured_abstract_sections_separated(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[0].abstract is not None
+        assert "\n\n" in articles[0].abstract
+
+    def test_simple_abstract(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[1].abstract is not None
+        assert "Propofol infusion syndrome" in articles[1].abstract
+
+    def test_no_abstract(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[2].abstract is None
+
+    def test_first_article_metadata(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        first = articles[0]
+        assert first.pmid == "38901234"
+        assert "Propofol" in first.title
+        assert first.journal == "Anesthesiology"
+        assert first.pub_date == "2024 Jan"
+        assert first.doi == "10.1234/anes.2024.001"
+
+    def test_authors_parsed(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[0].authors == ["Silva Ana B", "Santos Carlos D"]
+        assert articles[1].authors == ["Johnson Emily F"]
+
+    def test_no_authors(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[2].authors == []
+
+    def test_no_doi(self, golden_xml: str) -> None:
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[2].doi is None
+
+    def test_empty_xml(self) -> None:
+        assert parse_efetch_xml("") == []
+
+    def test_malformed_xml(self) -> None:
+        assert parse_efetch_xml("<bad") == []
+
+    def test_year_only_pub_date(self, golden_xml: str) -> None:
+        """Terceiro artigo tem apenas Year, sem Month."""
+        articles = parse_efetch_xml(golden_xml)
+        assert articles[2].pub_date == "2022"
 
 
 class TestParseSummaries:

@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
+from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
 from hypokrates.constants import NCBI_EUTILS_BASE_URL, HTTPSettings, Source
 from hypokrates.http.auth import inject_ncbi_auth, parse_ncbi_response
 from hypokrates.http.base_client import BaseClient, ParamsType
+from hypokrates.http.retry import retry_request
 from hypokrates.pubmed.constants import (
     DATABASE,
     DEFAULT_RETMAX,
+    EFETCH_ENDPOINT,
     ESEARCH_ENDPOINT,
     ESUMMARY_ENDPOINT,
     RATE_WITH_KEY,
@@ -19,6 +23,8 @@ from hypokrates.pubmed.constants import (
 
 if TYPE_CHECKING:
     import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class PubMedClient(BaseClient):
@@ -81,13 +87,56 @@ class PubMedClient(BaseClient):
         params = self._build_params(term, retmax=retmax)
         return await self._cached_get(ESEARCH_ENDPOINT, params, use_cache=use_cache)
 
+    async def fetch_articles(
+        self,
+        pmids: list[str],
+        *,
+        use_cache: bool = True,
+    ) -> str:
+        """EFetch — retorna XML com metadados completos + abstracts.
+
+        Args:
+            pmids: Lista de PMIDs.
+            use_cache: Se deve usar cache.
+
+        Returns:
+            XML text do EFetch (PubmedArticleSet).
+        """
+        if not pmids:
+            return ""
+
+        ids_str = ",".join(pmids)
+        params = self._build_efetch_params(ids_str)
+
+        should_cache = use_cache and get_config().cache_enabled
+        store = CacheStore.get_instance() if should_cache else None
+        key = cache_key(Source.PUBMED, EFETCH_ENDPOINT, params) if should_cache else ""
+
+        if store is not None:
+            cached = await store.aget(key)
+            if cached is not None:
+                logger.debug("Cache hit: %s", key)
+                return str(cached.get("xml", ""))
+
+        await self._rate_limiter.acquire()
+        client = await self._get_client()
+        response = await retry_request(
+            client, "GET", EFETCH_ENDPOINT, params=params, source_name=Source.PUBMED
+        )
+        xml_text = response.text
+
+        if store is not None:
+            await store.aset(key, {"xml": xml_text}, Source.PUBMED)
+
+        return xml_text
+
     async def fetch_summaries(
         self,
         pmids: list[str],
         *,
         use_cache: bool = True,
     ) -> dict[str, Any]:
-        """ESummary — retorna metadados dos artigos.
+        """ESummary — retorna metadados dos artigos (legacy).
 
         Args:
             pmids: Lista de PMIDs.
@@ -121,6 +170,20 @@ class PubMedClient(BaseClient):
             params["retmax"] = retmax
         if rettype is not None:
             params["rettype"] = rettype
+        inject_ncbi_auth(params)
+        return params
+
+    def _build_efetch_params(
+        self,
+        ids: str,
+    ) -> ParamsType:
+        """Monta parâmetros do EFetch."""
+        params: ParamsType = {
+            "db": DATABASE,
+            "id": ids,
+            "retmode": "xml",
+            "tool": TOOL_NAME,
+        }
         inject_ncbi_auth(params)
         return params
 

@@ -34,7 +34,7 @@ print(f"Query used: {result.query_translation}")
 
 ## `search_papers()`
 
-Search PubMed and return article metadata. Makes two requests: ESearch (get PMIDs) + ESummary (get metadata).
+Search PubMed and return article metadata including abstracts. Makes two requests: ESearch (get PMIDs) + EFetch (get full metadata + abstracts).
 
 ```python
 result = await pubmed.search_papers("propofol", "bradycardia", limit=5)
@@ -42,6 +42,8 @@ print(f"Total: {result.total_count}")
 for article in result.articles:
     print(f"  [{article.pmid}] {article.title}")
     print(f"    {article.journal} ({article.pub_date})")
+    if article.abstract:
+        print(f"    Abstract: {article.abstract[:100]}...")
 ```
 
 **Parameters**
@@ -103,3 +105,4 @@ Configure your API key in [Configuration](../guides/configuration.md) to increas
 | `journal` | `str \| None` | Journal name |
 | `pub_date` | `str \| None` | Publication date |
 | `doi` | `str \| None` | DOI identifier |
+| `abstract` | `str \| None` | Article abstract (structured sections concatenated, `None` if unavailable) |

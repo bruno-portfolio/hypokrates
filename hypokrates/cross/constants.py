@@ -15,3 +15,7 @@ COMPARE_RATIO_EQUAL_THRESHOLD: float = 0.1  # within 10% = equal
 OVERLAP_THRESHOLD: float = 0.5  # fração de overlap para classificar co-admin artifact
 CO_ADMIN_COMPARE_TOP_N: int = 5  # max co-drugs para rodar signal() comparativo
 SPECIFICITY_RATIO_THRESHOLD: float = 2.0  # PRR ratio acima = drug-specific
+
+# investigate() — thresholds demográficos
+STRATUM_SEX_NOTABLE_RATIO: float = 1.5  # flag se PRR M/F difere > 1.5x
+STRATUM_AGE_NOTABLE_RATIO: float = 2.0  # flag se age_group PRR > 2x average

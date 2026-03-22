@@ -76,6 +76,31 @@ class HypothesisResult(BaseModel):
     jader_signal: bool | None = None
 
 
+class StratumSignal(BaseModel):
+    """Sinal estratificado por subpopulação (sexo, faixa etária, país)."""
+
+    source: str = ""
+    stratum_type: str
+    stratum_value: str
+    drug_event_count: int = 0
+    prr: float = 0.0
+    ror: float = 0.0
+    ic: float = 0.0
+    signal_detected: bool = False
+    insufficient_data: bool = False
+
+
+class InvestigationResult(BaseModel):
+    """Resultado de investigação profunda: hypothesis + estratificação demográfica."""
+
+    hypothesis: HypothesisResult
+    sex_strata: list[StratumSignal] = Field(default_factory=list)
+    age_strata: list[StratumSignal] = Field(default_factory=list)
+    country_strata: list[StratumSignal] = Field(default_factory=list)
+    demographic_summary: str = ""
+    meta: MetaInfo
+
+
 class CompareSignalItem(BaseModel):
     """Comparação de um evento entre duas drogas."""
 

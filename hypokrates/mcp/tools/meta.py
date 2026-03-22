@@ -129,6 +129,11 @@ _TOOLS = [
         "module": "jader",
         "description": "JADER store status",
     },
+    {
+        "name": "investigate",
+        "module": "cross",
+        "description": "Deep investigation with demographic stratification",
+    },
     {"name": "list_tools", "module": "meta", "description": "List available tools"},
     {"name": "version", "module": "meta", "description": "Show version info"},
 ]

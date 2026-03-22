@@ -100,8 +100,52 @@ class TestPubMedClientSearchIds:
             await client.close()
 
 
+class TestPubMedClientFetchArticles:
+    """fetch_articles — EFetch XML."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    @respx.mock
+    async def test_fetch_articles_returns_xml(self) -> None:
+        xml = "<PubmedArticleSet><PubmedArticle></PubmedArticle></PubmedArticleSet>"
+        respx.get(url__startswith=f"{NCBI_EUTILS_BASE_URL}/efetch.fcgi").mock(
+            return_value=httpx.Response(200, text=xml)
+        )
+        client = PubMedClient()
+        try:
+            result = await client.fetch_articles(["12345"], use_cache=False)
+            assert "PubmedArticleSet" in result
+        finally:
+            await client.close()
+
+    async def test_fetch_articles_empty_pmids(self) -> None:
+        client = PubMedClient()
+        try:
+            result = await client.fetch_articles([], use_cache=False)
+            assert result == ""
+        finally:
+            await client.close()
+
+    @respx.mock
+    async def test_fetch_articles_params_include_retmode_xml(self) -> None:
+        xml = "<PubmedArticleSet/>"
+        route = respx.get(url__startswith=f"{NCBI_EUTILS_BASE_URL}/efetch.fcgi").mock(
+            return_value=httpx.Response(200, text=xml)
+        )
+        client = PubMedClient()
+        try:
+            await client.fetch_articles(["111", "222"], use_cache=False)
+            request = route.calls.last.request
+            assert "retmode=xml" in str(request.url)
+            assert "111%2C222" in str(request.url) or "111,222" in str(request.url)
+        finally:
+            await client.close()
+
+
 class TestPubMedClientFetchSummaries:
-    """fetch_summaries — ESummary."""
+    """fetch_summaries — ESummary (legacy)."""
 
     @pytest.fixture(autouse=True)
     def _disable_cache(self) -> None:
