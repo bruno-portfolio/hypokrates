@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hypokrates.cross.models import StratumSignal
+    from hypokrates.pubmed.models import PubMedArticle
+
+_ABSTRACT_SNIPPET_LEN = 200
+_YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 
 
 def format_measure(name: str, m: object) -> str:
@@ -38,4 +43,102 @@ def format_strata_table(
             f"| {s.source} | {s.stratum_value} | {s.drug_event_count} | "
             f"{s.prr:.2f} | {s.ror:.2f} | {sig_str} |"
         )
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# Citation formatters
+# ---------------------------------------------------------------------------
+
+
+def _format_authors(authors: list[str]) -> str:
+    """Formata lista de autores: 1=nome, 2=ambos, 3+=primeiro + et al."""
+    if not authors:
+        return ""
+
+    def _initials(name: str) -> str:
+        parts = name.split()
+        if len(parts) <= 1:
+            return name
+        last = parts[0]
+        inits = "".join(p[0] for p in parts[1:] if p)
+        return f"{last} {inits}"
+
+    if len(authors) == 1:
+        return _initials(authors[0])
+    if len(authors) == 2:
+        return f"{_initials(authors[0])}, {_initials(authors[1])}"
+    return f"{_initials(authors[0])}, et al."
+
+
+def _extract_year(pub_date: str | None) -> str | None:
+    """Extrai ano (4 dígitos) de pub_date PubMed."""
+    if not pub_date:
+        return None
+    match = _YEAR_RE.search(pub_date)
+    return match.group(0) if match else None
+
+
+def format_citation(article: PubMedArticle) -> str:
+    """Formata citação de um artigo — sem bullet prefix.
+
+    Exemplo: Smith J, et al. (2024) Title. *Journal*. PMID:12345678 | DOI:10.x
+    """
+    parts: list[str] = []
+
+    author_str = _format_authors(article.authors)
+    year = _extract_year(article.pub_date)
+
+    if author_str and year:
+        parts.append(f"{author_str}. ({year})")
+    elif author_str:
+        parts.append(f"{author_str}.")
+    elif year:
+        parts.append(f"({year})")
+
+    parts.append(article.title)
+
+    if article.journal:
+        parts.append(f"*{article.journal}*.")
+
+    parts.append(f"PMID:{article.pmid}")
+
+    if article.doi:
+        parts.append(f"| DOI:{article.doi}")
+
+    return " ".join(parts)
+
+
+def format_references(
+    articles: list[PubMedArticle],
+    *,
+    heading: str = "References",
+    max_items: int = 0,
+    include_abstract: bool = False,
+) -> list[str]:
+    """Formata seção de referências com heading e citações.
+
+    Args:
+        articles: Lista de PubMedArticle.
+        heading: Título da seção markdown.
+        max_items: Máximo de artigos (0 = todos).
+        include_abstract: Incluir snippet do abstract.
+
+    Returns:
+        Lista de linhas markdown (vazia se sem artigos).
+    """
+    if not articles:
+        return []
+
+    items = articles[:max_items] if max_items > 0 else articles
+
+    lines: list[str] = ["", f"## {heading}"]
+    for art in items:
+        lines.append(f"- {format_citation(art)}")
+        if include_abstract and art.abstract:
+            snippet = art.abstract[:_ABSTRACT_SNIPPET_LEN]
+            if len(art.abstract) > _ABSTRACT_SNIPPET_LEN:
+                snippet += "..."
+            lines.append(f"  > {snippet}")
+
     return lines

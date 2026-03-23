@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from hypokrates.mcp.tools._shared import format_references
 from hypokrates.pubmed import api as pubmed_api
 
 if TYPE_CHECKING:
@@ -39,10 +40,5 @@ def register(mcp: FastMCP) -> None:
             f"**Total:** {result.total_count} papers",
             "",
         ]
-        for art in result.articles:
-            doi = f" | doi:{art.doi}" if art.doi else ""
-            lines.append(f"- [{art.pmid}] {art.title}{doi}")
-            if art.abstract:
-                snippet = art.abstract[:200] + "..." if len(art.abstract) > 200 else art.abstract
-                lines.append(f"  > {snippet}")
+        lines.extend(format_references(result.articles, heading="Results", include_abstract=True))
         return "\n".join(lines)

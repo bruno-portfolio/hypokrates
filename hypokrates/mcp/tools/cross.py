@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from hypokrates.cross import api as cross_api
 from hypokrates.cross.investigate import investigate as investigate_fn
-from hypokrates.mcp.tools._shared import format_measure, format_strata_table
+from hypokrates.mcp.tools._shared import format_measure, format_references, format_strata_table
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -148,11 +148,7 @@ def register(mcp: FastMCP) -> None:
                     "population, not drug toxicity.",
                 ]
             )
-        if result.articles:
-            lines.append("")
-            lines.append("## Articles")
-            for art in result.articles:
-                lines.append(f"- [{art.pmid}] {art.title}")
+        lines.extend(format_references(result.articles, heading="References"))
         lines.extend(
             [
                 "",
@@ -219,15 +215,11 @@ def register(mcp: FastMCP) -> None:
             lines.extend(["", "## Demographic Summary", result.demographic_summary])
 
         # Key literature
-        if hyp.articles:
-            lines.extend(["", "## Key Literature"])
-            for art in hyp.articles[:5]:
-                lines.append(f"- [{art.pmid}] {art.title}")
-                if art.abstract:
-                    snippet = (
-                        art.abstract[:200] + "..." if len(art.abstract) > 200 else art.abstract
-                    )
-                    lines.append(f"  > {snippet}")
+        lines.extend(
+            format_references(
+                hyp.articles, heading="Key Literature", max_items=5, include_abstract=True
+            )
+        )
 
         lines.extend(
             [

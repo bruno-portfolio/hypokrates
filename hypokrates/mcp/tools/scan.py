@@ -6,6 +6,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from hypokrates.mcp.tools._shared import format_citation
 from hypokrates.scan import api as scan_api
 from hypokrates.scan import class_compare as class_compare_api
 from hypokrates.scan.models import ClassEventItem, EventClassification
@@ -162,6 +163,8 @@ def register(mcp: FastMCP) -> None:
                     f"{vol_info}{indication_info}{coadmin_info}"
                     f"{direction_info}{grouped_info}"
                 )
+                if item.articles:
+                    lines.append(f"   Ref: {format_citation(item.articles[0])}")
             lines.append("")
 
             # Agrupar por cluster semântico
