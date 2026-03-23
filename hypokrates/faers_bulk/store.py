@@ -318,26 +318,8 @@ class FAERSBulkStore:
         role: str,
         strata: StrataFilter,
     ) -> BulkCountResult:
-        where_clauses: list[str] = []
-        params: dict[str, object] = {"drug": drug, "events": events, "role": role}
-
-        if strata.sex is not None:
-            where_clauses.append("dm.sex = $sex")
-            params["sex"] = strata.sex.upper()
-
-        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
-            lo, hi = AGE_GROUPS[strata.age_group]
-            where_clauses.append(
-                "TRY_CAST(dm.age AS INTEGER) >= $age_lo AND TRY_CAST(dm.age AS INTEGER) < $age_hi"
-            )
-            params["age_lo"] = lo
-            params["age_hi"] = hi
-
-        if strata.reporter_country is not None:
-            where_clauses.append("dm.reporter_country = $country")
-            params["country"] = strata.reporter_country.upper()
-
-        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+        strata_where, strata_params = _build_strata_where(strata)
+        params: dict[str, object] = {"drug": drug, "events": events, "role": role, **strata_params}
 
         sql = f"""
         WITH strata_pids AS (
@@ -423,26 +405,8 @@ class FAERSBulkStore:
         limit: int,
         strata: StrataFilter,
     ) -> list[tuple[str, int]]:
-        where_clauses: list[str] = []
-        params: dict[str, object] = {"drug": drug, "role": role, "limit": limit}
-
-        if strata.sex is not None:
-            where_clauses.append("dm.sex = $sex")
-            params["sex"] = strata.sex.upper()
-
-        if strata.age_group is not None and strata.age_group in AGE_GROUPS:
-            lo, hi = AGE_GROUPS[strata.age_group]
-            where_clauses.append(
-                "TRY_CAST(dm.age AS INTEGER) >= $age_lo AND TRY_CAST(dm.age AS INTEGER) < $age_hi"
-            )
-            params["age_lo"] = lo
-            params["age_hi"] = hi
-
-        if strata.reporter_country is not None:
-            where_clauses.append("dm.reporter_country = $country")
-            params["country"] = strata.reporter_country.upper()
-
-        strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
+        strata_where, strata_params = _build_strata_where(strata)
+        params: dict[str, object] = {"drug": drug, "role": role, "limit": limit, **strata_params}
 
         sql = f"""
         WITH strata_pids AS (
@@ -504,15 +468,18 @@ class FAERSBulkStore:
         quarters = self.get_loaded_quarters()
 
         with self._db_lock:
-            demo_count = self._conn.execute("SELECT COUNT(*) FROM faers_demo").fetchone()
-            dedup_count = self._conn.execute("SELECT COUNT(*) FROM faers_dedup").fetchone()
-            drug_count = self._conn.execute("SELECT COUNT(*) FROM faers_drug").fetchone()
-            reac_count = self._conn.execute("SELECT COUNT(*) FROM faers_reac").fetchone()
+            row = self._conn.execute(
+                "SELECT "
+                "(SELECT COUNT(*) FROM faers_demo), "
+                "(SELECT COUNT(*) FROM faers_dedup), "
+                "(SELECT COUNT(*) FROM faers_drug), "
+                "(SELECT COUNT(*) FROM faers_reac)"
+            ).fetchone()
 
-        total_reports = demo_count[0] if demo_count else 0
-        deduped_cases = dedup_count[0] if dedup_count else 0
-        total_drug = drug_count[0] if drug_count else 0
-        total_reac = reac_count[0] if reac_count else 0
+        total_reports = row[0] if row else 0
+        deduped_cases = row[1] if row else 0
+        total_drug = row[2] if row else 0
+        total_reac = row[3] if row else 0
 
         oldest = min((q.quarter_key for q in quarters), default=None)
         newest = max((q.quarter_key for q in quarters), default=None)
@@ -661,6 +628,31 @@ class FAERSBulkStore:
             if self._conn is not None:
                 self._conn.close()
                 self._conn = None  # type: ignore[assignment]
+
+
+def _build_strata_where(strata: StrataFilter) -> tuple[str, dict[str, object]]:
+
+    where_clauses: list[str] = []
+    params: dict[str, object] = {}
+
+    if strata.sex is not None:
+        where_clauses.append("dm.sex = $sex")
+        params["sex"] = strata.sex.upper()
+
+    if strata.age_group is not None and strata.age_group in AGE_GROUPS:
+        lo, hi = AGE_GROUPS[strata.age_group]
+        where_clauses.append(
+            "TRY_CAST(dm.age AS INTEGER) >= $age_lo AND TRY_CAST(dm.age AS INTEGER) < $age_hi"
+        )
+        params["age_lo"] = lo
+        params["age_hi"] = hi
+
+    if strata.reporter_country is not None:
+        where_clauses.append("dm.reporter_country = $country")
+        params["country"] = strata.reporter_country.upper()
+
+    where_str = " AND ".join(where_clauses) if where_clauses else "1=1"
+    return where_str, params
 
 
 def _extract_quarter_key(zip_path: str) -> str:

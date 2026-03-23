@@ -136,12 +136,10 @@ async def scan_drug(
         from hypokrates.faers_bulk.store import FAERSBulkStore
 
         store = FAERSBulkStore.get_instance()
-        shared_drug_total_val, shared_n_total_val = await asyncio.gather(
+        shared_drug_total, shared_n_total = await asyncio.gather(
             bulk_api.bulk_drug_total(drug, role_filter=role_filter),
             asyncio.to_thread(store.count_total),
         )
-        shared_drug_total = shared_drug_total_val
-        shared_n_total = shared_n_total_val
     else:
         if primary_suspect_only:
             logger.warning(
@@ -524,9 +522,7 @@ def _resolve_role_filter(primary_suspect_only: bool, suspect_only: bool) -> Role
 
     if primary_suspect_only:
         return RoleCodFilter.PS_ONLY
-    if suspect_only:
-        return RoleCodFilter.SUSPECT
-    return RoleCodFilter.SUSPECT  # default: PS+SS
+    return RoleCodFilter.SUSPECT
 
 
 async def _check_bulk_available() -> bool:

@@ -534,7 +534,6 @@ def _classify(
     prr_ci_upper: float | None = None,
     drug_event_count: int = 0,
 ) -> HypothesisClassification:
-    """Classifica hipótese com base em sinal, literatura e label."""
     if not signal_detected:
         # PRR < 1 com CI inteiro abaixo de 1 e dados existentes → protetor
         if (
@@ -573,7 +572,6 @@ def _build_summary(
     in_label: bool | None = None,
     signal_detected: bool = True,
 ) -> str:
-    """Gera resumo textual da classificação."""
     labels = {
         HypothesisClassification.NOVEL_HYPOTHESIS: "Novel hypothesis",
         HypothesisClassification.EMERGING_SIGNAL: "Emerging signal",
@@ -632,7 +630,6 @@ def _build_summary(
 
 
 def _confidence_label(classification: HypothesisClassification) -> str:
-    """Retorna label de confiança baseado na classificação."""
     labels = {
         HypothesisClassification.NOVEL_HYPOTHESIS: "low — no corroborating literature",
         HypothesisClassification.EMERGING_SIGNAL: "moderate — limited corroborating literature",
@@ -646,14 +643,12 @@ def _confidence_label(classification: HypothesisClassification) -> str:
 
 
 def _format_label_detail(label_result: LabelCheckResult) -> str:
-    """Formata detalhe do label check."""
     if label_result.matched_terms:
         return f"Matched: {', '.join(label_result.matched_terms)}"
     return "Not found in label"
 
 
 def _format_trials_detail(trials_result: TrialsResult) -> str:
-    """Formata detalhe dos trials."""
     return f"{trials_result.total_count} trials found, {trials_result.active_count} active"
 
 
