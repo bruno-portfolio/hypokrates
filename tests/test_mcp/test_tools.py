@@ -1581,6 +1581,81 @@ class TestScanToolsExtended:
 
 
 # ---------------------------------------------------------------------------
+# Tests: Full Report MCP tool
+# ---------------------------------------------------------------------------
+
+
+class TestFullReportTool:
+    """MCP tool full_report."""
+
+    async def test_full_report_formatting(self, tool_capture: Any) -> None:
+        from hypokrates.cross.models import InvestigationResult, StratumSignal, SynthesisDirection
+        from hypokrates.cross.report import FullReportResult
+        from hypokrates.mcp.tools import cross
+
+        capture = tool_capture(cross)
+
+        mock_result = FullReportResult(
+            drug="semaglutide",
+            event="BRONCHOSPASM",
+            investigation=InvestigationResult(
+                hypothesis=HypothesisResult(
+                    drug="semaglutide",
+                    event="BRONCHOSPASM",
+                    classification=HypothesisClassification.EMERGING_SIGNAL,
+                    signal=make_signal(event="BRONCHOSPASM", prr=3.0),
+                    literature_count=5,
+                    articles=[make_article("99999", "GLP-1 bronchospasm case")],
+                    evidence=make_evidence(),
+                    summary="Emerging signal.",
+                ),
+                country_strata=[
+                    StratumSignal(
+                        source="FAERS",
+                        stratum_type="country",
+                        stratum_value="FAERS",
+                        drug_event_count=100,
+                        prr=3.0,
+                        signal_detected=True,
+                    ),
+                ],
+                caveats=["LOW COUNT: Only 5 reports"],
+                meta=make_meta(source="hypokrates/investigate"),
+            ),
+            scan=None,
+            comparison=None,
+            synthesis=SynthesisDirection(
+                signal_strength="MODERATE",
+                classification="emerging_signal",
+                reports=100,
+                caveats_triggered=1,
+                caveats_list=["LOW COUNT: Only 5 reports"],
+                replication_ratio="1/1",
+                label_status="UNKNOWN",
+                literature_count=5,
+                class_effect="NOT_TESTED",
+                demographic_bias="UNLIKELY",
+                indication_confounding=False,
+                coadmin_confounding=False,
+                mechanism_plausibility="UNKNOWN",
+                top_events_context="unavailable",
+            ),
+            meta=make_meta(source="hypokrates/full_report"),
+        )
+
+        with patch.object(cross, "full_report_fn", new=AsyncMock(return_value=mock_result)):
+            result = await capture.tools["full_report"]("semaglutide", "BRONCHOSPASM")
+
+        assert "# Full Report: SEMAGLUTIDE + BRONCHOSPASM" in result
+        assert "## Signal" in result
+        assert "## Caveats" in result
+        assert "LOW COUNT" in result
+        assert "## Synthesis Direction" in result
+        assert "signal_strength: MODERATE" in result
+        assert "class_effect: NOT_TESTED" in result
+
+
+# ---------------------------------------------------------------------------
 # Tests: MCP server — create_server
 # ---------------------------------------------------------------------------
 

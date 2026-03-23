@@ -159,7 +159,7 @@ hypokrates/
 ├── cache/             # DuckDB HTTP cache (thread-safe singleton)
 ├── http/              # BaseClient with retry, rate limiting, auth
 ├── contracts/         # Protocol classes (interfaces)
-├── mcp/               # MCP server (46 tools)
+├── mcp/               # MCP server (47 tools)
 └── utils/             # Helpers (validation, time, result)
 
 tests/

@@ -11,6 +11,8 @@ from hypokrates.cross.constants import (
     CAVEAT_AGE_CONCENTRATION,
     CAVEAT_LOW_COUNT,
     CAVEAT_NON_REPLICATION_MIN,
+    CAVEAT_PREFIX_AGE,
+    CAVEAT_PREFIX_SEX,
     CAVEAT_PRR_INFLATION,
     CAVEAT_SEX_CONCENTRATION,
     STRATUM_AGE_NOTABLE_RATIO,
@@ -398,7 +400,7 @@ def _build_caveats(
     sex_caveat = _check_concentration(
         sex_strata,
         CAVEAT_SEX_CONCENTRATION,
-        "SEX CONCENTRATION",
+        CAVEAT_PREFIX_SEX,
         "signal may reflect population bias, not drug effect.",
     )
     if sex_caveat:
@@ -408,7 +410,7 @@ def _build_caveats(
     age_caveat = _check_concentration(
         age_strata,
         CAVEAT_AGE_CONCENTRATION,
-        "AGE CONCENTRATION",
+        CAVEAT_PREFIX_AGE,
         "signal may reflect demographic usage pattern.",
     )
     if age_caveat:

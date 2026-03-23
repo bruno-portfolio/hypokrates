@@ -4,7 +4,13 @@ from typing import TYPE_CHECKING
 
 from hypokrates.cross import api as cross_api
 from hypokrates.cross.investigate import investigate as investigate_fn
-from hypokrates.mcp.tools._shared import format_measure, format_references, format_strata_table
+from hypokrates.cross.report import full_report_analysis as full_report_fn
+from hypokrates.mcp.tools._shared import (
+    format_country_strata_table,
+    format_measure,
+    format_references,
+    format_strata_table,
+)
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -193,18 +199,7 @@ def register(mcp: FastMCP) -> None:
 
         lines.extend(format_strata_table("By Sex", "Sex", result.sex_strata))
         lines.extend(format_strata_table("By Age Group", "Age", result.age_strata))
-
-        # Country strata
-        if result.country_strata:
-            lines.extend(["", "## Cross-Country Comparison"])
-            lines.append("| Database | Reports | PRR | Signal |")
-            lines.append("|----------|---------|-----|--------|")
-            for s in result.country_strata:
-                prr_str = f"{s.prr:.2f}" if s.prr > 0 else "n/a"
-                sig_str = "YES" if s.signal_detected else "NO"
-                lines.append(
-                    f"| {s.stratum_value} | {s.drug_event_count} | {prr_str} | {sig_str} |"
-                )
+        lines.extend(format_country_strata_table(result.country_strata))
 
         # Summary
         if result.demographic_summary:
@@ -298,4 +293,140 @@ def register(mcp: FastMCP) -> None:
             ]
         )
 
+        return "\n".join(lines)
+
+    @mcp.tool()
+    async def full_report(
+        drug: str,
+        event: str,
+        control: str = "",
+        suspect_only: bool = False,
+    ) -> str:
+        """Deep pharmacovigilance report with synthesis direction.
+
+        Orchestrates investigate + scan_drug + compare_signals in parallel,
+        then computes a Synthesis Direction block for clinical insight.
+
+        Args:
+            drug: Generic drug name (e.g., "semaglutide").
+            event: Adverse event term (MedDRA preferred term, e.g., "BRONCHOSPASM").
+            control: Optional control drug for class comparison (e.g., "liraglutide").
+            suspect_only: Only count reports where drug is suspect.
+        """
+        result = await full_report_fn(drug, event, control=control, suspect_only=suspect_only)
+        hyp = result.investigation.hypothesis
+        inv = result.investigation
+        syn = result.synthesis
+
+        lines = [
+            f"# Full Report: {drug.upper()} + {event.upper()}",
+            "",
+            "## Signal",
+            format_measure("PRR", hyp.signal.prr),
+            format_measure("ROR", hyp.signal.ror),
+            format_measure("IC ", hyp.signal.ic),
+            format_measure("EBGM", hyp.signal.ebgm),
+            f"**Reports (cell a):** {hyp.signal.table.a}",
+            f"**Signal detected:** {'YES' if hyp.signal.signal_detected else 'NO'}",
+            f"**Classification:** {hyp.classification.value}",
+        ]
+
+        # Caveats
+        if inv.caveats:
+            lines.extend(["", "## Caveats"])
+            for caveat in inv.caveats:
+                lines.append(f"- {caveat}")
+
+        # Demographic Stratification
+        lines.extend(format_strata_table("By Sex", "Sex", inv.sex_strata))
+        lines.extend(format_strata_table("By Age Group", "Age", inv.age_strata))
+        lines.extend(format_country_strata_table(inv.country_strata))
+
+        # Class Comparison
+        if result.comparison and result.comparison.items:
+            lines.extend(["", "## Class Comparison"])
+            lines.append("| Event | Drug PRR | Ctrl PRR | Ratio | Stronger |")
+            lines.append("|-------|----------|----------|-------|----------|")
+            for item in result.comparison.items:
+                ratio_str = f"{item.ratio:.1f}x" if item.ratio != float("inf") else "inf"
+                lines.append(
+                    f"| {item.event} | {item.drug_prr:.2f} | "
+                    f"{item.control_prr:.2f} | {ratio_str} | {item.stronger} |"
+                )
+
+        # Drug Profile
+        if hyp.mechanism or hyp.enzymes or hyp.interactions:
+            lines.extend(["", "## Drug Profile"])
+            if hyp.mechanism:
+                lines.append(f"**Mechanism:** {hyp.mechanism[:200]}")
+            if hyp.enzymes:
+                lines.append(f"**CYP enzymes:** {', '.join(hyp.enzymes)}")
+            if hyp.interactions:
+                lines.append(f"**Interactions:** {len(hyp.interactions)} known")
+
+        # Top Events
+        if result.scan and result.scan.items:
+            lines.extend(["", "## Top Events"])
+            lines.append("| # | Event | PRR | Classification | Score |")
+            lines.append("|---|-------|-----|----------------|-------|")
+            for sc_item in result.scan.items[:5]:
+                lines.append(
+                    f"| {sc_item.rank} | {sc_item.event} | "
+                    f"{sc_item.signal.prr.value:.2f} | "
+                    f"{sc_item.classification.value} | {sc_item.score:.1f} |"
+                )
+
+        # Label Status
+        if hyp.in_label is not None or hyp.onsides_sources or hyp.active_trials is not None:
+            lines.extend(["", "## Label Status"])
+            if hyp.in_label is not None:
+                lines.append(f"**In FDA label:** {'YES' if hyp.in_label else 'NO'}")
+            if hyp.onsides_sources:
+                sources_str = ", ".join(hyp.onsides_sources)
+                lines.append(f"**OnSIDES:** {len(hyp.onsides_sources)}/4 labels ({sources_str})")
+            if hyp.active_trials is not None:
+                lines.append(f"**Active trials:** {hyp.active_trials}")
+
+        # Pharmacogenomics
+        if hyp.pharmacogenomics:
+            lines.extend(["", "## Pharmacogenomics"])
+            for pgx in hyp.pharmacogenomics:
+                lines.append(f"- {pgx}")
+
+        # Key Literature
+        lines.extend(
+            format_references(
+                hyp.articles, heading="Key Literature", max_items=5, include_abstract=True
+            )
+        )
+
+        # Synthesis Direction
+        lines.extend(
+            [
+                "",
+                "## Synthesis Direction",
+                f"- signal_strength: {syn.signal_strength}",
+                f"- classification: {syn.classification}",
+                f"- reports: {syn.reports}",
+                f"- caveats_triggered: {syn.caveats_triggered}",
+                f"- replication_ratio: {syn.replication_ratio}",
+                f"- label_status: {syn.label_status}",
+                f"- literature_count: {syn.literature_count}",
+                f"- class_effect: {syn.class_effect}",
+                f"- demographic_bias: {syn.demographic_bias}",
+                f"- indication_confounding: {syn.indication_confounding}",
+                f"- coadmin_confounding: {syn.coadmin_confounding}",
+                f"- mechanism_plausibility: {syn.mechanism_plausibility}",
+                f"- top_events_context: {syn.top_events_context}",
+            ]
+        )
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "**Note:** This report combines multiple data sources. "
+                "Synthesis direction is a heuristic — clinical validation required.",
+            ]
+        )
         return "\n".join(lines)

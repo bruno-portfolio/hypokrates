@@ -46,6 +46,23 @@ def format_strata_table(
     return lines
 
 
+def format_country_strata_table(strata: list[StratumSignal]) -> list[str]:
+    """Formata tabela markdown de cross-country comparison."""
+    if not strata:
+        return []
+    lines = [
+        "",
+        "## Cross-Country Comparison",
+        "| Database | Reports | PRR | Signal |",
+        "|----------|---------|-----|--------|",
+    ]
+    for s in strata:
+        prr_str = f"{s.prr:.2f}" if s.prr > 0 else "n/a"
+        sig_str = "YES" if s.signal_detected else "NO"
+        lines.append(f"| {s.stratum_value} | {s.drug_event_count} | {prr_str} | {sig_str} |")
+    return lines
+
+
 # ---------------------------------------------------------------------------
 # Citation formatters
 # ---------------------------------------------------------------------------

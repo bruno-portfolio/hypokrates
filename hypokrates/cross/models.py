@@ -116,6 +116,34 @@ class CompareSignalItem(BaseModel):
     stronger: str
 
 
+class SignalStrength(StrEnum):
+    """Força do sinal de desproporcionalidade."""
+
+    NONE = "NONE"
+    WEAK = "WEAK"
+    MODERATE = "MODERATE"
+    STRONG = "STRONG"
+
+
+class SynthesisDirection(BaseModel):
+    """Direcionamento de síntese para o Claude gerar clinical insight."""
+
+    signal_strength: SignalStrength
+    classification: HypothesisClassification
+    reports: int
+    caveats_triggered: int
+    caveats_list: list[str] = Field(default_factory=list)
+    replication_ratio: str
+    label_status: str
+    literature_count: int
+    class_effect: str
+    demographic_bias: str
+    indication_confounding: bool
+    coadmin_confounding: bool
+    mechanism_plausibility: str
+    top_events_context: str
+
+
 class CompareResult(BaseModel):
     """Resultado da comparação de sinais entre duas drogas."""
 

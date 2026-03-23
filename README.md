@@ -3,9 +3,9 @@
 [![PyPI version](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
 [![Python](https://img.shields.io/pypi/pyversions/hypokrates)](https://pypi.org/project/hypokrates/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-1403_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1418_passing-brightgreen)]()
 [![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue)]()
-[![MCP](https://img.shields.io/badge/MCP-46_tools-purple)]()
+[![MCP](https://img.shields.io/badge/MCP-47_tools-purple)]()
 
 > Democratizing pharmacovigilance through open public health data.
 
@@ -147,7 +147,7 @@ jpn = jader.jader_signal("rocuronium", "anaphylactic shock")
 
 ## MCP Server
 
-46 tools available for LLM integration via [Model Context Protocol](https://modelcontextprotocol.io/):
+47 tools available for LLM integration via [Model Context Protocol](https://modelcontextprotocol.io/):
 
 ```bash
 python -m hypokrates.mcp
@@ -177,7 +177,7 @@ Configure in Claude Desktop, Cursor, or any MCP client:
 }
 ```
 
-**Core tools:** `signal`, `hypothesis`, `scan_drug`, `compare_signals`, `compare_class`
+**Core tools:** `signal`, `hypothesis`, `investigate`, `scan_drug`, `compare_signals`, `compare_class`, `full_report`
 
 **Source tools:** `adverse_events`, `top_events`, `drugs_by_event`, `search_papers`, `label_events`, `check_label`, `search_trials`, `drug_info`, `drug_interactions`, `drug_mechanism`, `drug_adverse_events`, `drug_safety_score`, `onsides_events`, `pgx_annotations`, `normalize_drug`, `map_to_mesh`
 
@@ -209,10 +209,10 @@ hypokrates/
 ├── download/       # Shared download utilities (streaming, ZIP, freshness)
 ├── cache/          # DuckDB HTTP cache (thread-safe singleton)
 ├── http/           # BaseClient with retry, rate limiting, auth
-└── mcp/            # MCP server (46 tools)
+└── mcp/            # MCP server (47 tools)
 ```
 
-**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1403 tests.
+**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1418 tests.
 
 ## Who is this for
 
@@ -232,7 +232,7 @@ hypokrates/
 
 ## Status
 
-**Alpha** (v0.7.1) — 1403 tests, mypy strict, ruff clean. Under active development.
+**Alpha** (v0.7.1) — 1418 tests, mypy strict, ruff clean. Under active development.
 
 ## License
 

@@ -24,5 +24,9 @@ STRATUM_AGE_NOTABLE_RATIO: float = 2.0  # flag se age_group PRR > 2x average
 CAVEAT_NON_REPLICATION_MIN: int = 2
 CAVEAT_SEX_CONCENTRATION: float = 0.75
 CAVEAT_AGE_CONCENTRATION: float = 0.75
+
+# Prefixos usados em _build_caveats → consumidos por _compute_demographic_bias
+CAVEAT_PREFIX_SEX: str = "SEX CONCENTRATION"
+CAVEAT_PREFIX_AGE: str = "AGE CONCENTRATION"
 CAVEAT_PRR_INFLATION: float = 3.0
 CAVEAT_LOW_COUNT: int = 5
