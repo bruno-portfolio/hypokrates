@@ -176,7 +176,7 @@ async def full_report_analysis(
     """Orquestra investigate + scan_drug + compare_signals em paralelo."""
     start = datetime.now(UTC)
 
-    inv_coro = investigate(drug, event, suspect_only=suspect_only)
+    inv_coro = investigate(drug, event, suspect_only=suspect_only, literature_limit=20)
     scan_coro = scan_drug(drug, top_n=5, suspect_only=suspect_only)
 
     comp_result: CompareResult | None = None
@@ -185,7 +185,7 @@ async def full_report_analysis(
         inv_raw, scan_raw, comp_raw = await asyncio.gather(
             inv_coro,
             scan_coro,
-            compare_signals(drug, control, suspect_only=suspect_only),
+            compare_signals(drug, control, suspect_only=suspect_only, annotate=True),
             return_exceptions=True,
         )
         if isinstance(comp_raw, BaseException):

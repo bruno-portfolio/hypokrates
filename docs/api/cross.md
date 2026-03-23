@@ -138,6 +138,8 @@ result = await cross.hypothesis(
 | `canada_signal` | `bool \| None` | Canada Vigilance signal detected (if `check_canada=True`) |
 | `jader_reports` | `int \| None` | JADER report count (if `check_jader=True`) |
 | `jader_signal` | `bool \| None` | JADER signal detected (if `check_jader=True`) |
+| `indication_confounding` | `bool` | Whether event matches a known therapeutic indication |
+| `indication_source` | `str` | Detection method: `"generic_term"`, `"dailymed_label"`, or `""` |
 
 ### `CoAdminAnalysis`
 
@@ -188,6 +190,7 @@ for s in result.country_strata:
 | `event` | `str` | *required* | Adverse event term (MedDRA PT) |
 | `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
 | `use_cache` | `bool` | `True` | Use DuckDB cache |
+| `literature_limit` | `int` | `5` | Max PubMed articles to fetch (full_report uses 20) |
 
 **Stratification queries:**
 

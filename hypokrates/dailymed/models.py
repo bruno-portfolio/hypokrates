@@ -14,6 +14,7 @@ class LabelEventsResult(BaseModel):
     set_id: str | None = None
     events: list[str] = Field(default_factory=list)
     raw_text: str = ""
+    indications_text: str = ""
     meta: MetaInfo
 
 

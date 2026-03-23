@@ -13,6 +13,16 @@ _ABSTRACT_SNIPPET_LEN = 200
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 
 
+def _format_article_lines(art: PubMedArticle, *, include_abstract: bool = False) -> list[str]:
+    lines = [f"- {format_citation(art)}"]
+    if include_abstract and art.abstract:
+        snippet = art.abstract[:_ABSTRACT_SNIPPET_LEN]
+        if len(art.abstract) > _ABSTRACT_SNIPPET_LEN:
+            snippet += "..."
+        lines.append(f"  > {snippet}")
+    return lines
+
+
 def format_measure(name: str, m: object) -> str:
     """Formata uma medida de desproporcionalidade (PRR/ROR/IC/EBGM)."""
     val = getattr(m, "value", 0.0)
@@ -149,11 +159,46 @@ def format_references(
 
     lines: list[str] = ["", f"## {heading}"]
     for art in items:
-        lines.append(f"- {format_citation(art)}")
-        if include_abstract and art.abstract:
-            snippet = art.abstract[:_ABSTRACT_SNIPPET_LEN]
-            if len(art.abstract) > _ABSTRACT_SNIPPET_LEN:
-                snippet += "..."
-            lines.append(f"  > {snippet}")
+        lines.extend(_format_article_lines(art, include_abstract=include_abstract))
+
+    return lines
+
+
+_CATEGORY_LABELS: dict[str, str] = {
+    "review": "Reviews & Meta-analyses",
+    "epidemiology": "Epidemiology & Pharmacovigilance",
+    "mechanism": "Mechanism & Pharmacology",
+    "clinical": "Clinical Trials",
+    "case_report": "Case Reports",
+    "": "Other",
+}
+_CATEGORY_ORDER: list[str] = ["review", "epidemiology", "mechanism", "clinical", "case_report", ""]
+
+
+def format_categorized_references(
+    articles: list[PubMedArticle],
+    *,
+    heading: str = "Literature",
+    max_per_category: int = 3,
+    include_abstract: bool = True,
+) -> list[str]:
+    """Formata referências agrupadas por categoria de estudo."""
+    if not articles:
+        return []
+
+    by_cat: dict[str, list[PubMedArticle]] = {}
+    for art in articles:
+        cat = art.category if art.category in _CATEGORY_LABELS else ""
+        by_cat.setdefault(cat, []).append(art)
+
+    lines: list[str] = ["", f"## {heading}"]
+    for cat in _CATEGORY_ORDER:
+        cat_articles = by_cat.get(cat, [])
+        if not cat_articles:
+            continue
+        label = _CATEGORY_LABELS.get(cat, "Other")
+        lines.append(f"\n### {label}")
+        for art in cat_articles[:max_per_category]:
+            lines.extend(_format_article_lines(art, include_abstract=include_abstract))
 
     return lines

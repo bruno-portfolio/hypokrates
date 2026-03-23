@@ -36,6 +36,7 @@ async def investigate(
     *,
     suspect_only: bool = False,
     use_cache: bool = True,
+    literature_limit: int = 5,
 ) -> InvestigationResult:
     """Investigação profunda: hypothesis completa + estratificação demográfica.
 
@@ -51,6 +52,7 @@ async def investigate(
         event: Termo MedDRA do evento adverso.
         suspect_only: Se True, conta apenas reports com droga suspect.
         use_cache: Se deve usar cache.
+        literature_limit: Número máximo de artigos PubMed a buscar.
 
     Returns:
         InvestigationResult com hypothesis + strata + summary.
@@ -61,6 +63,7 @@ async def investigate(
         hypothesis(
             drug,
             event,
+            literature_limit=literature_limit,
             check_label=True,
             check_trials=True,
             check_drugbank=True,
@@ -433,9 +436,11 @@ def _build_caveats(
 
     # 6. INDICATION CONFOUNDING
     if hyp.indication_confounding:
+        via = f" (via {hyp.indication_source})" if hyp.indication_source else ""
         caveats.append(
-            "INDICATION CONFOUNDING: This event matches a known therapeutic indication. "
-            "High PRR may reflect the patient population, not drug toxicity."
+            f"INDICATION CONFOUNDING{via}: {hyp.event} matches a known therapeutic "
+            f"indication for {hyp.drug}. High PRR likely reflects patient selection, "
+            "not toxicity."
         )
 
     # 7. CO-ADMINISTRATION

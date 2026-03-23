@@ -10,6 +10,7 @@ from hypokrates.dailymed.parser import (
     has_safety_sections,
     match_event_in_label,
     parse_adverse_reactions_xml,
+    parse_indications_text,
     parse_spl_search,
 )
 from hypokrates.models import MetaInfo
@@ -110,11 +111,15 @@ async def label_events(
         # 3. Parsear adverse reactions
         terms, raw_text = parse_adverse_reactions_xml(xml_text)
 
+        # 4. Extrair indicações (0 HTTP calls extra — mesmo XML)
+        indications_text = parse_indications_text(xml_text)
+
     return LabelEventsResult(
         drug=drug,
         set_id=set_id,
         events=terms,
         raw_text=raw_text,
+        indications_text=indications_text,
         meta=MetaInfo(
             source="DailyMed/FDA",
             query={"drug": drug, "set_id": set_id},

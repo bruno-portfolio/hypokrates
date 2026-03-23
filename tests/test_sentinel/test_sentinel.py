@@ -599,23 +599,23 @@ class TestSentinelGracefulFailure:
         assert result.classification == HypothesisClassification.NOVEL_HYPOTHESIS
         assert result.mechanism is None
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_dailymed_no_spl_degrades_gracefully(
         self,
         mock_signal: AsyncMock,
         mock_pubmed: AsyncMock,
-        mock_check_label: AsyncMock,
+        mock_label_events: AsyncMock,
     ) -> None:
         """DailyMed sem SPL (exceção) → hypothesis degrada gracefully.
 
-        FIX: hypothesis() agora captura exceções de check_label e continua
+        FIX: hypothesis() agora captura exceções de label_events e continua
         com in_label=None em vez de propagar a exceção.
         """
         mock_signal.return_value = _signal("propofol", "NAUSEA", detected=True)
         mock_pubmed.return_value = _pubmed(0)
-        mock_check_label.side_effect = Exception("No SPL found")
+        mock_label_events.side_effect = Exception("No SPL found")
 
         from hypokrates.cross.api import hypothesis
 
@@ -1023,8 +1023,14 @@ class TestSentinelInvariants:
         mock_signal.return_value = _signal("drug_x", "EVENT_Y", detected=True)
         mock_pubmed.return_value = _pubmed(0)
 
-        with patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock) as mock_label:
-            mock_label.return_value = _label_check("drug_x", "EVENT_Y", in_label=True)
+        with patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock) as mock_le:
+            from hypokrates.dailymed.models import LabelEventsResult
+
+            mock_le.return_value = LabelEventsResult(
+                drug="drug_x",
+                events=["EVENT_Y"],
+                meta=_meta("DailyMed"),
+            )
 
             from hypokrates.cross.api import hypothesis
 

@@ -68,6 +68,7 @@ class HypothesisResult(BaseModel):
     ot_llr: float | None = None
     coadmin: CoAdminAnalysis | None = None
     indication_confounding: bool = False
+    indication_source: str = ""
     onsides_sources: list[str] | None = None
     pharmacogenomics: list[str] = Field(default_factory=list)
     canada_reports: int | None = None
@@ -114,6 +115,9 @@ class CompareSignalItem(BaseModel):
     control_detected: bool
     ratio: float
     stronger: str
+    drug_indication: bool = False
+    control_indication: bool = False
+    top_co_suspects: list[str] = Field(default_factory=list)
 
 
 class SignalStrength(StrEnum):

@@ -178,6 +178,20 @@ class TestHypothesisAPI:
         assert result.trials_detail is None
 
 
+def _make_label_events(
+    *, drug: str = "propofol", events: list[str] | None = None, raw_text: str = ""
+) -> Any:
+    from hypokrates.dailymed.models import LabelEventsResult
+
+    return LabelEventsResult(
+        drug=drug,
+        set_id="test-set-id",
+        events=events or [],
+        raw_text=raw_text,
+        meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+    )
+
+
 class TestHypothesisWithLabel:
     """hypothesis() com check_label=True."""
 
@@ -185,24 +199,17 @@ class TestHypothesisWithLabel:
     def _disable_cache(self) -> None:
         configure(cache_enabled=False)
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_in_label_upgrades_novel_to_emerging(
-        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+        self, mock_signal: Any, mock_pubmed: Any, mock_label_events: AsyncMock
     ) -> None:
         """Signal + in_label=True + 0 papers → EMERGING (não NOVEL)."""
-        from hypokrates.dailymed.models import LabelCheckResult
-
         mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
-        mock_check_label.return_value = LabelCheckResult(
-            drug="propofol",
-            event="bradycardia",
-            in_label=True,
-            matched_terms=["Bradycardia"],
-            set_id="test-set-id",
-            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+        mock_label_events.return_value = _make_label_events(
+            events=["Bradycardia", "Hypotension"],
         )
 
         result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
@@ -210,24 +217,16 @@ class TestHypothesisWithLabel:
         assert result.in_label is True
         assert result.classification == HypothesisClassification.EMERGING_SIGNAL
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_not_in_label_stays_novel(
-        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+        self, mock_signal: Any, mock_pubmed: Any, mock_label_events: AsyncMock
     ) -> None:
         """Signal + in_label=False + 0 papers → NOVEL (confirmado)."""
-        from hypokrates.dailymed.models import LabelCheckResult
-
         mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
-        mock_check_label.return_value = LabelCheckResult(
-            drug="propofol",
-            event="serotonin syndrome",
-            in_label=False,
-            matched_terms=[],
-            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
-        )
+        mock_label_events.return_value = _make_label_events(events=["Hypotension"])
 
         result = await hypothesis(
             "propofol", "serotonin syndrome", check_label=True, use_cache=False
@@ -236,24 +235,17 @@ class TestHypothesisWithLabel:
         assert result.in_label is False
         assert result.classification == HypothesisClassification.NOVEL_HYPOTHESIS
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_label_detail_populated(
-        self, mock_signal: Any, mock_pubmed: Any, mock_check_label: AsyncMock
+        self, mock_signal: Any, mock_pubmed: Any, mock_label_events: AsyncMock
     ) -> None:
         """label_detail reflete resultado."""
-        from hypokrates.dailymed.models import LabelCheckResult
-
         mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
-        mock_check_label.return_value = LabelCheckResult(
-            drug="propofol",
-            event="bradycardia",
-            in_label=True,
-            matched_terms=["Bradycardia"],
-            set_id="test-set-id",
-            meta=MetaInfo(source="DailyMed/FDA", retrieved_at=datetime.now(UTC)),
+        mock_label_events.return_value = _make_label_events(
+            events=["Bradycardia", "Hypotension"],
         )
 
         result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
@@ -391,16 +383,16 @@ class TestHypothesisGracefulDegradation:
     def _disable_cache(self) -> None:
         configure(cache_enabled=False)
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_label_failure_degrades_gracefully(
-        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_check_label: AsyncMock
+        self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_label_events: AsyncMock
     ) -> None:
-        """check_label exception → in_label stays None, result still returned."""
+        """label_events exception → in_label stays None, result still returned."""
         mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
-        mock_check_label.side_effect = Exception("DailyMed down")
+        mock_label_events.side_effect = Exception("DailyMed down")
 
         result = await hypothesis("propofol", "bradycardia", check_label=True, use_cache=False)
 
@@ -475,7 +467,7 @@ class TestHypothesisGracefulDegradation:
         assert isinstance(result, HypothesisResult)
         assert result.coadmin is None
 
-    @patch("hypokrates.dailymed.api.check_label", new_callable=AsyncMock)
+    @patch("hypokrates.dailymed.api.label_events", new_callable=AsyncMock)
     @patch("hypokrates.trials.api.search_trials", new_callable=AsyncMock)
     @patch("hypokrates.cross.api.pubmed_api.search_papers")
     @patch("hypokrates.cross.api.stats_api.signal")
@@ -484,12 +476,12 @@ class TestHypothesisGracefulDegradation:
         mock_signal: AsyncMock,
         mock_pubmed: AsyncMock,
         mock_trials: AsyncMock,
-        mock_label: AsyncMock,
+        mock_label_events: AsyncMock,
     ) -> None:
-        """check_label + check_trials both fail → both stay None."""
+        """label_events + search_trials both fail → both stay None."""
         mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
-        mock_label.side_effect = Exception("DailyMed down")
+        mock_label_events.side_effect = Exception("DailyMed down")
         mock_trials.side_effect = Exception("Trials down")
 
         result = await hypothesis(

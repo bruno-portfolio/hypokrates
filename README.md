@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
 [![Python](https://img.shields.io/pypi/pyversions/hypokrates)](https://pypi.org/project/hypokrates/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-1418_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1440_passing-brightgreen)]()
 [![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue)]()
 [![MCP](https://img.shields.io/badge/MCP-47_tools-purple)]()
 
@@ -212,7 +212,7 @@ hypokrates/
 └── mcp/            # MCP server (47 tools)
 ```
 
-**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1418 tests.
+**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1440 tests.
 
 ## Who is this for
 
@@ -232,7 +232,7 @@ hypokrates/
 
 ## Status
 
-**Alpha** (v0.7.1) — 1418 tests, mypy strict, ruff clean. Under active development.
+**Alpha** (v0.7.1) — 1440 tests, mypy strict, ruff clean. Under active development.
 
 ## License
 

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from hypokrates.scan.indications import INDICATION_TERMS, is_indication_term
+from hypokrates.scan.indications import (
+    INDICATION_TERMS,
+    IndicationCheck,
+    check_drug_indication,
+    is_indication_term,
+)
 
 
 class TestIsIndicationTerm:
@@ -45,3 +50,46 @@ class TestIsIndicationTerm:
         assert not is_indication_term("HEPATOTOXICITY")
         assert not is_indication_term("RHABDOMYOLYSIS")
         assert not is_indication_term("QT PROLONGATION")
+
+
+class TestCheckDrugIndication:
+    """Testes para check_drug_indication() — drug-specific indication detection."""
+
+    def test_generic_term_detected(self) -> None:
+        result = check_drug_indication("any_drug", "RHEUMATOID ARTHRITIS")
+        assert isinstance(result, IndicationCheck)
+        assert result.is_indication is True
+        assert result.source == "generic_term"
+
+    def test_not_indication_without_label(self) -> None:
+        result = check_drug_indication("propofol", "BRADYCARDIA")
+        assert result.is_indication is False
+        assert result.source == ""
+
+    def test_drug_specific_from_label(self) -> None:
+        indications_text = (
+            "SUGAMMADEX is indicated for reversal of neuromuscular blockade "
+            "induced by rocuronium or vecuronium."
+        )
+        result = check_drug_indication(
+            "sugammadex", "NEUROMUSCULAR BLOCKADE", indications_text=indications_text
+        )
+        assert result.is_indication is True
+        assert result.source == "dailymed_label"
+
+    def test_drug_specific_no_match(self) -> None:
+        indications_text = "Indicated for reversal of neuromuscular blockade."
+        result = check_drug_indication(
+            "sugammadex", "ANAPHYLAXIS", indications_text=indications_text
+        )
+        assert result.is_indication is False
+
+    def test_generic_takes_priority_over_label(self) -> None:
+        indications_text = "Indicated for asthma management."
+        result = check_drug_indication("budesonide", "ASTHMA", indications_text=indications_text)
+        assert result.is_indication is True
+        assert result.source == "generic_term"
+
+    def test_empty_indications_text(self) -> None:
+        result = check_drug_indication("propofol", "DELIRIUM", indications_text="")
+        assert result.is_indication is False

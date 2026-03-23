@@ -17,6 +17,7 @@ class PubMedArticle(BaseModel):
     pub_date: str | None = None
     doi: str | None = None
     abstract: str | None = None
+    category: str = ""
 
 
 class PubMedSearchResult(BaseModel):

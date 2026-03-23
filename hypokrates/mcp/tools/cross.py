@@ -6,6 +6,7 @@ from hypokrates.cross import api as cross_api
 from hypokrates.cross.investigate import investigate as investigate_fn
 from hypokrates.cross.report import full_report_analysis as full_report_fn
 from hypokrates.mcp.tools._shared import (
+    format_categorized_references,
     format_country_strata_table,
     format_measure,
     format_references,
@@ -345,13 +346,21 @@ def register(mcp: FastMCP) -> None:
         # Class Comparison
         if result.comparison and result.comparison.items:
             lines.extend(["", "## Class Comparison"])
-            lines.append("| Event | Drug PRR | Ctrl PRR | Ratio | Stronger |")
-            lines.append("|-------|----------|----------|-------|----------|")
+            lines.append("| Event | Drug PRR | Ctrl PRR | Ratio | Stronger | Context |")
+            lines.append("|-------|----------|----------|-------|----------|---------|")
             for item in result.comparison.items:
                 ratio_str = f"{item.ratio:.1f}x" if item.ratio != float("inf") else "inf"
+                ctx_parts: list[str] = []
+                if item.drug_indication:
+                    ctx_parts.append(f"indication for {drug}")
+                if item.control_indication:
+                    ctx_parts.append(f"indication for {control}")
+                if item.top_co_suspects:
+                    ctx_parts.append(f"co-suspects: {', '.join(item.top_co_suspects)}")
+                ctx = "; ".join(ctx_parts) if ctx_parts else ""
                 lines.append(
                     f"| {item.event} | {item.drug_prr:.2f} | "
-                    f"{item.control_prr:.2f} | {ratio_str} | {item.stronger} |"
+                    f"{item.control_prr:.2f} | {ratio_str} | {item.stronger} | {ctx} |"
                 )
 
         # Drug Profile
@@ -395,8 +404,8 @@ def register(mcp: FastMCP) -> None:
 
         # Key Literature
         lines.extend(
-            format_references(
-                hyp.articles, heading="Key Literature", max_items=5, include_abstract=True
+            format_categorized_references(
+                hyp.articles, heading="Key Literature", include_abstract=True
             )
         )
 

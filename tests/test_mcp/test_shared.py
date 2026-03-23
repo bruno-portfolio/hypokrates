@@ -5,6 +5,7 @@ from __future__ import annotations
 from hypokrates.mcp.tools._shared import (
     _extract_year,
     _format_authors,
+    format_categorized_references,
     format_citation,
     format_references,
 )
@@ -88,3 +89,59 @@ class TestSharedFormatters:
     def test_format_authors_two(self) -> None:
         result = _format_authors(["Smith John", "Jones Mary"])
         assert result == "Smith J, Jones M"
+
+
+class TestCategorizedReferences:
+    """Testes para format_categorized_references()."""
+
+    def test_empty(self) -> None:
+        assert format_categorized_references([]) == []
+
+    def test_groups_by_category(self) -> None:
+        articles = [
+            PubMedArticle(pmid="1", title="Review article", category="review"),
+            PubMedArticle(pmid="2", title="Cohort study", category="epidemiology"),
+            PubMedArticle(pmid="3", title="Case report", category="case_report"),
+        ]
+        result = "\n".join(format_categorized_references(articles))
+        assert "Reviews & Meta-analyses" in result
+        assert "Epidemiology & Pharmacovigilance" in result
+        assert "Case Reports" in result
+
+    def test_respects_category_order(self) -> None:
+        articles = [
+            PubMedArticle(pmid="1", title="Case report", category="case_report"),
+            PubMedArticle(pmid="2", title="Review", category="review"),
+        ]
+        result = "\n".join(format_categorized_references(articles))
+        review_pos = result.index("Reviews & Meta-analyses")
+        case_pos = result.index("Case Reports")
+        assert review_pos < case_pos
+
+    def test_max_per_category(self) -> None:
+        articles = [
+            PubMedArticle(pmid=str(i), title=f"Review {i}", category="review") for i in range(5)
+        ]
+        result = "\n".join(format_categorized_references(articles, max_per_category=2))
+        assert "Review 0" in result
+        assert "Review 1" in result
+        assert "Review 2" not in result
+
+    def test_uncategorized_in_other(self) -> None:
+        articles = [
+            PubMedArticle(pmid="1", title="Generic article", category=""),
+        ]
+        result = "\n".join(format_categorized_references(articles))
+        assert "Other" in result
+
+    def test_includes_abstract_snippet(self) -> None:
+        articles = [
+            PubMedArticle(
+                pmid="1",
+                title="Test",
+                category="review",
+                abstract="This is a test abstract.",
+            ),
+        ]
+        result = "\n".join(format_categorized_references(articles, include_abstract=True))
+        assert "> This is a test abstract" in result

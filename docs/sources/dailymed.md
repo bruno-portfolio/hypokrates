@@ -50,9 +50,13 @@ Two-pass selection: first prefers SPLs with a formal Adverse Reactions section (
 - **Veterinary labels** are excluded
 - **Prescription labels** are preferred over OTC
 
+## Indications Extraction
+
+`label_events()` also extracts the "INDICATIONS AND USAGE" section (LOINC `34067-9`) from the same SPL XML — zero extra HTTP calls. The text is available as `LabelEventsResult.indications_text` and used by `check_drug_indication()` to detect indication confounding (e.g., sugammadex + "recurrence of NMB", dexmedetomidine + "delirium").
+
 ## Functions
 
-- `label_events(drug)` — Extract all adverse event terms from the drug's FDA label
+- `label_events(drug)` — Extract all adverse event terms + indications text from the drug's FDA label
 - `check_label(drug, event)` — Check if a specific event appears in the drug's label
 
 ## Label Matching

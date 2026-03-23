@@ -19,7 +19,7 @@ from hypokrates.cross.constants import (
 
 if TYPE_CHECKING:
     from hypokrates.chembl.models import ChEMBLMechanism
-    from hypokrates.dailymed.models import LabelCheckResult, LabelEventsResult
+    from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.drugbank.models import DrugBankInfo
     from hypokrates.faers.client import FAERSClient
     from hypokrates.faers.models import CoSuspectProfile
@@ -203,34 +203,33 @@ async def hypothesis(
     active_trials: int | None = None
     trials_detail: str | None = None
 
+    label_cache: LabelEventsResult | None = _label_cache
+
     if check_label and check_trials:
         from hypokrates.dailymed import api as dailymed_api
         from hypokrates.trials import api as trials_api
 
         try:
-            label_result, trials_result = await asyncio.gather(
-                dailymed_api.check_label(
-                    drug, event, use_cache=use_cache, _label_cache=_label_cache
-                ),
-                trials_api.search_trials(drug, event, use_cache=use_cache),
-            )
-            in_label = label_result.in_label
-            label_detail = _format_label_detail(label_result)
+            if label_cache is None:
+                label_raw, trials_result = await asyncio.gather(
+                    dailymed_api.label_events(drug, use_cache=use_cache),
+                    trials_api.search_trials(drug, event, use_cache=use_cache),
+                )
+                label_cache = label_raw
+            else:
+                trials_result = await trials_api.search_trials(drug, event, use_cache=use_cache)
             active_trials = trials_result.active_count
             trials_detail = _format_trials_detail(trials_result)
         except Exception:
             logger.warning("hypothesis %s + %s: label/trials unavailable", drug, event)
     elif check_label:
-        from hypokrates.dailymed import api as dailymed_api
+        if label_cache is None:
+            from hypokrates.dailymed import api as dailymed_api
 
-        try:
-            label_result = await dailymed_api.check_label(
-                drug, event, use_cache=use_cache, _label_cache=_label_cache
-            )
-            in_label = label_result.in_label
-            label_detail = _format_label_detail(label_result)
-        except Exception:
-            logger.warning("hypothesis %s + %s: label unavailable", drug, event)
+            try:
+                label_cache = await dailymed_api.label_events(drug, use_cache=use_cache)
+            except Exception:
+                logger.warning("hypothesis %s + %s: label unavailable", drug, event)
     elif check_trials:
         from hypokrates.trials import api as trials_api
 
@@ -240,6 +239,13 @@ async def hypothesis(
             trials_detail = _format_trials_detail(trials_result)
         except Exception:
             logger.warning("hypothesis %s + %s: trials unavailable", drug, event)
+
+    if label_cache is not None:
+        from hypokrates.dailymed.parser import match_event_in_label as _match_label
+
+        found, matched = _match_label(event, label_cache.events, label_cache.raw_text)
+        in_label = found
+        label_detail = f"Matched: {', '.join(matched)}" if matched else "Not found in label"
 
     mechanism: str | None = None
     interactions_list: list[str] = []
@@ -356,12 +362,24 @@ async def hypothesis(
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
-    indication_confounding = False
-    try:
-        from hypokrates.scan.indications import is_indication_term
+    from hypokrates.pubmed.classify import classify_article
 
-        if is_indication_term(event):
-            indication_confounding = True
+    for art in articles:
+        if not art.category:
+            art.category = classify_article(art)
+
+    indication_confounding = False
+    indication_source = ""
+    try:
+        from hypokrates.scan.indications import check_drug_indication
+
+        ind_check = check_drug_indication(
+            drug,
+            event,
+            indications_text=label_cache.indications_text if label_cache else "",
+        )
+        indication_confounding = ind_check.is_indication
+        indication_source = ind_check.source
     except Exception:
         logger.debug("hypothesis %s + %s: indication detection unavailable", drug, event)
 
@@ -458,6 +476,7 @@ async def hypothesis(
         ot_llr=ot_llr,
         coadmin=coadmin_result,
         indication_confounding=indication_confounding,
+        indication_source=indication_source,
         onsides_sources=onsides_sources,
         pharmacogenomics=pharmacogenomics,
         canada_reports=canada_reports,
@@ -586,12 +605,6 @@ def _confidence_label(classification: HypothesisClassification) -> str:
     return labels[classification]
 
 
-def _format_label_detail(label_result: LabelCheckResult) -> str:
-    if label_result.matched_terms:
-        return f"Matched: {', '.join(label_result.matched_terms)}"
-    return "Not found in label"
-
-
 def _format_trials_detail(trials_result: TrialsResult) -> str:
     return f"{trials_result.total_count} trials found, {trials_result.active_count} active"
 
@@ -604,6 +617,7 @@ async def compare_signals(
     top_n: int = DEFAULT_COMPARE_TOP_N,
     suspect_only: bool = False,
     use_cache: bool = True,
+    annotate: bool = False,
 ) -> CompareResult:
     """Compara sinais de desproporcionalidade entre duas drogas.
 
@@ -618,6 +632,7 @@ async def compare_signals(
         top_n: Número de top eventos a comparar quando auto-detectando.
         suspect_only: Se True, conta apenas reports onde a droga é suspect.
         use_cache: Se deve usar cache.
+        annotate: Se True, enriquece com indication check e co-suspects.
 
     Returns:
         CompareResult com items ordenados por ratio descendente.
@@ -656,6 +671,22 @@ async def compare_signals(
                 retrieved_at=datetime.now(UTC),
             ),
         )
+
+    # Pre-fetch indications para annotation (0 custo extra se cacheado)
+    drug_indications_text = ""
+    control_indications_text = ""
+    if annotate:
+        from hypokrates.dailymed import api as dailymed_api
+
+        try:
+            drug_label, ctrl_label = await asyncio.gather(
+                dailymed_api.label_events(drug, use_cache=use_cache),
+                dailymed_api.label_events(control, use_cache=use_cache),
+            )
+            drug_indications_text = drug_label.indications_text
+            control_indications_text = ctrl_label.indications_text
+        except Exception:
+            logger.debug("compare_signals: indications pre-fetch failed")
 
     semaphore = asyncio.Semaphore(DEFAULT_COMPARE_CONCURRENCY)
 
@@ -701,6 +732,35 @@ async def compare_signals(
             else:
                 stronger = "equal"
 
+            # Annotations (opt-in)
+            drug_indication = False
+            control_indication = False
+            top_co_suspects: list[str] = []
+            if annotate:
+                try:
+                    from hypokrates.scan.indications import check_drug_indication
+
+                    d_ind = check_drug_indication(
+                        drug, event_term, indications_text=drug_indications_text
+                    )
+                    drug_indication = d_ind.is_indication
+                    c_ind = check_drug_indication(
+                        control, event_term, indications_text=control_indications_text
+                    )
+                    control_indication = c_ind.is_indication
+                except Exception:
+                    pass
+                try:
+                    dbe = await faers_api.drugs_by_event(
+                        event_term, suspect_only=suspect_only, limit=5, use_cache=use_cache
+                    )
+                    exclude = {drug.upper(), control.upper()}
+                    top_co_suspects = [d.name for d in dbe.drugs if d.name.upper() not in exclude][
+                        :3
+                    ]
+                except Exception:
+                    pass
+
             return CompareSignalItem(
                 event=event_term,
                 drug_prr=round(d_prr, 2),
@@ -711,6 +771,9 @@ async def compare_signals(
                 control_detected=ctrl_sig.signal_detected,
                 ratio=round(ratio, 2) if ratio != float("inf") else ratio,
                 stronger=stronger,
+                drug_indication=drug_indication,
+                control_indication=control_indication,
+                top_co_suspects=top_co_suspects,
             )
 
     tasks = [_compare_one(ev) for ev in events]

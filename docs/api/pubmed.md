@@ -106,3 +106,4 @@ Configure your API key in [Configuration](../guides/configuration.md) to increas
 | `pub_date` | `str \| None` | Publication date |
 | `doi` | `str \| None` | DOI identifier |
 | `abstract` | `str \| None` | Article abstract (structured sections concatenated, `None` if unavailable) |
+| `category` | `str` | Study type classification: `"review"`, `"epidemiology"`, `"mechanism"`, `"clinical"`, `"case_report"`, or `""` (unclassified). Auto-populated by `classify_article()` in `hypothesis()` |
