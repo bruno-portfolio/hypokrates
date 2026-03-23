@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+#### Bug Fixes (5 bugs from stress test #3, 2026-03-23)
+
+- **INN/USAN drug synonym expansion**: `resolve_drug_field()` now expands INN↔USAN synonyms (epinephrine↔adrenaline, acetaminophen↔paracetamol, etc.). Prevents signal splitting in FAERS — noradrenaline was returning 0 reports. Static dict in `vocab/drug_synonyms.py` (15 drug groups). Both API and bulk paths expanded.
+- **PRODUCT TAMPERING filter**: Added PRODUCT TAMPERING, PRODUCT COUNTERFEIT, PRODUCT SUBSTITUTION ISSUE to `OPERATIONAL_MEDDRA_TERMS`. Fixes tirzepatide scan showing PRODUCT TAMPERING as #1 (PRR=3617).
+- **PubMed sort=relevance**: `search_papers()` now sorts by relevance instead of recency. Fixes irrelevant #1 refs (e.g., guinea pig paper for PRIS).
+- **MedDRA colloquial terms**: Added LOW BLOOD PRESSURE→HYPOTENSION, FAST HEART RATE/RAPID HEARTBEAT→TACHYCARDIA, GREEN URINE→CHROMATURIA, GASTROPARESIS→IMPAIRED GASTRIC EMPTYING.
+- **PGx display dedup**: `hypothesis(check_pharmgkb=True)` deduplicates PharmGKB annotations by gene+level+category. MTHFR no longer appears duplicated.
+
 ### Sprint 10 — Three New Data Sources
 
 - **onsides/** module: `onsides_events()`, `onsides_check_event()` — NLP-extracted drug-ADE pairs from 51,460 labels across US/EU/UK/JP (PubMedBERT F1=0.935)

@@ -164,6 +164,7 @@ class PubMedClient(BaseClient):
             "db": DATABASE,
             "term": term,
             "retmode": "json",
+            "sort": "relevance",
             "tool": TOOL_NAME,
         }
         if retmax is not None:

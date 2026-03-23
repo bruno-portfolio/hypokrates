@@ -7,6 +7,7 @@
 - **target_event in compare_signals**: new `target_event` parameter force-includes the investigated event in auto-detected top events. `full_report()` passes the event automatically, fixing `_compute_class_effect()` returning "NOT_IN_TOP_COMPARED" when the event isn't in the drug's top 10. CLI: `--target-event`/`-t`, MCP: `target_event` param
 
 ### Added
+- **vocab/drug_synonyms.py**: Static INN↔USAN synonym dict (15 drug groups) with `expand_drug_names()`. Bidirectional lookup — "adrenaline" and "epinephrine" both expand to the full group. API path generates OR queries; bulk path uses `ANY($drugs)`
 - **Drug-specific indication detection**: `check_drug_indication()` in `scan/indications.py` checks both the generic frozenset (~80 terms) AND drug-specific indications from the DailyMed SPL "INDICATIONS AND USAGE" section (LOINC 34067-9). `LabelEventsResult.indications_text` field wired with 0 extra HTTP calls (same XML already fetched). `HypothesisResult.indication_source` tracks detection method (`"generic_term"` or `"dailymed_label"`). Caveat text now drug-specific: "INDICATION CONFOUNDING (via dailymed_label): DELIRIUM matches a known therapeutic indication for dexmedetomidine"
 - **Annotated class comparison**: `compare_signals(annotate=True)` pre-fetches DailyMed indications for both drugs in parallel, then enriches each event with `drug_indication`, `control_indication` flags and `top_co_suspects` (top 3 drugs from `drugs_by_event()` excluding drug+control). `full_report()` passes `annotate=True` automatically. MCP `full_report` renders Context column: `| Delirium | 15.81 | 3.40 | 4.7x | drug | indication for dex |`
 - **Categorized literature**: `classify_article()` in `pubmed/classify.py` classifies articles by keyword matching into review, epidemiology, mechanism, clinical, case_report (priority order). `PubMedArticle.category` field. `format_categorized_references()` groups by category with headings (Reviews & Meta-analyses, Epidemiology & Pharmacovigilance, etc.). `full_report()` uses `literature_limit=20` (same 2 HTTP calls — EFetch supports up to 20 PMIDs) and categorized references instead of flat list
@@ -25,6 +26,11 @@
 - **Expanded JADER mappings**: +60 JP→EN drug names (semaglutide brands, dexmedetomidine, etc.) and +50 MedDRA PT mappings. New MedDRA groups: somnambulism, suicidal ideation
 
 ### Fixed
+- **INN/USAN drug synonym expansion**: `resolve_drug_field()` and FAERS Bulk queries now expand INN↔USAN synonyms (epinephrine↔adrenaline, acetaminophen↔paracetamol, etc. — 15 drug groups). Prevents signal splitting — "noradrenaline" was returning 0 FAERS reports
+- **PRODUCT TAMPERING operational filter**: Added PRODUCT TAMPERING, PRODUCT COUNTERFEIT, PRODUCT SUBSTITUTION ISSUE to `OPERATIONAL_MEDDRA_TERMS`. Fixes tirzepatide scan showing PRODUCT TAMPERING as #1 (PRR=3617)
+- **PubMed sort=relevance**: `_build_params()` now includes `sort=relevance` in ESearch params. Fixes irrelevant top refs (e.g., guinea pig paper for PRIS)
+- **MedDRA colloquial terms**: Added LOW BLOOD PRESSURE→HYPOTENSION, FAST HEART RATE/RAPID HEARTBEAT→TACHYCARDIA, GREEN URINE→CHROMATURIA, GASTROPARESIS→IMPAIRED GASTRIC EMPTYING to `MEDDRA_GROUPS`
+- **PGx display dedup**: `hypothesis(check_pharmgkb=True)` deduplicates PharmGKB annotations by gene+level+category (iterates [:8] with dedup instead of [:5]). MTHFR C677T vs A1298C no longer appear as duplicates
 - **Canada Vigilance strata gender_code**: Canada uses "1"=Male/"2"=Female (not "M"/"F"). Stratified PRR by sex was returning 0 results
 - **JADER parser**: Rewritten to use DuckDB native CSV reader + iconv for cp932 encoding. More robust than previous Python csv.reader approach
 - **meta.py Sprint 11**: JADER tools added to `_TOOLS` list, Sprint 11 label applied

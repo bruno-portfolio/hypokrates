@@ -42,12 +42,15 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "HEART RATE INCREASED",
         "TACHYARRHYTHMIA",
         "SUPRAVENTRICULAR TACHYCARDIA",
+        "FAST HEART RATE",
+        "RAPID HEARTBEAT",
     ],
     "HYPOTENSION": [
         "BLOOD PRESSURE DECREASED",
         "BLOOD PRESSURE LOW",
         "CIRCULATORY COLLAPSE",
         "HAEMODYNAMIC INSTABILITY",
+        "LOW BLOOD PRESSURE",
     ],
     "HYPERTENSION": [
         "BLOOD PRESSURE INCREASED",
@@ -268,6 +271,14 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "MACULOPAPULAR RASH",
         "MORBILLIFORM RASH",
         "SKIN ERUPTION",
+    ],
+    "CHROMATURIA": [
+        "GREEN URINE",
+        "URINE DISCOLOURATION",
+    ],
+    "IMPAIRED GASTRIC EMPTYING": [
+        "GASTROPARESIS",
+        "STOMACH PARALYSIS",
     ],
 }
 

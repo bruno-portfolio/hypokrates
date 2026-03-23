@@ -328,6 +328,25 @@ async def co_suspect_profile(
     )
 
 
+def _expand_drug_search(drug_upper: str, generic_field: str) -> str:
+    """Build search fragment with INN/USAN synonym expansion."""
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
+    names = expand_drug_names(drug_upper)
+    if len(names) == 1:
+        return f'{generic_field}:"{names[0]}"'
+    parts = [f'{generic_field}:"{n}"' for n in names]
+    return "(" + " ".join(parts) + ")"
+
+
+def _cache_drug_synonyms(drug_upper: str, search: str) -> None:
+    """Cache search fragment for drug and all its INN/USAN synonyms."""
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
+    for name in expand_drug_names(drug_upper):
+        _drug_field_cache[name] = search
+
+
 async def resolve_drug_field(
     drug: str,
     *,
@@ -361,9 +380,26 @@ async def resolve_drug_field(
         search = f'{generic_field}:"{drug_upper}"'
         total = await resolved_client.fetch_total(search, use_cache=use_cache)
         if total > 0:
-            _drug_field_cache[drug_upper] = search
+            expanded = _expand_drug_search(drug_upper, generic_field)
+            _cache_drug_synonyms(drug_upper, expanded)
             logger.info("Resolved %s -> generic_name.exact (%d reports)", drug, total)
-            return search
+            return expanded
+
+        # 1.5: INN/USAN synonyms (antes do RxNorm)
+        from hypokrates.vocab.drug_synonyms import expand_drug_names
+
+        synonym_names = expand_drug_names(drug_upper)
+        if len(synonym_names) > 1:
+            for syn in synonym_names:
+                if syn == drug_upper:
+                    continue
+                syn_search = f'{generic_field}:"{syn}"'
+                syn_total = await resolved_client.fetch_total(syn_search, use_cache=use_cache)
+                if syn_total > 0:
+                    expanded = _expand_drug_search(drug_upper, generic_field)
+                    _cache_drug_synonyms(drug_upper, expanded)
+                    logger.info("Resolved %s -> synonym %s (%d reports)", drug, syn, syn_total)
+                    return expanded
 
         # 2. Normalizar brand→generic via RxNorm ANTES de tentar outros campos
         try:
@@ -382,15 +418,16 @@ async def resolve_drug_field(
                 generic_search = f'{generic_field}:"{generic_upper}"'
                 total = await resolved_client.fetch_total(generic_search, use_cache=use_cache)
                 if total > 0:
-                    _drug_field_cache[drug_upper] = generic_search
-                    _drug_field_cache[generic_upper] = generic_search
+                    expanded = _expand_drug_search(generic_upper, generic_field)
+                    _drug_field_cache[drug_upper] = expanded
+                    _cache_drug_synonyms(generic_upper, expanded)
                     logger.info(
                         "Resolved %s -> generic_name %s (%d reports)",
                         drug,
                         norm.generic_name,
                         total,
                     )
-                    return generic_search
+                    return expanded
         except Exception:
             logger.debug("normalize_drug failed for %s", drug)
 

@@ -63,11 +63,14 @@ OPERATIONAL_MEDDRA_TERMS: frozenset[str] = frozenset(
         "MEDICATION ERROR",
         "CONTRAINDICATED PRODUCT ADMINISTERED",
         "INAPPROPRIATE SCHEDULE OF PRODUCT ADMINISTRATION",
-        # Qualidade do produto
+        # Qualidade do produto / supply chain
         "PRODUCT QUALITY ISSUE",
         "PRODUCT ADHESION ISSUE",
         "PRODUCT PACKAGING ISSUE",
         "PRODUCT PACKAGING CONFUSION",
+        "PRODUCT TAMPERING",
+        "PRODUCT COUNTERFEIT",
+        "PRODUCT SUBSTITUTION ISSUE",
         # Genéricos demais (sem valor farmacológico)
         "DEATH",
         "CONDITION AGGRAVATED",

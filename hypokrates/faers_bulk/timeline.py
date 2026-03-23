@@ -25,7 +25,7 @@ drug_pids AS (
     SELECT DISTINCT d.primaryid
     FROM faers_drug d
     INNER JOIN deduped dd ON d.primaryid = dd.primaryid
-    WHERE d.drug_name_norm = $drug
+    WHERE d.drug_name_norm = ANY($drugs)
     AND (
         $role = 'all'
         OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -73,13 +73,18 @@ async def bulk_signal_timeline(
     resolved = await resolve_bulk_drug(drug, store=store)
     drug_name = resolved if resolved is not None else drug.strip().upper()
 
+    # Expandir sinônimos INN/USAN para a droga
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
+    drug_names = expand_drug_names(drug_name)
+
     # Expandir sinônimos MedDRA para o evento
     from hypokrates.vocab.meddra import expand_event_terms
 
     event_terms = expand_event_terms(event)
 
     # Query no bulk store (thread)
-    rows = await asyncio.to_thread(_query_quarterly, store, drug_name, event_terms, role_filter)
+    rows = await asyncio.to_thread(_query_quarterly, store, drug_names, event_terms, role_filter)
 
     # Converter para QuarterlyCount
     quarters: list[QuarterlyCount] = []
@@ -141,7 +146,7 @@ async def bulk_signal_timeline(
 
 def _query_quarterly(
     store: FAERSBulkStore,
-    drug: str,
+    drug_names: list[str],
     events: list[str],
     role_filter: RoleCodFilter,
 ) -> list[tuple[str, int]]:
@@ -149,6 +154,6 @@ def _query_quarterly(
     with store._db_lock:
         rows = store._conn.execute(
             _QUARTERLY_COUNTS_SQL,
-            {"drug": drug, "events": events, "role": role_filter.value},
+            {"drugs": drug_names, "events": events, "role": role_filter.value},
         ).fetchall()
     return [(str(row[0]), int(row[1])) for row in rows]

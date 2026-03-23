@@ -87,7 +87,7 @@ drug_pids AS (
     SELECT DISTINCT d.primaryid
     FROM faers_drug d
     INNER JOIN deduped dd ON d.primaryid = dd.primaryid
-    WHERE d.drug_name_norm = $drug
+    WHERE d.drug_name_norm = ANY($drugs)
     AND (
         $role = 'all'
         OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -117,7 +117,7 @@ drug_pids AS (
     SELECT DISTINCT d.primaryid
     FROM faers_drug d
     INNER JOIN deduped dd ON d.primaryid = dd.primaryid
-    WHERE d.drug_name_norm = $drug
+    WHERE d.drug_name_norm = ANY($drugs)
     AND (
         $role = 'all'
         OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -139,7 +139,7 @@ WITH deduped AS (
 SELECT COUNT(DISTINCT d.primaryid)
 FROM faers_drug d
 INNER JOIN deduped dd ON d.primaryid = dd.primaryid
-WHERE d.drug_name_norm = $drug
+WHERE d.drug_name_norm = ANY($drugs)
 AND (
     $role = 'all'
     OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -247,7 +247,10 @@ class FAERSBulkStore(BaseDuckDBStore):
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
         strata: StrataFilter | None = None,
     ) -> BulkCountResult:
+        from hypokrates.vocab.drug_synonyms import expand_drug_names
+
         drug_upper = drug.strip().upper()
+        drug_names = expand_drug_names(drug_upper)
         if isinstance(event, list):
             events_list = [e.strip().upper() for e in event]
         else:
@@ -255,12 +258,12 @@ class FAERSBulkStore(BaseDuckDBStore):
         role_value = role_filter.value
 
         if strata is not None and not strata.is_empty:
-            return self._four_counts_stratified(drug_upper, events_list, role_value, strata)
+            return self._four_counts_stratified(drug_names, events_list, role_value, strata)
 
         with self._db_lock:
             result = self._conn.execute(
                 _FOUR_COUNTS_SQL,
-                {"drug": drug_upper, "events": events_list, "role": role_value},
+                {"drugs": drug_names, "events": events_list, "role": role_value},
             ).fetchone()
 
         if result is None:
@@ -275,13 +278,18 @@ class FAERSBulkStore(BaseDuckDBStore):
 
     def _four_counts_stratified(
         self,
-        drug: str,
+        drug_names: list[str],
         events: list[str],
         role: str,
         strata: StrataFilter,
     ) -> BulkCountResult:
         strata_where, strata_params = _build_strata_where(strata)
-        params: dict[str, object] = {"drug": drug, "events": events, "role": role, **strata_params}
+        params: dict[str, object] = {
+            "drugs": drug_names,
+            "events": events,
+            "role": role,
+            **strata_params,
+        }
 
         sql = f"""
         WITH strata_pids AS (
@@ -294,7 +302,7 @@ class FAERSBulkStore(BaseDuckDBStore):
             SELECT DISTINCT d.primaryid
             FROM faers_drug d
             INNER JOIN strata_pids sp ON d.primaryid = sp.primaryid
-            WHERE d.drug_name_norm = $drug
+            WHERE d.drug_name_norm = ANY($drugs)
             AND (
                 $role = 'all'
                 OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -346,29 +354,37 @@ class FAERSBulkStore(BaseDuckDBStore):
         strata: StrataFilter | None = None,
     ) -> list[tuple[str, int]]:
         """Retorna os eventos mais reportados para uma droga (deduplicado)."""
+        from hypokrates.vocab.drug_synonyms import expand_drug_names
+
         drug_upper = drug.strip().upper()
+        drug_names = expand_drug_names(drug_upper)
         role_value = role_filter.value
 
         if strata is not None and not strata.is_empty:
-            return self._top_events_stratified(drug_upper, role_value, limit, strata)
+            return self._top_events_stratified(drug_names, role_value, limit, strata)
 
         with self._db_lock:
             rows = self._conn.execute(
                 _TOP_EVENTS_SQL,
-                {"drug": drug_upper, "role": role_value, "limit": limit},
+                {"drugs": drug_names, "role": role_value, "limit": limit},
             ).fetchall()
 
         return [(row[0], row[1]) for row in rows]
 
     def _top_events_stratified(
         self,
-        drug: str,
+        drug_names: list[str],
         role: str,
         limit: int,
         strata: StrataFilter,
     ) -> list[tuple[str, int]]:
         strata_where, strata_params = _build_strata_where(strata)
-        params: dict[str, object] = {"drug": drug, "role": role, "limit": limit, **strata_params}
+        params: dict[str, object] = {
+            "drugs": drug_names,
+            "role": role,
+            "limit": limit,
+            **strata_params,
+        }
 
         sql = f"""
         WITH strata_pids AS (
@@ -381,7 +397,7 @@ class FAERSBulkStore(BaseDuckDBStore):
             SELECT DISTINCT d.primaryid
             FROM faers_drug d
             INNER JOIN strata_pids sp ON d.primaryid = sp.primaryid
-            WHERE d.drug_name_norm = $drug
+            WHERE d.drug_name_norm = ANY($drugs)
             AND (
                 $role = 'all'
                 OR ($role = 'suspect' AND d.role_cod IN ('PS', 'SS'))
@@ -407,13 +423,16 @@ class FAERSBulkStore(BaseDuckDBStore):
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
     ) -> int:
+        from hypokrates.vocab.drug_synonyms import expand_drug_names
+
         drug_upper = drug.strip().upper()
+        drug_names = expand_drug_names(drug_upper)
         role_value = role_filter.value
 
         with self._db_lock:
             result = self._conn.execute(
                 _DRUG_TOTAL_SQL,
-                {"drug": drug_upper, "role": role_value},
+                {"drugs": drug_names, "role": role_value},
             ).fetchone()
 
         return result[0] if result else 0

@@ -353,9 +353,14 @@ async def hypothesis(
 
         try:
             pgx_anns = await pharmgkb_api_mod.pgx_annotations(drug)
-            for ann in pgx_anns[:5]:
+            seen_pgx: set[str] = set()
+            for ann in pgx_anns[:8]:
                 if ann.gene_symbol and ann.level_of_evidence:
                     cats = ", ".join(ann.annotation_types[:2]) if ann.annotation_types else ""
+                    key = f"{ann.gene_symbol}|{ann.level_of_evidence}|{cats}"
+                    if key in seen_pgx:
+                        continue
+                    seen_pgx.add(key)
                     summary = f"{ann.gene_symbol} (Level {ann.level_of_evidence})"
                     if cats:
                         summary += f" — {cats}"

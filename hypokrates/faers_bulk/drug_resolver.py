@@ -54,8 +54,11 @@ async def resolve_bulk_drug(
 
         store = FAERSBulkStore.get_instance()
 
-    # Tier 1: match direto
-    found = await asyncio.to_thread(_check_drug_exists, store, drug_upper)
+    # Tier 1: match direto (incluindo sinônimos INN/USAN)
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
+    drug_names = expand_drug_names(drug_upper)
+    found = await asyncio.to_thread(_check_drug_exists, store, drug_names)
     if found:
         with _cache_lock:
             _resolve_cache[drug_upper] = drug_upper
@@ -69,7 +72,9 @@ async def resolve_bulk_drug(
         if normalized and normalized.generic_name:
             generic_upper = normalized.generic_name.strip().upper()
             if generic_upper != drug_upper:
-                found = await asyncio.to_thread(_check_drug_exists, store, generic_upper)
+                found = await asyncio.to_thread(
+                    _check_drug_exists, store, expand_drug_names(generic_upper)
+                )
                 if found:
                     with _cache_lock:
                         _resolve_cache[drug_upper] = generic_upper
@@ -88,12 +93,12 @@ async def resolve_bulk_drug(
     return None
 
 
-def _check_drug_exists(store: FAERSBulkStore, drug_name_norm: str) -> bool:
-    """Verifica se existe ao menos 1 row com drug_name_norm no store."""
+def _check_drug_exists(store: FAERSBulkStore, drug_names: list[str]) -> bool:
+    """Verifica se existe ao menos 1 row com qualquer nome no store."""
     with store._db_lock:
         result = store._conn.execute(
-            "SELECT 1 FROM faers_drug WHERE drug_name_norm = ? LIMIT 1",
-            [drug_name_norm],
+            "SELECT 1 FROM faers_drug WHERE drug_name_norm = ANY($drugs) LIMIT 1",
+            {"drugs": drug_names},
         ).fetchone()
     return result is not None
 
