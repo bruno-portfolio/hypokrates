@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from hypokrates.config import get_config
-from hypokrates.exceptions import ConfigurationError
 from hypokrates.models import MetaInfo
 from hypokrates.onsides.constants import DEFAULT_MIN_CONFIDENCE
 from hypokrates.onsides.store import OnSIDESStore
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def _ensure_loaded(
     _store: OnSIDESStore | None = None,
 ) -> OnSIDESStore:
-    """Garante que o store está carregado, fazendo parse dos CSVs se necessário."""
+    """Garante que o store está carregado, com auto-download se necessário."""
     if _store is not None:
         return _store
 
@@ -31,15 +30,21 @@ async def _ensure_loaded(
         return store
 
     config = get_config()
-    if config.onsides_path is None:
-        raise ConfigurationError(
-            "onsides_path",
-            "Use configure(onsides_path='/path/to/onsides/csvs/') first.",
-        )
 
-    csv_dir = str(config.onsides_path)
-    logger.info("OnSIDES store not loaded — loading CSVs: %s", csv_dir)
-    await asyncio.to_thread(store.load_from_csvs, csv_dir)
+    # 1. Manual config override
+    if config.onsides_path is not None:
+        csv_dir = str(config.onsides_path)
+        logger.info("OnSIDES store not loaded — loading CSVs: %s", csv_dir)
+        await asyncio.to_thread(store.load_from_csvs, csv_dir)
+        return store
+
+    # 2. Auto-download
+    from hypokrates.onsides.downloader import download_onsides
+
+    logger.info("OnSIDES store not loaded — downloading data")
+    csv_dir_path = await download_onsides()
+    logger.info("Loading OnSIDES data from %s", csv_dir_path)
+    await asyncio.to_thread(store.load_from_csvs, str(csv_dir_path))
     return store
 
 

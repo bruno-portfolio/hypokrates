@@ -125,6 +125,81 @@ def timeline(
         _print_timeline(result)
 
 
+@app.command()
+def download(
+    source: str = typer.Argument(..., help="Source to download: canada, jader, onsides, faers"),
+    force: bool = typer.Option(False, "--force", help="Force re-download"),
+) -> None:
+    """Download bulk data for a pharmacovigilance source.
+
+    Supported sources: canada, jader, onsides, faers.
+    Data is stored in ~/.cache/hypokrates/ and loaded automatically.
+    """
+    import asyncio
+
+    source_lower = source.lower().strip()
+
+    if source_lower == "canada":
+        asyncio.run(_download_canada(force=force))
+    elif source_lower == "jader":
+        _download_jader()
+    elif source_lower == "onsides":
+        asyncio.run(_download_onsides(force=force))
+    elif source_lower == "faers":
+        asyncio.run(_download_faers(force=force))
+    else:
+        typer.echo(f"Unknown source: {source}")
+        typer.echo("Supported: canada, jader, onsides, faers")
+        raise typer.Exit(code=1)
+
+
+async def _download_canada(*, force: bool = False) -> None:
+    from hypokrates.canada.downloader import download_canada
+
+    typer.echo("Downloading Canada Vigilance data (~325MB)...")
+    path = await download_canada(force=force)
+    typer.echo(f"Done. Data available at: {path}")
+
+
+def _download_jader() -> None:
+    from hypokrates.jader.downloader import JADER_INSTRUCTIONS
+
+    typer.echo(JADER_INSTRUCTIONS)
+    raise typer.Exit()
+
+
+async def _download_onsides(*, force: bool = False) -> None:
+    from hypokrates.onsides.downloader import download_onsides
+
+    typer.echo("Downloading OnSIDES data (~313MB)...")
+    path = await download_onsides(force=force)
+    typer.echo(f"Done. Data available at: {path}")
+
+
+async def _download_faers(*, force: bool = False) -> None:
+    from hypokrates.config import get_config
+    from hypokrates.faers_bulk.downloader import download_latest
+    from hypokrates.faers_bulk.loader import load_incremental
+
+    config = get_config()
+    dest_dir = config.cache_dir / "faers_bulk"
+
+    typer.echo("Downloading missing FAERS quarters...")
+
+    # Download ZIPs
+    paths = await download_latest(dest_dir=dest_dir)
+
+    if not paths:
+        typer.echo("All available quarters already downloaded.")
+    else:
+        typer.echo(f"Downloaded {len(paths)} quarters.")
+
+    # Load into store
+    typer.echo("Loading into DuckDB store...")
+    loaded = await load_incremental(str(dest_dir))
+    typer.echo(f"Done. Loaded {loaded} quarters.")
+
+
 # ---------------------------------------------------------------------------
 # Output formatters
 # ---------------------------------------------------------------------------

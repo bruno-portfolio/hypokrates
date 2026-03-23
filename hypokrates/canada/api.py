@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from hypokrates.canada.models import CanadaBulkStatus, CanadaSignalResult
 from hypokrates.canada.store import CanadaVigilanceStore
 from hypokrates.config import get_config
-from hypokrates.exceptions import ConfigurationError
 from hypokrates.models import MetaInfo
 from hypokrates.stats.measures import compute_ebgm, compute_ic, compute_ror
 from hypokrates.stats.models import ContingencyTable
@@ -28,7 +27,7 @@ _MIN_PRR = 2.0
 async def _ensure_loaded(
     _store: CanadaVigilanceStore | None = None,
 ) -> CanadaVigilanceStore:
-    """Garante que o store está carregado."""
+    """Garante que o store está carregado, com auto-download se necessário."""
     if _store is not None:
         return _store
 
@@ -37,15 +36,21 @@ async def _ensure_loaded(
         return store
 
     config = get_config()
-    if config.canada_bulk_path is None:
-        raise ConfigurationError(
-            "canada_bulk_path",
-            "Use configure(canada_bulk_path='/path/to/extracted/') first.",
-        )
 
-    csv_dir = str(config.canada_bulk_path)
-    logger.info("Canada Vigilance store not loaded — loading: %s", csv_dir)
-    await asyncio.to_thread(store.load_from_csvs, csv_dir)
+    # 1. Manual config override
+    if config.canada_bulk_path is not None:
+        csv_dir = str(config.canada_bulk_path)
+        logger.info("Canada Vigilance store not loaded — loading: %s", csv_dir)
+        await asyncio.to_thread(store.load_from_csvs, csv_dir)
+        return store
+
+    # 2. Auto-download
+    from hypokrates.canada.downloader import download_canada
+
+    logger.info("Canada Vigilance store not loaded — downloading bulk data")
+    csv_dir_path = await download_canada()
+    logger.info("Loading Canada Vigilance data from %s", csv_dir_path)
+    await asyncio.to_thread(store.load_from_csvs, str(csv_dir_path))
     return store
 
 

@@ -7,7 +7,6 @@ import logging
 from datetime import UTC, datetime
 
 from hypokrates.config import get_config
-from hypokrates.exceptions import ConfigurationError
 from hypokrates.jader.constants import JADER_CAVEAT
 from hypokrates.jader.models import JADERBulkStatus, JADERSignalResult, MappingConfidence
 from hypokrates.jader.store import JADERStore
@@ -24,7 +23,11 @@ _MIN_PRR = 2.0
 async def _ensure_loaded(
     _store: JADERStore | None = None,
 ) -> JADERStore:
-    """Garante que o store está carregado."""
+    """Garante que o store está carregado.
+
+    JADER requires manual download due to PMDA CAPTCHA protection.
+    Auto-download is not possible — use configure(jader_bulk_path=...).
+    """
     if _store is not None:
         return _store
 
@@ -34,9 +37,14 @@ async def _ensure_loaded(
 
     config = get_config()
     if config.jader_bulk_path is None:
+        from hypokrates.exceptions import ConfigurationError
+
         raise ConfigurationError(
             "jader_bulk_path",
-            "Use configure(jader_bulk_path='/path/to/jader/csvs/') first.",
+            "JADER requires manual download (PMDA uses CAPTCHA). "
+            "Download from https://www.pmda.go.jp/safety/info-services/"
+            "drugs/adr-info/suspected-adr/0005.html then use "
+            "configure(jader_bulk_path='/path/to/extracted/csvs/').",
         )
 
     csv_dir = str(config.jader_bulk_path)

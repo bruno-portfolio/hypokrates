@@ -35,7 +35,9 @@ def register(mcp: FastMCP) -> None:
             return (
                 "# FAERS Bulk Store\n\n"
                 "**Status:** Empty — no quarters loaded.\n\n"
-                "Use `faers_bulk_load` to load FAERS quarterly ASCII ZIPs."
+                "Run `hypokrates download faers` in your terminal to download "
+                "and load the latest quarters (~800MB for 4 quarters).\n\n"
+                "Alternatively, use `faers_bulk_load` to load ZIPs you already have."
             )
 
         lines = [
@@ -80,8 +82,9 @@ def register(mcp: FastMCP) -> None:
         available = await bulk_api.is_bulk_available()
         if not available:
             return (
-                "FAERS Bulk store is empty. Load quarterly ASCII ZIPs first "
-                "with `faers_bulk_load`."
+                "FAERS Bulk store is empty. Run `hypokrates download faers` "
+                "in your terminal to enable stratification, or use "
+                "`faers_bulk_load` to load ZIPs you already have."
             )
 
         try:
