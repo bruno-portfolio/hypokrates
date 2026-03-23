@@ -1,5 +1,3 @@
-"""MCP tools para DrugBank."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -16,8 +14,6 @@ _UNAVAILABLE_MSG = (
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de DrugBank no MCP server."""
-
     @mcp.tool()
     async def drug_info(drug: str) -> str:
         """Get drug information from DrugBank (mechanism, targets, enzymes, interactions).

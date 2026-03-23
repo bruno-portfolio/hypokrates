@@ -1,5 +1,3 @@
-"""MCP tools de metadados."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -140,8 +138,6 @@ _TOOLS = [
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de metadados no MCP server."""
-
     @mcp.tool()
     async def list_tools() -> str:
         """List all available hypokrates MCP tools."""

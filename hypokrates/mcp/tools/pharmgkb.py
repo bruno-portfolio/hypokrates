@@ -1,5 +1,3 @@
-"""MCP tools para PharmGKB."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de PharmGKB no MCP server."""
-
     @mcp.tool()
     async def pgx_drug_info(drug: str) -> str:
         """Get pharmacogenomic information from PharmGKB (gene-drug associations, guidelines).

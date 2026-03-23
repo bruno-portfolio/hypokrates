@@ -1,5 +1,3 @@
-"""API pública do módulo OnSIDES — async-first."""
-
 from __future__ import annotations
 
 import asyncio

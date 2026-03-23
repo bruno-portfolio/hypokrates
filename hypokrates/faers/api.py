@@ -1,5 +1,3 @@
-"""API pública do módulo FAERS — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -475,7 +473,6 @@ def _build_event_search(
 
 
 def _extract_total(data: dict[str, Any]) -> int:
-    """Extrai total de resultados do meta OpenFDA."""
     try:
         meta = data.get("meta", {})
         results_meta = meta.get("results", {})

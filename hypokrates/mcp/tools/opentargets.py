@@ -1,5 +1,3 @@
-"""MCP tools para OpenTargets."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de OpenTargets no MCP server."""
-
     @mcp.tool()
     async def drug_adverse_events(drug: str) -> str:
         """Get adverse events for a drug from OpenTargets Platform with LRT scores.

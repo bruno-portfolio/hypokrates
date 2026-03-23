@@ -1,5 +1,3 @@
-"""API pública do módulo PubMed — async-first."""
-
 from __future__ import annotations
 
 import logging

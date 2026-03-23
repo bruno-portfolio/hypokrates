@@ -1,5 +1,3 @@
-"""investigate() — hipótese completa + estratificação demográfica."""
-
 from __future__ import annotations
 
 import asyncio
@@ -129,17 +127,6 @@ async def _run_strata_batch(
     strata_configs: list[tuple[str, str, StrataFilter]],
     query_fn: _StrataQueryFn,
 ) -> list[StratumSignal]:
-    """Roda batch de strata queries em paralelo via asyncio.gather.
-
-    Args:
-        source: Nome da fonte ("FAERS", "Canada").
-        strata_configs: Lista de (stratum_type, stratum_value, StrataFilter).
-        query_fn: Async callable(drug, event, strata) → StratumSignal.
-
-    Returns:
-        Lista de StratumSignal (com insufficient_data=True em caso de erro).
-    """
-
     async def _safe_query(stype: str, sval: str, sf: StrataFilter) -> StratumSignal:
         try:
             return await query_fn(stype, sval, sf)
@@ -164,7 +151,6 @@ async def _run_faers_strata(
     *,
     suspect_only: bool = False,
 ) -> list[StratumSignal]:
-    """Roda 6 FAERS Bulk strata queries (2 sex + 4 age groups)."""
     from hypokrates.faers_bulk import api as bulk_api
     from hypokrates.faers_bulk.constants import RoleCodFilter
     from hypokrates.faers_bulk.models import StrataFilter
@@ -207,7 +193,6 @@ async def _run_canada_strata(
     *,
     suspect_only: bool = False,
 ) -> list[StratumSignal]:
-    """Roda Canada Vigilance sex strata (2 queries)."""
     from hypokrates.faers_bulk.models import StrataFilter
 
     async def _query(stype: str, sval: str, sf: StrataFilter) -> StratumSignal:
@@ -236,7 +221,6 @@ async def _run_canada_strata(
 
 
 def _build_country_strata(hyp: HypothesisResult) -> list[StratumSignal]:
-    """Extrai comparação cross-country do resultado do hypothesis."""
     strata: list[StratumSignal] = []
 
     # FAERS (sempre disponível)
@@ -285,7 +269,6 @@ def _build_demographic_summary(
     age_strata: list[StratumSignal],
     country_strata: list[StratumSignal],
 ) -> str:
-    """Gera resumo textual comparando PRR entre subgrupos."""
     parts: list[str] = []
 
     # Sex comparison (FAERS)

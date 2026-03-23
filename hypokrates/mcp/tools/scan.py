@@ -1,5 +1,3 @@
-"""MCP tools para scan de eventos adversos."""
-
 from __future__ import annotations
 
 import logging
@@ -18,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de scan no MCP server."""
-
     @mcp.tool()
     async def scan_drug(
         drug: str,

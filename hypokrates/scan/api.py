@@ -1,5 +1,3 @@
-"""API pública do módulo scan — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -83,41 +81,15 @@ async def scan_drug(
     - Sem API key FAERS (40/min): ~2-3 minutos para 20 eventos
     - Com API key FAERS (240/min): ~30-60 segundos para 20 eventos
 
-    Args:
-        drug: Nome genérico do medicamento.
-        top_n: Número de top eventos para escanear.
-        concurrency: Máximo de hipóteses simultâneas.
-        include_no_signal: Se True, inclui eventos sem sinal no resultado.
-        use_cache: Se deve usar cache.
-        check_labels: Se deve verificar bula FDA via DailyMed para cada evento.
-        check_trials: Se deve buscar trials em ClinicalTrials.gov para cada evento.
-        check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
-        check_opentargets: Se deve buscar LRT score no OpenTargets.
-        check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
-        group_events: Se deve agrupar termos MedDRA sinônimos.
-        filter_operational: Se deve filtrar termos MedDRA operacionais/regulatórios.
-        suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
-        primary_suspect_only: Se True + bulk, usa PS_ONLY (apenas Primary Suspect).
-            Requer bulk; sem bulk, faz fallback para suspect_only com warning.
-        check_coadmin: Se True, analisa confounding por co-administração (Layer 1).
-        check_onsides: Se True, verifica bulas internacionais via OnSIDES (US/EU/UK/JP).
-        check_pharmgkb: Se True, busca farmacogenômica via PharmGKB.
-        check_canada: Se True, verifica sinal no Canada Vigilance.
-        check_jader: Se True, verifica sinal no JADER (Japão).
-        check_direction: Se True + bulk, compara PRR base vs PS-only para cada sinal.
-            "strengthens" se PS PRR > 1.2x base, "weakens" se < 0.8x.
-        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
-        on_progress: Callback opcional (completed, total, event_term).
-
-    Returns:
-        ScanResult com items ordenados por score descendente.
+    ``primary_suspect_only`` requer bulk; sem bulk, faz fallback para suspect_only.
+    ``check_direction`` compara PRR base vs PS-only:
+    "strengthens" se PS PRR > 1.2x base, "weakens" se < 0.8x.
     """
-    # 1. Obter top eventos (over-fetch para capturar sinais de PRR alto com volume baixo)
+    # over-fetch para capturar sinais de PRR alto com volume baixo
     fetch_limit = top_n * OVERFETCH_MULTIPLIER
 
     _using_bulk = use_bulk is True or (use_bulk is None and await _check_bulk_available())
 
-    # Resolve role filter para event discovery
     role_filter_used: str | None = None
 
     if _using_bulk:
@@ -129,7 +101,6 @@ async def scan_drug(
         raw_events = await bulk_api.bulk_top_events(
             drug, role_filter=role_filter, limit=fetch_limit
         )
-        # Converter para AdverseEvent para compatibilidade
         events = [AdverseEvent(term=ev, count=cnt) for ev, cnt in raw_events]
 
         # Pre-fetch drug_total e n_total via bulk
@@ -153,7 +124,6 @@ async def scan_drug(
         shared_drug_total = None
         shared_n_total = None
 
-    # 1b. Filtrar termos operacionais/regulatórios MedDRA
     filtered_operational_count = 0
     if filter_operational and events:
         original_count = len(events)
@@ -232,7 +202,6 @@ async def scan_drug(
                 drug,
             )
 
-    # 3. Executar hypothesis() em paralelo com semáforo
     semaphore = asyncio.Semaphore(concurrency)
     completed = 0
     total = len(events)
@@ -292,7 +261,6 @@ async def scan_drug(
         if faers_client is not None:
             await faers_client.close()
 
-    # 3. Processar resultados
     items: list[ScanItem] = []
     failed_count = 0
     skipped_events: list[str] = []
@@ -322,7 +290,6 @@ async def scan_drug(
         if hyp.in_label is True:
             labeled_count += 1
 
-        # Filtrar NO_SIGNAL se não solicitado
         if not include_no_signal and hyp.classification == HypothesisClassification.NO_SIGNAL:
             continue
 
@@ -348,7 +315,6 @@ async def scan_drug(
             )
         )
 
-    # 4. Ordenar por score e reconstruir com ranks corretos
     items.sort(key=lambda x: x.score, reverse=True)
 
     # 5. MedDRA grouping (antes do truncate para agrupar corretamente)
@@ -361,7 +327,6 @@ async def scan_drug(
             items = grouped
             groups_applied = True
 
-    # 5a. Flag indication terms e penalizar score
     flagged_items: list[ScanItem] = []
     for item in items:
         if is_indication_term(item.event):
@@ -431,7 +396,6 @@ async def scan_drug(
             if coadmin_client is not None:
                 await coadmin_client.close()
 
-    # 5c. Direction analysis — compara PRR base vs PS-only (bulk only)
     if check_direction and _using_bulk:
         from hypokrates.faers_bulk.api import bulk_signal as _bulk_signal
         from hypokrates.faers_bulk.constants import RoleCodFilter as _RoleCodFilter
@@ -462,14 +426,12 @@ async def scan_drug(
 
         items = list(await asyncio.gather(*[_run_direction(it) for it in items]))
 
-    # 5d. Truncar para top_n, atribuir ranks e clusters semânticos
     items = items[:top_n]
     items = [
         item.model_copy(update={"rank": idx + 1, "cluster": get_cluster(item.event)})
         for idx, item in enumerate(items)
     ]
 
-    # 6. Enriquecer ScanResult com dados drug-level (DrugBank ou ChEMBL)
     scan_mechanism: str | None = None
     scan_interactions_count: int | None = None
     scan_cyp_enzymes: list[str] = []

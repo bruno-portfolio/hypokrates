@@ -1,5 +1,3 @@
-"""MCP tools para ANVISA."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de ANVISA no MCP server."""
-
     @mcp.tool()
     async def anvisa_buscar(nome: str) -> str:
         """Search Brazilian drug registry (ANVISA) by brand name or active ingredient.

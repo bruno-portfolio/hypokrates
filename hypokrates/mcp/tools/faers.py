@@ -1,5 +1,3 @@
-"""MCP tools para FAERS."""
-
 from __future__ import annotations
 
 import json
@@ -12,8 +10,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools FAERS no MCP server."""
-
     @mcp.tool()
     async def adverse_events(drug: str, limit: int = 10) -> str:
         """Search adverse events for a drug in FDA FAERS database.

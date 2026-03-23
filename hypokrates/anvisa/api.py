@@ -1,5 +1,3 @@
-"""API publica do modulo ANVISA — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -80,24 +78,13 @@ async def buscar_medicamento(
     return await asyncio.to_thread(store.search, nome, limit=limit)
 
 
-async def buscar_por_substancia(
+async def buscar_por_substancia(  # noqa: D103
     substancia: str,
     *,
     categoria: str | None = None,
     limit: int = 50,
     _store: AnvisaStore | None = None,
 ) -> AnvisaSearchResult:
-    """Busca todos os produtos registrados contendo uma substancia ativa.
-
-    Args:
-        substancia: Nome do principio ativo (PT ou EN).
-        categoria: Filtro opcional: "Genérico", "Similar", "Referência".
-        limit: Maximo de resultados.
-        _store: Store injetado (para testes).
-
-    Returns:
-        AnvisaSearchResult com medicamentos encontrados.
-    """
     store = await _ensure_loaded(_store=_store)
     return await asyncio.to_thread(
         store.search_by_substancia,

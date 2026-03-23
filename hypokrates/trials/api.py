@@ -1,5 +1,3 @@
-"""API pública do módulo ClinicalTrials.gov — async-first."""
-
 from __future__ import annotations
 
 import logging

@@ -73,23 +73,19 @@ class TestBulkSignal:
         assert result.table.a == 2
 
     async def test_signal_ps_only(self, loaded_store: FAERSBulkStore) -> None:
-        """PS_ONLY filter."""
         result = await bulk_signal("propofol", "bradycardia", role_filter=RoleCodFilter.PS_ONLY)
         assert result.table.a == 1
 
     async def test_meta_source(self, loaded_store: FAERSBulkStore) -> None:
-        """Meta source indica bulk deduplicated."""
         result = await bulk_signal("propofol", "bradycardia")
         assert result.meta.source == "FAERS/bulk (deduplicated)"
 
     async def test_signal_detected(self, loaded_store: FAERSBulkStore) -> None:
-        """Verifica heurística signal_detected funciona."""
         result = await bulk_signal("propofol", "bradycardia")
         # Com golden data pequeno, pode ou não ser detectado
         assert isinstance(result.signal_detected, bool)
 
     async def test_nonexistent_drug(self, loaded_store: FAERSBulkStore) -> None:
-        """Droga não existente retorna zeros."""
         result = await bulk_signal("NONEXISTENT", "BRADYCARDIA")
         assert result.table.a == 0
 

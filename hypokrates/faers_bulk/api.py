@@ -1,9 +1,3 @@
-"""API pública do FAERS Bulk — async-first.
-
-Expõe funcionalidades do bulk store para uso direto e integração
-com signal() via dual-mode.
-"""
-
 from __future__ import annotations
 
 import asyncio

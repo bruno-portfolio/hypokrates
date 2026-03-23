@@ -1,5 +1,3 @@
-"""API pública do módulo JADER — async-first."""
-
 from __future__ import annotations
 
 import asyncio

@@ -1,5 +1,3 @@
-"""MCP tools para ChEMBL."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de ChEMBL no MCP server."""
-
     @mcp.tool()
     async def drug_mechanism(drug: str) -> str:
         """Get mechanism of action and targets from ChEMBL (free, no API key).

@@ -117,6 +117,7 @@ convention = "google"
 "tests/**" = ["D", "TCH"]
 "hypokrates/jader/mappings.py" = ["RUF001"]  # fullwidth JP chars are real JADER data
 "hypokrates/cli.py" = ["B008"]  # typer.Argument/Option in defaults is the official pattern
+"hypokrates/mcp/tools/**" = ["D103"]  # register() functions are internal, not public API
 
 [tool.ruff.lint.isort]
 known-first-party = ["hypokrates"]

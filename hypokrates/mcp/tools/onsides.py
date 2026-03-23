@@ -1,5 +1,3 @@
-"""MCP tools para OnSIDES."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -16,8 +14,6 @@ _UNAVAILABLE_MSG = (
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de OnSIDES no MCP server."""
-
     @mcp.tool()
     async def onsides_events(
         drug: str,

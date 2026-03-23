@@ -1,5 +1,3 @@
-"""MCP tools para signal detection."""
-
 from __future__ import annotations
 
 import asyncio
@@ -14,8 +12,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de stats no MCP server."""
-
     @mcp.tool()
     async def signal(
         drug: str,

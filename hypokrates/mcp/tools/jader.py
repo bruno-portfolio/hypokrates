@@ -1,5 +1,3 @@
-"""MCP tools para JADER (farmacovigilância japonesa)."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -15,8 +13,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de JADER no MCP server."""
-
     @mcp.tool()
     async def jader_signal(drug: str, event: str, suspect_only: bool = False) -> str:
         """Calculate PRR signal for a drug-event pair in JADER (Japanese) database.

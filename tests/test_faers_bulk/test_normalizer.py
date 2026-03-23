@@ -11,32 +11,26 @@ class TestNormalizeDrugName:
     """Testes de normalização de nomes de droga."""
 
     def test_prod_ai_has_priority(self) -> None:
-        """prod_ai deve ter prioridade sobre drugname."""
         result = normalize_drug_name("PROPOFOL", "DIPRIVAN 10MG/ML")
         assert result == "PROPOFOL"
 
     def test_drugname_fallback(self) -> None:
-        """Se prod_ai vazio, usa drugname."""
         result = normalize_drug_name("", "FENTANYL CITRATE")
         assert result == "FENTANYL CITRATE"
 
     def test_drugname_dose_removal(self) -> None:
-        """Remove informação de dose do drugname."""
         result = normalize_drug_name("", "PROPOFOL 10MG/ML")
         assert result == "PROPOFOL"
 
     def test_drugname_dose_mcg(self) -> None:
-        """Remove dose em MCG."""
         result = normalize_drug_name("", "FENTANYL 50MCG")
         assert result == "FENTANYL"
 
     def test_upper_case(self) -> None:
-        """Resultado sempre em uppercase."""
         result = normalize_drug_name("propofol", "")
         assert result == "PROPOFOL"
 
     def test_empty_both(self) -> None:
-        """Ambos vazios retorna string vazia."""
         result = normalize_drug_name("", "")
         assert result == ""
 
@@ -46,7 +40,6 @@ class TestNormalizeDrugName:
         assert result == ""
 
     def test_trailing_punctuation(self) -> None:
-        """Remove pontuação trailing."""
         result = normalize_drug_name("PROPOFOL.", "")
         assert result == "PROPOFOL"
 

@@ -1,5 +1,3 @@
-"""API pública de cruzamento de hipóteses — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -72,20 +70,7 @@ async def coadmin_analysis(
     Layer 2: compara os top drugs para o evento (via drugs_by_event) com os
     co-suspects do Layer 1 (profile). Alta sobreposição + PRR similar entre
     co-drugs indica que o sinal é provavelmente confounding por co-administração.
-
-    Args:
-        drug: Nome genérico do medicamento-índice.
-        event: Termo MedDRA do evento adverso.
-        profile: CoSuspectProfile do Layer 1.
-        drug_prr: PRR do medicamento-índice (de signal()).
-        top_n_compare: Máximo de co-drugs para rodar signal() comparativo.
-        suspect_only: Se True, conta apenas reports com droga suspect.
-        use_cache: Se deve usar cache.
-
-    Returns:
-        CoAdminAnalysis com verdict (specific/co_admin_artifact/inconclusive).
     """
-    # 1. Buscar top drugs para este evento
     dbe_result = await faers_api.drugs_by_event(
         event, suspect_only=suspect_only, limit=20, use_cache=use_cache
     )
@@ -93,7 +78,6 @@ async def coadmin_analysis(
     if not dbe_result.drugs or not profile.top_co_drugs:
         return CoAdminAnalysis(profile=profile, verdict="inconclusive")
 
-    # 2. Calcular overlap entre top-event-drugs e co-suspects
     co_drug_names = {name for name, _ in profile.top_co_drugs}
     event_drug_names = {d.name.upper() for d in dbe_result.drugs}
     # Excluir a droga-índice
@@ -105,7 +89,6 @@ async def coadmin_analysis(
     overlap = co_drug_names & event_drug_names
     overlap_ratio = len(overlap) / len(event_drug_names)
 
-    # 3. Se overlap baixo ou não flaggado → provavelmente específico
     if overlap_ratio < OVERLAP_THRESHOLD or not profile.co_admin_flag:
         return CoAdminAnalysis(
             profile=profile,
@@ -114,7 +97,6 @@ async def coadmin_analysis(
             verdict="specific",
         )
 
-    # 4. Rodar signal() comparativo para top co-drugs
     co_drugs_to_compare = [name for name, _ in profile.top_co_drugs[:top_n_compare]]
 
     async def _safe_signal(co_drug: str) -> CoSignalItem | None:
@@ -134,7 +116,6 @@ async def coadmin_analysis(
     co_results = await asyncio.gather(*[_safe_signal(d) for d in co_drugs_to_compare])
     co_signals = [r for r in co_results if r is not None]
 
-    # 5. Calcular specificity ratio
     co_prrs = [cs.prr for cs in co_signals if cs.signal_detected and cs.prr > 0]
     specificity_ratio: float | None = None
 
@@ -142,7 +123,6 @@ async def coadmin_analysis(
         median_co = statistics.median(co_prrs)
         specificity_ratio = round(drug_prr / median_co, 2) if median_co > 0 else None
 
-    # 6. Determinar verdict
     if specificity_ratio is not None and specificity_ratio > SPECIFICITY_RATIO_THRESHOLD:
         verdict = "specific"
         is_specific = True
@@ -195,33 +175,8 @@ async def hypothesis(
 ) -> HypothesisResult:
     """Cruza sinal FAERS + literatura PubMed → classificação.
 
-    Args:
-        drug: Nome genérico do medicamento.
-        event: Termo do evento adverso.
-        novel_max: Até N papers = novel_hypothesis (default 0).
-        emerging_max: Até N papers = emerging_signal (default 5). Acima = known.
-        literature_limit: Máximo de artigos retornados na busca PubMed.
-        use_mesh: Usar qualificadores MeSH na busca PubMed (mais preciso).
-        use_cache: Se deve usar cache.
-        check_label: Se deve verificar bula FDA via DailyMed.
-        check_trials: Se deve buscar trials em ClinicalTrials.gov.
-        check_drugbank: Se deve buscar mecanismo/interações no DrugBank.
-        check_opentargets: Se deve buscar LRT score no OpenTargets.
-        check_chembl: Se deve buscar mecanismo/targets via ChEMBL API.
-        check_coadmin: Se deve analisar confounding por co-administração (Layer 1+2).
-        check_onsides: Se deve verificar bulas internacionais via OnSIDES (US/EU/UK/JP).
-        check_pharmgkb: Se deve buscar farmacogenômica via PharmGKB.
-        check_canada: Se deve verificar sinal no Canada Vigilance.
-        check_jader: Se deve verificar sinal no JADER (Japão).
-        suspect_only: Se True, conta apenas reports onde a droga é suspect no FAERS.
-        use_bulk: None=auto-detect, True=forçar bulk, False=forçar API.
-
     Thresholds são heurísticas — ajuste pro domínio clínico.
-
-    Returns:
-        HypothesisResult com classificação, sinal, literatura e evidência.
     """
-    # 1+2. FAERS e PubMed são independentes — rodar em paralelo
     signal_result, pubmed_result = await asyncio.gather(
         stats_api.signal(
             drug,
@@ -243,7 +198,6 @@ async def hypothesis(
         ),
     )
 
-    # 3. Opcionais: DailyMed e Trials (paralelo se ambos)
     in_label: bool | None = None
     label_detail: str | None = None
     active_trials: int | None = None
@@ -287,7 +241,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: trials unavailable", drug, event)
 
-    # 3b. DrugBank (drug-level, cached externally)
     mechanism: str | None = None
     interactions_list: list[str] = []
     enzymes_list: list[str] = []
@@ -314,7 +267,6 @@ async def hypothesis(
             interactions_list = [it.partner_name for it in db_info.interactions[:10]]
             enzymes_list = [e.gene_name for e in db_info.enzymes if e.gene_name]
 
-    # 3c. OpenTargets (per-event LRT score)
     ot_llr: float | None = None
 
     if check_opentargets:
@@ -327,7 +279,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: OpenTargets unavailable", drug, event)
 
-    # 3d. ChEMBL (mecanismo + targets, alternativa ao DrugBank sem download)
     if check_chembl and mechanism is None:
         from hypokrates.chembl import api as chembl_api
 
@@ -345,7 +296,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: ChEMBL unavailable", drug, event)
 
-    # 3e. OnSIDES (international labels, per-event)
     onsides_sources: list[str] | None = None
 
     if check_onsides:
@@ -358,7 +308,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: OnSIDES unavailable", drug, event)
 
-    # 3e2. Canada Vigilance (cross-country validation)
     canada_reports: int | None = None
     canada_signal_detected: bool | None = None
 
@@ -374,7 +323,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: Canada Vigilance unavailable", drug, event)
 
-    # 3e3. JADER (Japanese cross-country validation)
     jader_reports: int | None = None
     jader_signal_detected: bool | None = None
 
@@ -388,7 +336,6 @@ async def hypothesis(
         except Exception:
             logger.warning("hypothesis %s + %s: JADER unavailable", drug, event)
 
-    # 3e4. PharmGKB (drug-level pharmacogenomics)
     pharmacogenomics: list[str] = []
 
     if check_pharmgkb:
@@ -409,7 +356,6 @@ async def hypothesis(
     literature_count = pubmed_result.total_count
     articles = pubmed_result.articles
 
-    # 3f. Indication confounding detection
     indication_confounding = False
     try:
         from hypokrates.scan.indications import is_indication_term
@@ -430,7 +376,6 @@ async def hypothesis(
         drug_event_count=signal_result.table.a,
     )
 
-    # 5. Gerar summary
     summary = _build_summary(
         drug,
         event,
@@ -440,7 +385,6 @@ async def hypothesis(
         signal_detected=signal_result.signal_detected,
     )
 
-    # 6. Gerar EvidenceBlock
     thresholds_used = {"novel_max": novel_max, "emerging_max": emerging_max}
     evidence = build_evidence(
         MetaInfo(
@@ -678,7 +622,6 @@ async def compare_signals(
     Returns:
         CompareResult com items ordenados por ratio descendente.
     """
-    # 1. Auto-detectar eventos se não fornecidos
     if events is None:
         faers_result = await faers_api.top_events(
             drug, suspect_only=suspect_only, limit=top_n * 2, use_cache=use_cache
@@ -714,7 +657,6 @@ async def compare_signals(
             ),
         )
 
-    # 2. Rodar signal() em paralelo para ambas as drogas
     semaphore = asyncio.Semaphore(DEFAULT_COMPARE_CONCURRENCY)
 
     async def _compare_one(
@@ -774,7 +716,6 @@ async def compare_signals(
     tasks = [_compare_one(ev) for ev in events]
     results = await asyncio.gather(*tasks)
 
-    # 3. Processar resultados
     items: list[CompareSignalItem] = [r for r in results if r is not None]
     items.sort(key=lambda x: x.ratio if x.ratio != float("inf") else 1e9, reverse=True)
 

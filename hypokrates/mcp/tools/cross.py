@@ -1,5 +1,3 @@
-"""MCP tools para cross-reference de hipóteses."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -13,8 +11,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de cross-reference no MCP server."""
-
     @mcp.tool()
     async def hypothesis(
         drug: str,

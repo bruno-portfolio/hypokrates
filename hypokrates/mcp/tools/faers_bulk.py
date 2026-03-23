@@ -1,5 +1,3 @@
-"""MCP tools para FAERS Bulk (deduplicação por CASEID)."""
-
 from __future__ import annotations
 
 import logging
@@ -25,8 +23,6 @@ _INVALID_ROLE_MSG = "Invalid role_filter: {}. Use: suspect, ps_only, all."
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de FAERS Bulk no MCP server."""
-
     @mcp.tool()
     async def faers_bulk_status() -> str:
         """Show FAERS Bulk store status: loaded quarters, total cases, dedup stats.

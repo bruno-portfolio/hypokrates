@@ -1,5 +1,3 @@
-"""MCP tools para Canada Vigilance."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -20,8 +18,6 @@ _UNAVAILABLE_MSG = (
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de Canada Vigilance no MCP server."""
-
     @mcp.tool()
     async def canada_signal(
         drug: str,

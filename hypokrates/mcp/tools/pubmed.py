@@ -1,5 +1,3 @@
-"""MCP tools para PubMed."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -12,8 +10,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools PubMed no MCP server."""
-
     @mcp.tool()
     async def count_papers(drug: str, event: str) -> str:
         """Count PubMed papers mentioning a drug-event pair.

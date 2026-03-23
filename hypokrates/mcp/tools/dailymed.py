@@ -1,5 +1,3 @@
-"""MCP tools para DailyMed (bulas FDA)."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -16,8 +14,6 @@ _NO_SPL_MSG = (
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de DailyMed no MCP server."""
-
     @mcp.tool()
     async def label_events(drug: str) -> str:
         """Extract adverse reactions listed in a drug's FDA label (SPL) via DailyMed.

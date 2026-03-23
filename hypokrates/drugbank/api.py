@@ -1,5 +1,3 @@
-"""API pública do módulo DrugBank — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 async def _ensure_loaded() -> DrugBankStore:
-    """Garante que o store está carregado, fazendo parse do XML se necessário."""
     store = DrugBankStore.get_instance()
     if store.loaded:
         return store
@@ -35,20 +32,11 @@ async def _ensure_loaded() -> DrugBankStore:
     return store
 
 
-async def drug_info(
+async def drug_info(  # noqa: D103
     drug_name: str,
     *,
     _store: DrugBankStore | None = None,
 ) -> DrugBankInfo | None:
-    """Busca informações completas de uma droga no DrugBank.
-
-    Args:
-        drug_name: Nome da droga (genérico ou sinônimo).
-        _store: Store injetado (para testes).
-
-    Returns:
-        DrugBankInfo ou None se não encontrado.
-    """
     if _store is not None:
         return await asyncio.to_thread(_store.find_drug, drug_name)
 

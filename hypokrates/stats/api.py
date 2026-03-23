@@ -1,5 +1,3 @@
-"""API pública de detecção de sinais — async-first."""
-
 from __future__ import annotations
 
 import asyncio
@@ -305,7 +303,6 @@ async def signal_timeline(
 
 
 def _aggregate_quarterly(daily_counts: list[dict[str, Any]]) -> list[QuarterlyCount]:
-    """Agrega contagens diárias OpenFDA receivedate em trimestres."""
     quarterly: dict[tuple[int, int], int] = {}
     for entry in daily_counts:
         time_str = str(entry.get("time", ""))

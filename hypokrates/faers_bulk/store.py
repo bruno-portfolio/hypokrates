@@ -1,9 +1,3 @@
-"""FAERS Bulk DuckDB store — deduplicação por CASEID.
-
-Armazena em DuckDB separado do cache HTTP (mesmo padrão DrugBank).
-Parse dos ZIPs acontece 1x por quarter; chamadas subsequentes usam DuckDB persistido.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -165,8 +159,7 @@ class FAERSBulkStore(BaseDuckDBStore):
     _DB_FILENAME = FAERS_BULK_DB_FILENAME
     _CREATE_TABLES = _CREATE_TABLES_SQL
 
-    def is_loaded(self) -> bool:
-        """Se o store contém ao menos um quarter carregado."""
+    def is_loaded(self) -> bool:  # noqa: D102
         with self._db_lock:
             result = self._conn.execute("SELECT COUNT(*) FROM faers_quarters").fetchone()
             return result is not None and result[0] > 0
@@ -246,7 +239,7 @@ class FAERSBulkStore(BaseDuckDBStore):
         count: int = result[0] if result else 0
         return count
 
-    def four_counts(
+    def four_counts(  # noqa: D102
         self,
         drug: str,
         event: str | list[str],
@@ -254,7 +247,6 @@ class FAERSBulkStore(BaseDuckDBStore):
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
         strata: StrataFilter | None = None,
     ) -> BulkCountResult:
-        """Calcula 4-count deduplicado para um par droga-evento."""
         drug_upper = drug.strip().upper()
         if isinstance(event, list):
             events_list = [e.strip().upper() for e in event]
@@ -409,13 +401,12 @@ class FAERSBulkStore(BaseDuckDBStore):
 
         return [(row[0], row[1]) for row in rows]
 
-    def drug_total(
+    def drug_total(  # noqa: D102
         self,
         drug: str,
         *,
         role_filter: RoleCodFilter = RoleCodFilter.SUSPECT,
     ) -> int:
-        """Total de cases deduplicados que mencionam a droga com o role dado."""
         drug_upper = drug.strip().upper()
         role_value = role_filter.value
 
@@ -427,14 +418,12 @@ class FAERSBulkStore(BaseDuckDBStore):
 
         return result[0] if result else 0
 
-    def count_total(self) -> int:
-        """Total de cases deduplicados (N)."""
+    def count_total(self) -> int:  # noqa: D102
         with self._db_lock:
             result = self._conn.execute("SELECT COUNT(*) FROM faers_dedup").fetchone()
             return result[0] if result else 0
 
-    def get_status(self) -> BulkStoreStatus:
-        """Status completo do store."""
+    def get_status(self) -> BulkStoreStatus:  # noqa: D102
         quarters = self.get_loaded_quarters()
 
         with self._db_lock:
@@ -464,8 +453,7 @@ class FAERSBulkStore(BaseDuckDBStore):
             newest_quarter=newest,
         )
 
-    def get_loaded_quarters(self) -> list[QuarterInfo]:
-        """Lista quarters carregados."""
+    def get_loaded_quarters(self) -> list[QuarterInfo]:  # noqa: D102
         with self._db_lock:
             rows = self._conn.execute(
                 "SELECT quarter_key, year, quarter, loaded_at, demo_count, drug_count, reac_count "

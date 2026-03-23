@@ -1,5 +1,3 @@
-"""MCP tools para ClinicalTrials.gov."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 
 def register(mcp: FastMCP) -> None:
-    """Registra tools de ClinicalTrials.gov no MCP server."""
-
     @mcp.tool()
     async def search_trials(drug: str, event: str) -> str:
         """Search ClinicalTrials.gov for trials related to a drug-event pair.
