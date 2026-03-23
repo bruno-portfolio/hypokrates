@@ -78,6 +78,13 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "STATUS EPILEPTICUS",
         "TONIC CLONIC MOVEMENTS",
     ],
+    "SOMNAMBULISM": [
+        "SLEEPWALKING",
+        "SLEEP WALKING",
+        "SLEEP-RELATED EATING DISORDER",
+        "COMPLEX SLEEP BEHAVIOUR",
+        "COMPLEX SLEEP BEHAVIOR",
+    ],
     "HEPATOTOXICITY": [
         "HEPATIC FAILURE",
         "LIVER INJURY",
@@ -235,6 +242,16 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
         "INTERSTITIAL LUNG DISEASE",
         "PNEUMONITIS",
         "PULMONARY TOXICITY",
+    ],
+    "SUICIDAL IDEATION": [
+        "SUICIDAL THINKING",
+        "SUICIDAL THOUGHTS",
+        "SUICIDALITY",
+        "SUICIDAL BEHAVIOUR",
+        "SUICIDAL BEHAVIOR",
+        "SUICIDE ATTEMPT",
+        "COMPLETED SUICIDE",
+        "SELF-INJURIOUS IDEATION",
     ],
     "DEPRESSION": [
         "DEPRESSED MOOD",
