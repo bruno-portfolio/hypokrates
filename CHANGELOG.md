@@ -6,6 +6,21 @@
 - **PubMed abstracts via EFetch XML**: `search_papers()` now returns full abstracts. Replaced ESummary with EFetch (same number of requests, superset of data). Supports structured abstracts (labeled sections like BACKGROUND/METHODS/RESULTS/CONCLUSIONS) and simple abstracts. `PubMedArticle.abstract` field added (`str | None`). MCP `search_papers` tool shows 200-char snippet
 - **`investigate()` with demographic stratification**: new high-level function combining `hypothesis()` (all enrichments) + FAERS Bulk strata (sex M/F + age 0-17/18-44/45-64/65+) + Canada Vigilance strata (sex M/F), all in parallel via `asyncio.gather()`. Cross-country comparison from FAERS/Canada/JADER. Demographic summary flags notable PRR differences (sex >1.5x, age >2x average). New models: `StratumSignal`, `InvestigationResult`
 - MCP tool `investigate`: one-shot deep investigation with markdown tables (hypothesis + sex/age/country strata + summary + literature with abstracts). MCP tools: 44 → 46
+- **Rich citations (OpenEvidence-style)**: `format_citation()` and `format_references()` generate numbered references with authors, journal, year, and DOI across MCP tools. All literature-enriched responses now include a `## References` section
+- **Automatic caveats in `investigate()`**: 7 detection rules flag data quality issues in results — low report count, non-replication across countries, sex/age concentration, PRR inflation, indication confounding, co-administration confounding
+- **Auto-download Canada/OnSIDES + CLI download command**: `hypokrates download canada|onsides` auto-fetches bulk data. JADER instructions added (PMDA requires CAPTCHA)
+- **Expanded JADER mappings**: +60 JP→EN drug names (semaglutide brands, dexmedetomidine, etc.) and +50 MedDRA PT mappings. New MedDRA groups: somnambulism, suicidal ideation
+
+### Fixed
+- **Canada Vigilance strata gender_code**: Canada uses "1"=Male/"2"=Female (not "M"/"F"). Stratified PRR by sex was returning 0 results
+- **JADER parser**: Rewritten to use DuckDB native CSV reader + iconv for cp932 encoding. More robust than previous Python csv.reader approach
+- **meta.py Sprint 11**: JADER tools added to `_TOOLS` list, Sprint 11 label applied
+
+### Refactored
+- **`BaseDuckDBStore` base class**: extracted singleton, `__init__`, `get_instance`, `reset`, `close`, and lock helpers from 6 identical store implementations (OnSIDES, JADER, Canada, DrugBank, ANVISA, FAERS Bulk) into `hypokrates/store/base.py`. ~189 LOC eliminated
+- **ANVISA downloader eliminated**: `anvisa/downloader.py` (89 LOC) removed — `_ensure_loaded` now uses `download/base.py::download_file(verify=False)` directly. Added `verify` parameter to `download_file()`
+- **5 largest files simplified**: extracted `_build_strata_where` helper, eliminated redundant variables/docstrings/queries across `faers_bulk/store.py`, `canada/store.py`, `cross/api.py`, `scan/api.py`, `faers_bulk/api.py`
+- **3 duplicated patterns eliminated**: cache helpers extracted, retry logic unified, test factories shared across modules
 
 ## [0.7.0] - 2026-03-17
 

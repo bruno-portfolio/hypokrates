@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/hypokrates)](https://pypi.org/project/hypokrates/)
 [![Python](https://img.shields.io/pypi/pyversions/hypokrates)](https://pypi.org/project/hypokrates/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-1349_passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1403_passing-brightgreen)]()
 [![mypy](https://img.shields.io/badge/type_checked-mypy_strict-blue)]()
 [![MCP](https://img.shields.io/badge/MCP-46_tools-purple)]()
 
@@ -205,12 +205,14 @@ hypokrates/
 ├── canada/         # Canada Vigilance (cross-country validation)
 ├── jader/          # JADER/PMDA Japan (cross-country, JP→EN translation)
 ├── anvisa/         # ANVISA Brazil (drug registry, PT↔EN mapping)
+├── store/          # BaseDuckDBStore base class (shared singleton + lock)
+├── download/       # Shared download utilities (streaming, ZIP, freshness)
 ├── cache/          # DuckDB HTTP cache (thread-safe singleton)
 ├── http/           # BaseClient with retry, rate limiting, auth
-└── mcp/            # MCP server (44 tools)
+└── mcp/            # MCP server (46 tools)
 ```
 
-**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1349 tests.
+**Async-first** with sync wrappers. DuckDB for cache and bulk stores. Pydantic 2 for all models. mypy strict. 1403 tests.
 
 ## Who is this for
 
@@ -230,7 +232,7 @@ hypokrates/
 
 ## Status
 
-**Alpha** (v0.7.0) — 1349 tests, mypy strict, ruff clean. Under active development.
+**Alpha** (v0.7.1) — 1403 tests, mypy strict, ruff clean. Under active development.
 
 ## License
 

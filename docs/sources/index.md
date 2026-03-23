@@ -20,6 +20,7 @@ hypokrates queries multiple public health databases. Each source has its own rat
 | [OnSIDES](onsides.md) | `hypokrates.onsides` | 7.1M drug-ADE pairs (US/EU/UK/JP labels) | Local (offline) | - |
 | [PharmGKB](pharmgkb.md) | `hypokrates.pharmgkb` | Pharmacogenomic gene-drug associations | 60 req/min | - |
 | [Canada Vigilance](canada.md) | `hypokrates.canada` | ~738K reports (1965-present) | Local (offline) | - |
+| JADER (PMDA) | `hypokrates.jader` | ~1M reports (Japan, 2004-present) | Local (offline) | - |
 
 ## Planned
 
@@ -52,7 +53,7 @@ All HTTP responses are cached in a local DuckDB database with source-specific TT
 | ChEMBL | 7 days |
 | PharmGKB | 7 days |
 
-DrugBank, ANVISA, OnSIDES, and Canada Vigilance use separate local DuckDB stores (`~/.cache/hypokrates/drugbank.duckdb` and `~/.cache/hypokrates/anvisa.duckdb`) — they are not part of the HTTP cache.
+DrugBank, ANVISA, OnSIDES, Canada Vigilance, JADER, and FAERS Bulk use separate local DuckDB stores (`~/.cache/hypokrates/{source}.duckdb`) — they are not part of the HTTP cache.
 
 Cache can be disabled per-call with `use_cache=False` or globally via `configure(cache_enabled=False)`.
 

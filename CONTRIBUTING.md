@@ -136,25 +136,42 @@ hypokrates/
 ├── exceptions.py      # HypokratesError hierarchy
 ├── models.py          # Drug, AdverseEvent, MetaInfo
 ├── sync.py            # Synchronous wrappers
-├── cache/             # DuckDB thread-safe cache
-├── http/              # Retry, rate limiter, client factory
 ├── faers/             # OpenFDA/FAERS (client, parser, models)
-├── stats/             # PRR, ROR, IC — signal detection
+├── faers_bulk/        # FAERS quarterly ASCII (dedup, role filter, strata)
+├── stats/             # PRR, ROR, IC, EBGM — signal detection
+├── cross/             # Hypothesis generation (signal + literature + enrichments)
+├── scan/              # Automated drug scanning with scoring
 ├── evidence/          # EvidenceBlock with provenance
+├── pubmed/            # NCBI/PubMed (EFetch + ESearch)
+├── vocab/             # RxNorm normalization + MeSH + MedDRA grouping
+├── dailymed/          # FDA label parsing (SPL XML)
+├── trials/            # ClinicalTrials.gov (curl_cffi for Cloudflare)
+├── drugbank/          # DrugBank XML (mechanism, interactions, enzymes)
+├── opentargets/       # OpenTargets Platform (GraphQL, LRT scores)
+├── chembl/            # ChEMBL (mechanism, targets, metabolism)
+├── onsides/           # OnSIDES international labels (NLP-extracted)
+├── pharmgkb/          # PharmGKB pharmacogenomics (CPIC/DPWG)
+├── canada/            # Canada Vigilance (cross-country validation)
+├── jader/             # JADER/PMDA Japan (cross-country, JP→EN)
+├── anvisa/            # ANVISA Brazil (drug registry, PT↔EN mapping)
+├── store/             # BaseDuckDBStore base class (shared singleton + lock)
+├── download/          # Shared download utilities (streaming, ZIP, freshness)
+├── cache/             # DuckDB HTTP cache (thread-safe singleton)
+├── http/              # BaseClient with retry, rate limiting, auth
 ├── contracts/         # Protocol classes (interfaces)
-├── pubmed/            # NCBI/PubMed (client, parser, models)
-├── cross/             # Hypothesis cross-referencing (FAERS + PubMed)
+├── mcp/               # MCP server (46 tools)
 └── utils/             # Helpers (validation, time, result)
 
 tests/
 ├── golden_data/       # JSON fixtures per source
-├── test_faers/        # FAERS tests
-├── test_stats/        # Stats tests
-├── test_evidence/     # Evidence tests
-├── test_contracts/    # Contracts tests
-├── test_pubmed/       # PubMed tests
-├── test_cross/        # Cross-reference tests
-└── ...
+├── test_faers/        # FAERS API tests
+├── test_faers_bulk/   # FAERS Bulk tests
+├── test_stats/        # Signal detection tests
+├── test_cross/        # Hypothesis + investigate tests
+├── test_scan/         # Drug scanning tests
+├── test_store/        # BaseDuckDBStore tests
+├── test_download/     # Download utilities tests
+└── test_{source}/     # Per-source tests (pubmed, drugbank, etc.)
 ```
 
 ## Adding a new data source
@@ -187,4 +204,4 @@ One concern per commit. Never mix feature + refactoring.
 
 ## License
 
-By contributing, you agree that your contribution will be licensed under the [MIT License](LICENSE).
+By contributing, you agree that your contribution will be licensed under the [AGPL-3.0](LICENSE).
