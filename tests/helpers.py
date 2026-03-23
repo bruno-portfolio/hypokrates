@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import httpx
 import respx
 
-from hypokrates.faers.models import FAERSReport
-from hypokrates.models import MetaInfo
+from hypokrates.evidence.models import EvidenceBlock
+from hypokrates.faers.models import FAERSReport, FAERSResult
+from hypokrates.models import AdverseEvent, MetaInfo
+from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
 
 GOLDEN_DATA = Path(__file__).parent / "golden_data"
 
@@ -179,3 +182,79 @@ def assert_meta_complete(meta: MetaInfo) -> None:
     assert meta.disclaimer, "MetaInfo.disclaimer vazio"
     assert isinstance(meta.total_results, int), "MetaInfo.total_results não é int"
     assert isinstance(meta.query, dict), "MetaInfo.query não é dict"
+
+
+# ---------------------------------------------------------------------------
+# Shared test factories — MetaInfo, SignalResult, EvidenceBlock, FAERSResult
+# ---------------------------------------------------------------------------
+
+
+def make_meta(*, source: str = "test", total: int = 0, **kwargs: Any) -> MetaInfo:
+    """Factory para MetaInfo de teste."""
+    return MetaInfo(source=source, total_results=total, retrieved_at=datetime.now(UTC), **kwargs)
+
+
+def make_signal(
+    *,
+    drug: str = "propofol",
+    event: str = "TEST",
+    a: int = 100,
+    prr: float = 2.0,
+    prr_lci: float | None = None,
+    ror_lci: float | None = None,
+    detected: bool = True,
+) -> SignalResult:
+    """Factory para SignalResult de teste.
+
+    prr_lci/ror_lci permitem override dos CI lower bounds (usado em testes de score).
+    """
+    _prr_lci = prr_lci if prr_lci is not None else prr * 0.75
+    _ror_lci = ror_lci if ror_lci is not None else (prr * 1.05) * 0.75
+    return SignalResult(
+        drug=drug,
+        event=event,
+        table=ContingencyTable(a=a, b=900, c=50, d=9000),
+        prr=DisproportionalityResult(
+            measure="PRR",
+            value=prr,
+            ci_lower=_prr_lci,
+            ci_upper=prr * 1.3,
+            significant=detected,
+        ),
+        ror=DisproportionalityResult(
+            measure="ROR",
+            value=prr * 1.05,
+            ci_lower=_ror_lci,
+            ci_upper=prr * 1.4,
+            significant=detected,
+        ),
+        ic=DisproportionalityResult(
+            measure="IC",
+            value=1.0,
+            ci_lower=0.5,
+            ci_upper=1.5,
+            significant=detected,
+        ),
+        ebgm=DisproportionalityResult(
+            measure="EBGM",
+            value=2.0,
+            ci_lower=1.5,
+            ci_upper=2.5,
+            significant=detected,
+        ),
+        signal_detected=detected,
+        meta=make_meta(),
+    )
+
+
+def make_evidence(*, source: str = "test", **kwargs: Any) -> EvidenceBlock:
+    """Factory para EvidenceBlock de teste."""
+    return EvidenceBlock(source=source, retrieved_at=datetime.now(UTC), **kwargs)
+
+
+def make_events(terms: list[str]) -> FAERSResult:
+    """Factory para FAERSResult de teste com eventos."""
+    return FAERSResult(
+        events=[AdverseEvent(term=t, count=100 - i) for i, t in enumerate(terms)],
+        meta=make_meta(),
+    )

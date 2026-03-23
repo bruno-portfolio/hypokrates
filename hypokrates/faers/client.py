@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from hypokrates.cache import CacheStore, cache_key
 from hypokrates.config import get_config
 from hypokrates.constants import OPENFDA_BASE_URL, Source
 from hypokrates.exceptions import ParseError, SourceUnavailableError
@@ -95,27 +94,14 @@ class FAERSClient(BaseClient):
         Com cache TTL=24h, o valor pode ficar levemente desatualizado
         entre updates, mas a diferença é marginal para cálculos de
         desproporcionalidade.
-
-        Args:
-            search: Query string OpenFDA.
-            use_cache: Se deve usar cache.
-
-        Returns:
-            Total de reports (int). 0 se nenhum match.
         """
         params = self._build_params(search, limit=1)
-
-        should_cache = use_cache and get_config().cache_enabled
         ep = f"{DRUG_EVENT_ENDPOINT}/total"
-        key = cache_key(Source.FAERS, ep, params) if should_cache else ""
 
-        if should_cache:
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit (total): %s", key)
-                raw_total: Any = cached.get("total", 0)
-                return int(raw_total)
+        key, cached = await self._cache_lookup(ep, params, use_cache=use_cache)
+        if cached is not None:
+            raw_total: Any = cached.get("total", 0)
+            return int(raw_total)
 
         await self._rate_limiter.acquire()
         client = await self._get_client()
@@ -146,10 +132,7 @@ class FAERSClient(BaseClient):
             except (ValueError, TypeError):
                 total = 0
 
-        if should_cache:
-            store = CacheStore.get_instance()
-            await store.aset(key, {"total": total}, Source.FAERS)
-
+        await self._cache_store(key, {"total": total})
         return total
 
     def _parse_response(self, response: httpx.Response) -> dict[str, Any]:

@@ -13,30 +13,7 @@ from hypokrates.cross.api import hypothesis
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.models import MetaInfo
 from hypokrates.pubmed.models import PubMedArticle, PubMedSearchResult
-from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
-
-
-def _make_signal(*, detected: bool = True, a: int = 100) -> SignalResult:
-    """Cria SignalResult mock."""
-    return SignalResult(
-        drug="propofol",
-        event="PRIS",
-        table=ContingencyTable(a=a, b=900, c=200, d=8800),
-        prr=DisproportionalityResult(
-            measure="PRR", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=detected
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR", value=2.2, ci_lower=1.6, ci_upper=3.0, significant=detected
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=detected
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=detected
-        ),
-        signal_detected=detected,
-        meta=MetaInfo(source="OpenFDA/FAERS", retrieved_at=datetime.now(UTC)),
-    )
+from tests.helpers import make_signal
 
 
 def _make_pubmed_result(
@@ -61,7 +38,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_novel_hypothesis(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sinal detectado + 0 papers → novel_hypothesis."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis("propofol", "PRIS", use_cache=False)
@@ -75,7 +52,7 @@ class TestHypothesisAPI:
     async def test_emerging_signal(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sinal detectado + 3 papers → emerging_signal."""
         articles = [PubMedArticle(pmid=str(i), title=f"Paper {i}") for i in range(3)]
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(3, articles)
 
         result = await hypothesis("propofol", "PRIS", use_cache=False)
@@ -89,7 +66,7 @@ class TestHypothesisAPI:
     async def test_known_association(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sinal detectado + 10 papers → known_association."""
         articles = [PubMedArticle(pmid=str(i), title=f"Paper {i}") for i in range(5)]
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(10, articles)
 
         result = await hypothesis("propofol", "PRIS", use_cache=False)
@@ -101,7 +78,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_no_signal_no_literature(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sem sinal + 0 papers → no_signal."""
-        mock_signal.return_value = _make_signal(detected=False)
+        mock_signal.return_value = make_signal(event="PRIS", detected=False)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis("aspirin", "HEADACHE", use_cache=False)
@@ -112,7 +89,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_no_signal_with_literature(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sem sinal FAERS + literatura substancial → emerging (FAERS diluído)."""
-        mock_signal.return_value = _make_signal(detected=False)
+        mock_signal.return_value = make_signal(event="PRIS", detected=False)
         mock_pubmed.return_value = _make_pubmed_result(50)
 
         result = await hypothesis("aspirin", "HEADACHE", use_cache=False)
@@ -122,7 +99,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_custom_thresholds(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Thresholds customizados mudam classificação."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(3)
 
         # Default: 3 papers → emerging. Com novel_max=5 → novel.
@@ -134,7 +111,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_evidence_block_present(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """HypothesisResult tem EvidenceBlock completo."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis("propofol", "PRIS", use_cache=False)
@@ -147,7 +124,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_thresholds_in_result(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """thresholds_used reflete os valores usados."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis(
@@ -159,7 +136,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_boundary_novel_to_emerging(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Exatamente novel_max papers → novel. novel_max+1 → emerging."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
 
         # At boundary: 0 papers com novel_max=0 → novel
         mock_pubmed.return_value = _make_pubmed_result(0)
@@ -175,7 +152,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_boundary_emerging_to_known(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Exatamente emerging_max papers → emerging. emerging_max+1 → known."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
 
         # At boundary: 5 papers → emerging
         mock_pubmed.return_value = _make_pubmed_result(5)
@@ -191,7 +168,7 @@ class TestHypothesisAPI:
     @patch("hypokrates.cross.api.stats_api.signal")
     async def test_default_no_label_fields(self, mock_signal: Any, mock_pubmed: Any) -> None:
         """Sem check_label/check_trials → campos são None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         result = await hypothesis("propofol", "PRIS", use_cache=False)
@@ -217,7 +194,7 @@ class TestHypothesisWithLabel:
         """Signal + in_label=True + 0 papers → EMERGING (não NOVEL)."""
         from hypokrates.dailymed.models import LabelCheckResult
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_check_label.return_value = LabelCheckResult(
             drug="propofol",
@@ -242,7 +219,7 @@ class TestHypothesisWithLabel:
         """Signal + in_label=False + 0 papers → NOVEL (confirmado)."""
         from hypokrates.dailymed.models import LabelCheckResult
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_check_label.return_value = LabelCheckResult(
             drug="propofol",
@@ -268,7 +245,7 @@ class TestHypothesisWithLabel:
         """label_detail reflete resultado."""
         from hypokrates.dailymed.models import LabelCheckResult
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_check_label.return_value = LabelCheckResult(
             drug="propofol",
@@ -302,7 +279,7 @@ class TestHypothesisWithTrials:
         """check_trials → active_trials e trials_detail populados."""
         from hypokrates.trials.models import ClinicalTrial, TrialsResult
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_search_trials.return_value = TrialsResult(
             drug="propofol",
@@ -344,7 +321,7 @@ class TestHypothesisWithDrugBank:
             DrugTarget,
         )
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_drug_info.return_value = DrugBankInfo(
             drugbank_id="DB00818",
@@ -374,7 +351,7 @@ class TestHypothesisWithDrugBank:
         """_drugbank_cache é usado em vez de chamar API."""
         from hypokrates.drugbank.models import DrugBankInfo
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         cache = DrugBankInfo(
@@ -396,7 +373,7 @@ class TestHypothesisWithDrugBank:
         self, mock_signal: Any, mock_pubmed: Any, mock_drug_info: AsyncMock
     ) -> None:
         """DrugBank não encontrou a droga → campos None/empty."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_drug_info.return_value = None
 
@@ -421,7 +398,7 @@ class TestHypothesisGracefulDegradation:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_check_label: AsyncMock
     ) -> None:
         """check_label exception → in_label stays None, result still returned."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_check_label.side_effect = Exception("DailyMed down")
 
@@ -438,7 +415,7 @@ class TestHypothesisGracefulDegradation:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_trials: AsyncMock
     ) -> None:
         """check_trials exception → active_trials stays None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_trials.side_effect = Exception("ClinicalTrials.gov down")
 
@@ -455,7 +432,7 @@ class TestHypothesisGracefulDegradation:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_ot: AsyncMock
     ) -> None:
         """check_opentargets exception → ot_llr stays None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_ot.side_effect = Exception("OpenTargets down")
 
@@ -473,7 +450,7 @@ class TestHypothesisGracefulDegradation:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_chembl: AsyncMock
     ) -> None:
         """check_chembl exception → mechanism stays None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_chembl.side_effect = Exception("ChEMBL down")
 
@@ -489,7 +466,7 @@ class TestHypothesisGracefulDegradation:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_coadmin: AsyncMock
     ) -> None:
         """check_coadmin exception → coadmin stays None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_coadmin.side_effect = Exception("FAERS co-suspect down")
 
@@ -510,7 +487,7 @@ class TestHypothesisGracefulDegradation:
         mock_label: AsyncMock,
     ) -> None:
         """check_label + check_trials both fail → both stay None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_label.side_effect = Exception("DailyMed down")
         mock_trials.side_effect = Exception("Trials down")
@@ -538,7 +515,7 @@ class TestHypothesisWithOpenTargets:
         self, mock_signal: Any, mock_pubmed: Any, mock_ot_score: AsyncMock
     ) -> None:
         """check_opentargets → ot_llr populado."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_ot_score.return_value = 18.72
 
@@ -555,7 +532,7 @@ class TestHypothesisWithOpenTargets:
         self, mock_signal: Any, mock_pubmed: Any, mock_ot_score: AsyncMock
     ) -> None:
         """OpenTargets não encontrou o par → ot_llr=None."""
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
         mock_ot_score.return_value = None
 
@@ -569,7 +546,7 @@ class TestHypothesisWithOpenTargets:
         """_ot_safety_cache é usado em vez de chamar API."""
         from hypokrates.opentargets.models import OTAdverseEvent, OTDrugSafety
 
-        mock_signal.return_value = _make_signal(detected=True)
+        mock_signal.return_value = make_signal(event="PRIS", detected=True)
         mock_pubmed.return_value = _make_pubmed_result(0)
 
         cache = OTDrugSafety(

@@ -22,7 +22,7 @@ class TestOpenTargetsClient:
         client = OpenTargetsClient()
         with patch.object(client, "_get_client") as mock_get:
             mock_http = AsyncMock()
-            mock_http.post.return_value = mock_response
+            mock_http.request.return_value = mock_response
             mock_get.return_value = mock_http
 
             result = await client.query(
@@ -44,7 +44,7 @@ class TestOpenTargetsClient:
         client = OpenTargetsClient()
         with patch.object(client, "_get_client") as mock_get:
             mock_http = AsyncMock()
-            mock_http.post.return_value = mock_response
+            mock_http.request.return_value = mock_response
             mock_get.return_value = mock_http
 
             with pytest.raises(ParseError, match="GraphQL errors"):
@@ -57,15 +57,17 @@ class TestOpenTargetsClient:
         await client.close()
 
     async def test_query_http_error(self) -> None:
+        from hypokrates.exceptions import SourceUnavailableError
+
         request = httpx.Request("POST", "https://example.com/graphql")
         mock_response = httpx.Response(500, json={}, request=request)
         client = OpenTargetsClient()
         with patch.object(client, "_get_client") as mock_get:
             mock_http = AsyncMock()
-            mock_http.post.return_value = mock_response
+            mock_http.request.return_value = mock_response
             mock_get.return_value = mock_http
 
-            with pytest.raises(httpx.HTTPStatusError):
+            with pytest.raises(SourceUnavailableError):
                 await client.query(
                     "query { test }",
                     {"name": "test"},
@@ -101,7 +103,7 @@ class TestOpenTargetsClient:
         client = OpenTargetsClient()
         with patch.object(client, "_get_client") as mock_get:
             mock_http = AsyncMock()
-            mock_http.post.return_value = mock_response
+            mock_http.request.return_value = mock_response
             mock_get.return_value = mock_http
 
             # First call — cache miss
@@ -119,128 +121,3 @@ class TestOpenTargetsClient:
         client = OpenTargetsClient()
         with pytest.raises(ParseError, match="Invalid JSON"):
             client._parse_response(response)
-
-
-class TestPostWithRetry:
-    """Testes para _post_with_retry — retry, rate limit, timeout."""
-
-    async def test_timeout_retries(self) -> None:
-        """Timeout na primeira tentativa → retry → sucesso na segunda."""
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        mock_http.post.side_effect = [
-            httpx.TimeoutException("timeout"),
-            httpx.Response(200, json={"data": {"ok": True}}),
-        ]
-
-        response = await client._post_with_retry(mock_http, {"query": "test"})
-        assert response.status_code == 200
-        assert mock_http.post.call_count == 2
-        await client.close()
-
-    async def test_connect_error_retries(self) -> None:
-        """ConnectError na primeira tentativa → retry → sucesso."""
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        mock_http.post.side_effect = [
-            httpx.ConnectError("connection refused"),
-            httpx.Response(200, json={"data": {"ok": True}}),
-        ]
-
-        response = await client._post_with_retry(mock_http, {"query": "test"})
-        assert response.status_code == 200
-        await client.close()
-
-    async def test_timeout_exhausted_raises(self) -> None:
-        """Timeout em todas as tentativas → NetworkError."""
-        from hypokrates.exceptions import NetworkError
-
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        # MAX_RETRIES + 1 timeouts
-        mock_http.post.side_effect = httpx.TimeoutException("timeout")
-
-        with pytest.raises(NetworkError):
-            await client._post_with_retry(mock_http, {"query": "test"})
-        await client.close()
-
-    async def test_rate_limit_429_retries(self) -> None:
-        """429 na primeira tentativa → retry → sucesso."""
-
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.side_effect = [
-            httpx.Response(429, json={}, request=request),
-            httpx.Response(200, json={"data": {"ok": True}}),
-        ]
-
-        response = await client._post_with_retry(mock_http, {"query": "test"})
-        assert response.status_code == 200
-        await client.close()
-
-    async def test_rate_limit_429_with_retry_after(self) -> None:
-        """429 com Retry-After header usa o valor do header."""
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.side_effect = [
-            httpx.Response(429, json={}, headers={"Retry-After": "0.01"}, request=request),
-            httpx.Response(200, json={"data": {"ok": True}}),
-        ]
-
-        response = await client._post_with_retry(mock_http, {"query": "test"})
-        assert response.status_code == 200
-        await client.close()
-
-    async def test_rate_limit_exhausted(self) -> None:
-        """429 em todas as tentativas → RateLimitError."""
-        from hypokrates.exceptions import RateLimitError
-
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.return_value = httpx.Response(429, json={}, request=request)
-
-        with pytest.raises(RateLimitError):
-            await client._post_with_retry(mock_http, {"query": "test"})
-        await client.close()
-
-    async def test_500_retries(self) -> None:
-        """500 na primeira → retry → sucesso."""
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.side_effect = [
-            httpx.Response(500, json={}, request=request),
-            httpx.Response(200, json={"data": {"ok": True}}),
-        ]
-
-        response = await client._post_with_retry(mock_http, {"query": "test"})
-        assert response.status_code == 200
-        await client.close()
-
-    async def test_retry_exhausted_raises(self) -> None:
-        """Retry exausto sem sucesso → NetworkError."""
-        from hypokrates.exceptions import NetworkError
-
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.return_value = httpx.Response(500, json={}, request=request)
-
-        with pytest.raises((httpx.HTTPStatusError, NetworkError)):
-            await client._post_with_retry(mock_http, {"query": "test"})
-        await client.close()
-
-    async def test_400_no_retry(self) -> None:
-        """400 (não retryable) → raise imediato."""
-        client = OpenTargetsClient()
-        mock_http = AsyncMock()
-        request = httpx.Request("POST", "https://example.com/graphql")
-        mock_http.post.return_value = httpx.Response(400, json={}, request=request)
-
-        with pytest.raises(httpx.HTTPStatusError):
-            await client._post_with_retry(mock_http, {"query": "test"})
-        assert mock_http.post.call_count == 1
-        await client.close()

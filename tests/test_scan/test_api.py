@@ -8,52 +8,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
-from hypokrates.evidence.models import EvidenceBlock
 from hypokrates.faers.models import FAERSResult
-from hypokrates.models import AdverseEvent, MetaInfo
 from hypokrates.pubmed.models import PubMedArticle
 from hypokrates.scan.api import _score, scan_drug
 from hypokrates.scan.constants import LABEL_IN_MULTIPLIER, LABEL_NOT_IN_MULTIPLIER
 from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_meta() -> MetaInfo:
-    return MetaInfo(source="test", retrieved_at=datetime.now(UTC))
-
-
-def _make_signal(
-    *,
-    prr_lci: float = 1.5,
-    ror_lci: float = 1.6,
-    detected: bool = True,
-) -> SignalResult:
-    return SignalResult(
-        drug="propofol",
-        event="TEST",
-        table=ContingencyTable(a=100, b=900, c=50, d=9000),
-        prr=DisproportionalityResult(
-            measure="PRR", value=2.0, ci_lower=prr_lci, ci_upper=3.0, significant=detected
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR", value=2.1, ci_lower=ror_lci, ci_upper=3.1, significant=detected
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=detected
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=detected
-        ),
-        signal_detected=detected,
-        meta=_make_meta(),
-    )
-
-
-def _make_evidence() -> EvidenceBlock:
-    return EvidenceBlock(source="test", retrieved_at=datetime.now(UTC))
+from tests.helpers import make_events, make_evidence, make_meta, make_signal
 
 
 def _make_hypothesis_result(
@@ -72,22 +32,14 @@ def _make_hypothesis_result(
         drug="propofol",
         event=event,
         classification=classification,
-        signal=_make_signal(prr_lci=prr_lci, ror_lci=ror_lci, detected=signal_detected),
+        signal=make_signal(prr_lci=prr_lci, ror_lci=ror_lci, detected=signal_detected),
         literature_count=lit_count,
         articles=[PubMedArticle(pmid="123", title="Test")] if lit_count > 0 else [],
-        evidence=_make_evidence(),
+        evidence=make_evidence(),
         summary=f"{classification.value}: propofol + {event}",
         thresholds_used={"novel_max": 0, "emerging_max": 5},
         in_label=in_label,
         active_trials=active_trials,
-    )
-
-
-def _make_events(terms: list[str]) -> FAERSResult:
-    """Cria FAERSResult com eventos para teste."""
-    return FAERSResult(
-        events=[AdverseEvent(term=t, count=100 - i) for i, t in enumerate(terms)],
-        meta=_make_meta(),
     )
 
 
@@ -103,7 +55,7 @@ async def test_scan_basic(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """3 eventos, classificações mistas → resultado correto."""
-    mock_top_events.return_value = _make_events(["NAUSEA", "HEADACHE", "RASH"])
+    mock_top_events.return_value = make_events(["NAUSEA", "HEADACHE", "RASH"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("NAUSEA", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -134,7 +86,7 @@ async def test_scan_scoring_order(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Novel com sinal forte > emerging com sinal fraco."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result(
@@ -168,7 +120,7 @@ async def test_scan_filter_no_signal(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """include_no_signal=False filtra corretamente."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result(
@@ -196,7 +148,7 @@ async def test_scan_include_no_signal(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """include_no_signal=True inclui tudo."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -219,7 +171,7 @@ async def test_scan_empty_events(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Droga sem eventos FAERS → ScanResult vazio."""
-    mock_top_events.return_value = FAERSResult(events=[], meta=_make_meta())
+    mock_top_events.return_value = FAERSResult(events=[], meta=make_meta())
 
     result = await scan_drug("unknowndrug", top_n=10)
 
@@ -235,7 +187,7 @@ async def test_scan_partial_failure(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """1 de 3 hypothesis falha → 2 items + failed_count=1."""
-    mock_top_events.return_value = _make_events(["A", "B", "C"])
+    mock_top_events.return_value = make_events(["A", "B", "C"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -257,7 +209,7 @@ async def test_scan_all_fail(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Todos falham → items vazio, failed_count=N."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         RuntimeError("error1"),
@@ -278,7 +230,7 @@ async def test_scan_ranking(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Ranks atribuídos corretamente (1, 2, 3...)."""
-    mock_top_events.return_value = _make_events(["A", "B", "C"])
+    mock_top_events.return_value = make_events(["A", "B", "C"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result(
@@ -319,7 +271,7 @@ async def test_scan_counts(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Contadores de classificação corretos."""
-    mock_top_events.return_value = _make_events(["A", "B", "C", "D"])
+    mock_top_events.return_value = make_events(["A", "B", "C", "D"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -344,7 +296,7 @@ async def test_scan_on_progress_callback(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Callback on_progress é chamado para cada evento."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -370,7 +322,7 @@ async def test_scan_labeled_count(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """labeled_count conta eventos in_label=True."""
-    mock_top_events.return_value = _make_events(["A", "B", "C"])
+    mock_top_events.return_value = make_events(["A", "B", "C"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.NOVEL_HYPOTHESIS, in_label=True),
@@ -399,7 +351,7 @@ async def test_scan_passes_check_labels_and_trials(
     from hypokrates.dailymed.models import LabelEventsResult
     from hypokrates.models import MetaInfo as _Meta
 
-    mock_top_events.return_value = _make_events(["A"])
+    mock_top_events.return_value = make_events(["A"])
     mock_label_events.return_value = LabelEventsResult(
         drug="propofol", meta=_Meta(source="test", retrieved_at=datetime.now(UTC))
     )
@@ -424,7 +376,7 @@ async def test_scan_items_have_label_fields(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """ScanItem tem in_label e active_trials."""
-    mock_top_events.return_value = _make_events(["A"])
+    mock_top_events.return_value = make_events(["A"])
 
     mock_hypothesis.return_value = _make_hypothesis_result(
         "A",
@@ -524,7 +476,7 @@ async def test_scan_group_events_merges_synonyms(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """group_events=True consolida sinônimos MedDRA."""
-    mock_top_events.return_value = _make_events(
+    mock_top_events.return_value = make_events(
         ["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION", "BRADYCARDIA"]
     )
 
@@ -556,7 +508,7 @@ async def test_scan_group_events_disabled(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """group_events=False mantém todos separados."""
-    mock_top_events.return_value = _make_events(["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION"])
+    mock_top_events.return_value = make_events(["ANAPHYLACTIC SHOCK", "ANAPHYLACTIC REACTION"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("ANAPHYLACTIC SHOCK", HypothesisClassification.NOVEL_HYPOTHESIS),
@@ -582,7 +534,7 @@ async def test_scan_check_drugbank(
     """check_drugbank → ScanResult tem mechanism, interactions_count, cyp_enzymes."""
     from hypokrates.drugbank.models import DrugBankInfo, DrugEnzyme, DrugInteraction
 
-    mock_top_events.return_value = _make_events(["A"])
+    mock_top_events.return_value = make_events(["A"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "A", HypothesisClassification.NOVEL_HYPOTHESIS
     )
@@ -617,14 +569,14 @@ async def test_scan_check_opentargets(
     """check_opentargets → _ot_safety_cache passado para hypothesis."""
     from hypokrates.opentargets.models import OTDrugSafety
 
-    mock_top_events.return_value = _make_events(["A"])
+    mock_top_events.return_value = make_events(["A"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "A", HypothesisClassification.NOVEL_HYPOTHESIS
     )
     mock_ot_events.return_value = OTDrugSafety(
         drug_name="propofol",
         chembl_id="CHEMBL526",
-        meta=_make_meta(),
+        meta=make_meta(),
     )
 
     result = await scan_drug("propofol", top_n=1, check_opentargets=True, group_events=False)
@@ -647,7 +599,7 @@ async def test_scan_filter_operational_removes_blocklisted_terms(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """filter_operational=True remove termos operacionais antes de rodar hypothesis."""
-    mock_top_events.return_value = _make_events(
+    mock_top_events.return_value = make_events(
         ["NAUSEA", "OFF LABEL USE", "DRUG INEFFECTIVE", "DEATH", "HEADACHE"]
     )
 
@@ -675,7 +627,7 @@ async def test_scan_filter_operational_disabled(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """filter_operational=False mantém todos os termos."""
-    mock_top_events.return_value = _make_events(["NAUSEA", "OFF LABEL USE"])
+    mock_top_events.return_value = make_events(["NAUSEA", "OFF LABEL USE"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION),
@@ -697,7 +649,7 @@ async def test_scan_volume_flag_set_when_above_threshold(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """volume_flag=True quando cell a >= VOLUME_ANOMALY_THRESHOLD."""
-    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_top_events.return_value = make_events(["NAUSEA"])
 
     # Criar hypothesis com signal que tem a=5000 (acima do limiar de 2000)
     hyp = _make_hypothesis_result("NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION)
@@ -718,7 +670,7 @@ async def test_scan_volume_flag_set_when_above_threshold(
             measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
         ),
         signal_detected=True,
-        meta=_make_meta(),
+        meta=make_meta(),
     )
     mock_hypothesis.return_value = hyp
 
@@ -735,7 +687,7 @@ async def test_scan_volume_flag_false_when_below_threshold(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """volume_flag=False quando cell a < VOLUME_ANOMALY_THRESHOLD."""
-    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_top_events.return_value = make_events(["NAUSEA"])
 
     mock_hypothesis.return_value = _make_hypothesis_result(
         "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
@@ -754,7 +706,7 @@ async def test_scan_filter_operational_case_insensitive(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """Filtro operacional funciona independente de case."""
-    mock_top_events.return_value = _make_events(["off label use", "NAUSEA"])
+    mock_top_events.return_value = make_events(["off label use", "NAUSEA"])
 
     mock_hypothesis.return_value = _make_hypothesis_result(
         "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
@@ -773,7 +725,7 @@ async def test_scan_suspect_only_propagated(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """suspect_only propaga para top_events e hypothesis."""
-    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_top_events.return_value = make_events(["NAUSEA"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
     )
@@ -797,7 +749,7 @@ async def test_scan_overfetch_fetches_more_than_top_n(
 ) -> None:
     """Over-fetch busca top_n*3 eventos mas retorna top_n por score."""
     # Simular 9 eventos retornados (top_n=3, fetch_limit=9)
-    mock_top_events.return_value = _make_events(["A", "B", "C", "D", "E", "F", "G", "H", "I"])
+    mock_top_events.return_value = make_events(["A", "B", "C", "D", "E", "F", "G", "H", "I"])
 
     mock_hypothesis.side_effect = [
         _make_hypothesis_result("A", HypothesisClassification.KNOWN_ASSOCIATION, prr_lci=1.0),
@@ -849,7 +801,7 @@ async def test_scan_check_chembl_enrichment(
     """check_chembl → ScanResult tem mechanism e cyp_enzymes do ChEMBL."""
     from hypokrates.chembl.models import ChEMBLMechanism, ChEMBLTarget
 
-    mock_top_events.return_value = _make_events(["A"])
+    mock_top_events.return_value = make_events(["A"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "A", HypothesisClassification.NOVEL_HYPOTHESIS
     )
@@ -864,7 +816,7 @@ async def test_scan_check_chembl_enrichment(
                 gene_names=["GABRA1", "GABRA2"],
             ),
         ],
-        meta=MetaInfo(source="test", retrieved_at=datetime.now(UTC)),
+        meta=make_meta(),
     )
 
     result = await scan_drug("propofol", top_n=1, check_chembl=True, group_events=False)
@@ -884,7 +836,7 @@ async def test_scan_progress_on_failure(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """on_progress é chamado mesmo quando hypothesis falha."""
-    mock_top_events.return_value = _make_events(["A", "B"])
+    mock_top_events.return_value = make_events(["A", "B"])
 
     mock_hypothesis.side_effect = [
         RuntimeError("API error"),
@@ -982,7 +934,7 @@ async def test_scan_primary_suspect_only_fallback_without_bulk(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """primary_suspect_only=True sem bulk → warning, fallback to suspect_only."""
-    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_top_events.return_value = make_events(["NAUSEA"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "NAUSEA", HypothesisClassification.KNOWN_ASSOCIATION
     )
@@ -1022,7 +974,7 @@ async def test_scan_direction_analysis_strengthens(
         )
 
         # PS-only signal com PRR=3.0 (> 2.0 * 1.2 = 2.4 → strengthens)
-        mock_bulk_signal.return_value = _make_signal(prr_lci=2.5)
+        mock_bulk_signal.return_value = make_signal(prr_lci=2.5)
         mock_bulk_signal.return_value = SignalResult(
             drug="propofol",
             event="NAUSEA",
@@ -1040,7 +992,7 @@ async def test_scan_direction_analysis_strengthens(
                 measure="EBGM", value=3.0, ci_lower=2.5, ci_upper=3.5, significant=True
             ),
             signal_detected=True,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         result = await scan_drug(
@@ -1097,7 +1049,7 @@ async def test_scan_direction_analysis_weakens(
                 measure="EBGM", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=False
             ),
             signal_detected=True,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         result = await scan_drug(
@@ -1117,7 +1069,7 @@ async def test_scan_direction_skipped_without_bulk(
     mock_hypothesis: AsyncMock,
 ) -> None:
     """check_direction=True sem bulk → ignorado (sem PS-only sem bulk)."""
-    mock_top_events.return_value = _make_events(["NAUSEA"])
+    mock_top_events.return_value = make_events(["NAUSEA"])
     mock_hypothesis.return_value = _make_hypothesis_result(
         "NAUSEA", HypothesisClassification.EMERGING_SIGNAL, lit_count=3
     )

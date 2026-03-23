@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from hypokrates.cache import CacheStore, cache_key
-from hypokrates.config import get_config
 from hypokrates.constants import DAILYMED_BASE_URL, HTTPSettings, Source
 from hypokrates.http.base_client import BaseClient, ParamsType
 from hypokrates.http.retry import retry_request
@@ -56,27 +54,13 @@ class DailyMedClient(BaseClient):
         *,
         use_cache: bool = True,
     ) -> str:
-        """Busca XML completo de um SPL por SET ID.
-
-        Args:
-            set_id: UUID do SPL (SET ID).
-            use_cache: Se deve usar cache.
-
-        Returns:
-            XML text do SPL.
-        """
+        """Busca XML completo de um SPL por SET ID."""
         endpoint = f"{SPL_ENDPOINT}/{set_id}.xml"
         cache_params: ParamsType = {"set_id": set_id}
 
-        should_cache = use_cache and get_config().cache_enabled
-        key = cache_key(Source.DAILYMED, endpoint, cache_params) if should_cache else ""
-
-        if should_cache:
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return str(cached.get("xml", ""))
+        key, cached = await self._cache_lookup(endpoint, cache_params, use_cache=use_cache)
+        if cached is not None:
+            return str(cached.get("xml", ""))
 
         await self._rate_limiter.acquire()
         client = await self._get_client()
@@ -88,9 +72,5 @@ class DailyMedClient(BaseClient):
         )
 
         xml_text = response.text
-
-        if should_cache:
-            store = CacheStore.get_instance()
-            await store.aset(key, {"xml": xml_text}, Source.DAILYMED)
-
+        await self._cache_store(key, {"xml": xml_text})
         return xml_text

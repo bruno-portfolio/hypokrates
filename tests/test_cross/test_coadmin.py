@@ -7,12 +7,7 @@ from unittest.mock import AsyncMock, patch
 from hypokrates.cross.api import coadmin_analysis, hypothesis
 from hypokrates.cross.constants import OVERLAP_THRESHOLD, SPECIFICITY_RATIO_THRESHOLD
 from hypokrates.faers.models import CoSuspectProfile, DrugCount, DrugsByEventResult
-from hypokrates.models import MetaInfo
-from hypokrates.stats.models import (
-    ContingencyTable,
-    DisproportionalityResult,
-    SignalResult,
-)
+from tests.helpers import make_meta, make_signal
 
 
 def _make_profile(
@@ -41,18 +36,6 @@ def _make_profile(
     )
 
 
-def _make_meta() -> MetaInfo:
-    """Builder para MetaInfo."""
-    from datetime import UTC, datetime
-
-    return MetaInfo(
-        source="test",
-        query={},
-        total_results=0,
-        retrieved_at=datetime.now(UTC),
-    )
-
-
 def _make_drugs_by_event(
     names: list[str],
 ) -> DrugsByEventResult:
@@ -60,34 +43,7 @@ def _make_drugs_by_event(
     return DrugsByEventResult(
         event="ANAPHYLACTIC SHOCK",
         drugs=[DrugCount(name=n, count=100 - i * 10) for i, n in enumerate(names)],
-        meta=_make_meta(),
-    )
-
-
-def _make_signal_result(
-    drug: str = "PROPOFOL",
-    prr: float = 50.0,
-    signal_detected: bool = True,
-) -> SignalResult:
-    """Builder para SignalResult."""
-    return SignalResult(
-        drug=drug,
-        event="ANAPHYLACTIC SHOCK",
-        table=ContingencyTable(a=100, b=1000, c=5000, d=1000000),
-        prr=DisproportionalityResult(
-            measure="PRR", value=prr, ci_lower=prr * 0.9, ci_upper=prr * 1.1, significant=True
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR", value=prr, ci_lower=prr * 0.9, ci_upper=prr * 1.1, significant=True
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=5.0, ci_lower=4.5, ci_upper=5.5, significant=True
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=4.0, ci_lower=3.5, ci_upper=4.5, significant=True
-        ),
-        signal_detected=signal_detected,
-        meta=_make_meta(),
+        meta=make_meta(),
     )
 
 
@@ -112,7 +68,9 @@ class TestCoAdminAnalysisVerdicts:
             patch(
                 "hypokrates.cross.api.stats_api.signal",
                 new_callable=AsyncMock,
-                side_effect=lambda drug, event, **kw: _make_signal_result(drug, prr=48.0),
+                side_effect=lambda drug, event, **kw: make_signal(
+                    drug=drug, event="ANAPHYLACTIC SHOCK", prr=48.0
+                ),
             ),
         ):
             result = await coadmin_analysis(
@@ -166,7 +124,9 @@ class TestCoAdminAnalysisVerdicts:
                 "hypokrates.cross.api.stats_api.signal",
                 new_callable=AsyncMock,
                 # Co-drugs têm PRR muito baixo → specificity ratio alto
-                side_effect=lambda drug, event, **kw: _make_signal_result(drug, prr=5.0),
+                side_effect=lambda drug, event, **kw: make_signal(
+                    drug=drug, event="ANAPHYLACTIC SHOCK", prr=5.0
+                ),
             ),
         ):
             result = await coadmin_analysis(
@@ -244,7 +204,9 @@ class TestCoAdminAnalysisVerdicts:
             patch(
                 "hypokrates.cross.api.stats_api.signal",
                 new_callable=AsyncMock,
-                side_effect=lambda drug, event, **kw: _make_signal_result(drug, prr=45.0),
+                side_effect=lambda drug, event, **kw: make_signal(
+                    drug=drug, event="ANAPHYLACTIC SHOCK", prr=45.0
+                ),
             ),
         ):
             result = await coadmin_analysis(
@@ -258,14 +220,12 @@ class TestCoAdminAnalysisVerdicts:
 
 def _make_pubmed() -> object:
     """Cria PubMedSearchResult mock."""
-    from datetime import UTC, datetime
-
     from hypokrates.pubmed.models import PubMedSearchResult
 
     return PubMedSearchResult(
         total_count=10,
         articles=[],
-        meta=MetaInfo(source="NCBI/PubMed", retrieved_at=datetime.now(UTC)),
+        meta=make_meta(source="NCBI/PubMed"),
     )
 
 
@@ -278,7 +238,9 @@ class TestHypothesisCoAdminIntegration:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock
     ) -> None:
         """check_coadmin=False (default) → coadmin é None."""
-        mock_signal.return_value = _make_signal_result()
+        mock_signal.return_value = make_signal(
+            event="ANAPHYLACTIC SHOCK",
+        )
         mock_pubmed.return_value = _make_pubmed()
 
         result = await hypothesis("propofol", "anaphylactic shock")
@@ -292,7 +254,7 @@ class TestHypothesisCoAdminIntegration:
         self, mock_signal: AsyncMock, mock_pubmed: AsyncMock, mock_profile: AsyncMock
     ) -> None:
         """Sem sinal FAERS e sem co_admin_flag → Layer 1 only."""
-        mock_signal.return_value = _make_signal_result(signal_detected=False, prr=0.5)
+        mock_signal.return_value = make_signal(event="ANAPHYLACTIC SHOCK", detected=False, prr=0.5)
         mock_pubmed.return_value = _make_pubmed()
         mock_profile.return_value = _make_profile(
             median=2.0,
@@ -317,7 +279,9 @@ class TestHypothesisCoAdminIntegration:
         mock_dbe: AsyncMock,
     ) -> None:
         """check_coadmin=True + signal detected → coadmin é populado."""
-        mock_signal.return_value = _make_signal_result()
+        mock_signal.return_value = make_signal(
+            event="ANAPHYLACTIC SHOCK",
+        )
         mock_pubmed.return_value = _make_pubmed()
         mock_profile.return_value = _make_profile()
         mock_dbe.return_value = _make_drugs_by_event(["ROCURONIUM", "FENTANYL", "CEFAZOLIN"])

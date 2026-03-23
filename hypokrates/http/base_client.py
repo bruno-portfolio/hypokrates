@@ -62,6 +62,39 @@ class BaseClient:
         """Sai do context manager e fecha o client."""
         await self.close()
 
+    async def _cache_lookup(
+        self,
+        endpoint: str,
+        params: ParamsType | None = None,
+        *,
+        use_cache: bool = True,
+        cache_source: str | None = None,
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Check cache. Returns (key, cached_data_or_None). key="" if cache disabled."""
+        src = cache_source or self._source
+        if not (use_cache and get_config().cache_enabled):
+            return "", None
+        key = cache_key(src, endpoint, params)
+        store = CacheStore.get_instance()
+        cached = await store.aget(key)
+        if cached is not None:
+            logger.debug("Cache hit: %s", key)
+        return key, cached
+
+    async def _cache_store(
+        self,
+        key: str,
+        data: dict[str, Any],
+        *,
+        cache_source: str | None = None,
+    ) -> None:
+        """Store data in cache. No-op if key is empty (cache disabled)."""
+        if not key:
+            return
+        src = cache_source or self._source
+        store = CacheStore.get_instance()
+        await store.aset(key, data, src)
+
     async def _cached_get(
         self,
         endpoint: str,
@@ -72,31 +105,16 @@ class BaseClient:
         cache_source: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """GET com cache + rate limit + retry + parse.
-
-        Args:
-            endpoint: Endpoint relativo à base_url.
-            params: Query params.
-            use_cache: Se deve usar cache.
-            cache_suffix: Sufixo para diferenciar cache keys (e.g. "/count").
-            cache_source: Source para cache key (default: self._source).
-            headers: Headers extras para o request.
-
-        Returns:
-            JSON response parseado.
-        """
-        src = cache_source or self._source
+        """GET com cache + rate limit + retry + parse."""
         cache_ep = f"{endpoint}{cache_suffix}" if cache_suffix else endpoint
-        should_cache = use_cache and get_config().cache_enabled
-        store = CacheStore.get_instance() if should_cache else None
-        key = ""
-
-        if store is not None:
-            key = cache_key(src, cache_ep, params)
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
+        key, cached = await self._cache_lookup(
+            cache_ep,
+            params,
+            use_cache=use_cache,
+            cache_source=cache_source,
+        )
+        if cached is not None:
+            return cached
 
         await self._rate_limiter.acquire()
         client = await self._get_client()
@@ -110,10 +128,7 @@ class BaseClient:
         )
 
         data = self._parse_response(response)
-
-        if store is not None:
-            await store.aset(key, data, src)
-
+        await self._cache_store(key, data, cache_source=cache_source)
         return data
 
     def _parse_response(self, response: httpx.Response) -> dict[str, Any]:

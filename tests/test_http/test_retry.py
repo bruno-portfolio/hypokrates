@@ -10,7 +10,8 @@ import respx
 
 from hypokrates.constants import HTTPSettings
 from hypokrates.exceptions import NetworkError, RateLimitError, SourceUnavailableError
-from hypokrates.http.retry import _backoff, _parse_retry_after, retry_request
+from hypokrates.http.retry import _parse_retry_after, retry_request
+from hypokrates.http.retry import calculate_backoff as _backoff
 from hypokrates.http.settings import create_client
 
 

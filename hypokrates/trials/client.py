@@ -10,12 +10,10 @@ import asyncio
 import logging
 from typing import Any
 
-from hypokrates.cache import CacheStore, cache_key
-from hypokrates.config import get_config
 from hypokrates.constants import TRIALS_BASE_URL, HTTPSettings, Source
 from hypokrates.exceptions import NetworkError, ParseError, RateLimitError
 from hypokrates.http.base_client import BaseClient, ParamsType
-from hypokrates.http.retry import retry_request
+from hypokrates.http.retry import calculate_backoff, retry_request
 
 from .constants import STUDIES_ENDPOINT
 
@@ -53,40 +51,20 @@ class TrialsClient(BaseClient):
         page_size: int = 10,
         use_cache: bool = True,
     ) -> dict[str, Any]:
-        """Busca trials clínicos por droga e evento.
-
-        Args:
-            drug: Nome da droga (intervention).
-            event: Termo do evento (condition).
-            page_size: Máximo de resultados.
-            use_cache: Se deve usar cache.
-
-        Returns:
-            JSON response de /studies.
-        """
+        """Busca trials clínicos por droga e evento."""
         params: ParamsType = {
             "query.intr": drug,
             "query.cond": event,
             "pageSize": page_size,
         }
 
-        should_cache = use_cache and get_config().cache_enabled
-        key = cache_key(Source.TRIALS, STUDIES_ENDPOINT, params) if should_cache else ""
-
-        if should_cache:
-            store = CacheStore.get_instance()
-            cached = await store.aget(key)
-            if cached is not None:
-                logger.debug("Cache hit: %s", key)
-                return cached
+        key, cached = await self._cache_lookup(STUDIES_ENDPOINT, params, use_cache=use_cache)
+        if cached is not None:
+            return cached
 
         await self._rate_limiter.acquire()
         data = await self._fetch(params)
-
-        if should_cache:
-            store = CacheStore.get_instance()
-            await store.aset(key, data, Source.TRIALS)
-
+        await self._cache_store(key, data)
         return data
 
     async def _fetch(self, params: ParamsType) -> dict[str, Any]:
@@ -117,7 +95,7 @@ class TrialsClient(BaseClient):
 
                 if status == 429:
                     if attempt < max_retries:
-                        wait = HTTPSettings.BACKOFF_BASE * (HTTPSettings.BACKOFF_FACTOR**attempt)
+                        wait = calculate_backoff(attempt)
                         logger.warning(
                             "Rate limit %s (attempt %d/%d, wait %.1fs)",
                             Source.TRIALS,
@@ -130,7 +108,7 @@ class TrialsClient(BaseClient):
                     raise RateLimitError(Source.TRIALS, None)
 
                 if status >= 500 and attempt < max_retries:
-                    wait = HTTPSettings.BACKOFF_BASE * (HTTPSettings.BACKOFF_FACTOR**attempt)
+                    wait = calculate_backoff(attempt)
                     logger.warning(
                         "HTTP %d from %s (attempt %d/%d, wait %.1fs)",
                         status,
@@ -150,7 +128,7 @@ class TrialsClient(BaseClient):
             except (OSError, ConnectionError) as exc:
                 last_error = exc
                 if attempt < max_retries:
-                    wait = HTTPSettings.BACKOFF_BASE * (HTTPSettings.BACKOFF_FACTOR**attempt)
+                    wait = calculate_backoff(attempt)
                     logger.warning(
                         "Connection error %s (attempt %d/%d, wait %.1fs)",
                         Source.TRIALS,

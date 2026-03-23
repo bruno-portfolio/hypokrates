@@ -13,67 +13,9 @@ from hypokrates.cross.models import (
     InvestigationResult,
     StratumSignal,
 )
-from hypokrates.evidence.models import EvidenceBlock
 from hypokrates.faers.models import CoSuspectProfile
-from hypokrates.models import MetaInfo
-from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
-
-
-def _make_meta() -> MetaInfo:
-    from datetime import UTC, datetime
-
-    return MetaInfo(
-        source="test",
-        query={},
-        total_results=0,
-        retrieved_at=datetime.now(UTC),
-        disclaimer="test",
-    )
-
-
-def _make_measure(
-    name: str = "PRR", value: float = 3.0, sig: bool = True
-) -> DisproportionalityResult:
-    return DisproportionalityResult(
-        measure=name,
-        value=value,
-        ci_lower=1.5 if sig else 0.5,
-        ci_upper=6.0,
-        significant=sig,
-    )
-
-
-def _make_signal(
-    drug: str = "atorvastatin",
-    event: str = "myalgia",
-    *,
-    a: int = 100,
-    prr: float = 3.0,
-    detected: bool = True,
-) -> SignalResult:
-    return SignalResult(
-        drug=drug,
-        event=event,
-        table=ContingencyTable(a=a, b=500, c=200, d=50000),
-        prr=_make_measure("PRR", prr, detected),
-        ror=_make_measure("ROR", prr * 1.1, detected),
-        ic=_make_measure("IC", 1.5, detected),
-        ebgm=_make_measure("EBGM", 2.0, detected),
-        signal_detected=detected,
-        meta=_make_meta(),
-    )
-
-
-def _make_evidence() -> EvidenceBlock:
-    from datetime import UTC, datetime
-
-    return EvidenceBlock(
-        source="test",
-        retrieved_at=datetime.now(UTC),
-        confidence="high",
-        methodology="test",
-        data={},
-    )
+from hypokrates.stats.models import SignalResult
+from tests.helpers import make_evidence, make_signal
 
 
 def _make_hypothesis(
@@ -91,9 +33,9 @@ def _make_hypothesis(
         drug="atorvastatin",
         event="myalgia",
         classification=HypothesisClassification.KNOWN_ASSOCIATION,
-        signal=_make_signal(a=a, prr=prr),
+        signal=make_signal(drug="atorvastatin", event="myalgia", a=a, prr=prr),
         literature_count=15,
-        evidence=_make_evidence(),
+        evidence=make_evidence(confidence="high", methodology="test"),
         summary="Known association.",
         canada_reports=canada_reports,
         canada_signal=canada_signal,
@@ -105,7 +47,7 @@ def _make_hypothesis(
 
 
 def _make_bulk_signal(a: int = 50, prr: float = 2.5, detected: bool = True) -> SignalResult:
-    return _make_signal(a=a, prr=prr, detected=detected)
+    return make_signal(drug="atorvastatin", event="myalgia", a=a, prr=prr, detected=detected)
 
 
 class TestInvestigateResult:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 import httpx
 
@@ -23,6 +24,7 @@ async def retry_request(
     *,
     params: ParamsType | None = None,
     headers: dict[str, str] | None = None,
+    json_body: dict[str, Any] | None = None,
     max_retries: int | None = None,
     source_name: str = "unknown",
 ) -> httpx.Response:
@@ -35,12 +37,18 @@ async def retry_request(
 
     for attempt in range(retries + 1):
         try:
-            response = await client.request(method, url, params=params, headers=headers)
+            response = await client.request(
+                method,
+                url,
+                params=params,
+                headers=headers,
+                json=json_body,
+            )
 
             if response.status_code == 429:
                 retry_after = _parse_retry_after(response)
                 if attempt < retries:
-                    wait = retry_after or _backoff(attempt)
+                    wait = retry_after or calculate_backoff(attempt)
                     logger.warning(
                         "Rate limit %s (attempt %d/%d, wait %.1fs)",
                         source_name,
@@ -53,7 +61,7 @@ async def retry_request(
                 raise RateLimitError(source_name, retry_after)
 
             if response.status_code in _RETRYABLE_STATUS and attempt < retries:
-                wait = _backoff(attempt)
+                wait = calculate_backoff(attempt)
                 logger.warning(
                     "HTTP %d from %s (attempt %d/%d, wait %.1fs)",
                     response.status_code,
@@ -76,7 +84,7 @@ async def retry_request(
         except httpx.TimeoutException as exc:
             last_error = exc
             if attempt < retries:
-                wait = _backoff(attempt)
+                wait = calculate_backoff(attempt)
                 logger.warning(
                     "Timeout %s (attempt %d/%d, wait %.1fs)",
                     source_name,
@@ -90,7 +98,7 @@ async def retry_request(
         except httpx.ConnectError as exc:
             last_error = exc
             if attempt < retries:
-                wait = _backoff(attempt)
+                wait = calculate_backoff(attempt)
                 logger.warning(
                     "Connection error %s (attempt %d/%d, wait %.1fs)",
                     source_name,
@@ -113,7 +121,7 @@ async def retry_request(
     raise NetworkError(url, msg)
 
 
-def _backoff(attempt: int) -> float:
+def calculate_backoff(attempt: int) -> float:
     """Calcula delay com exponential backoff."""
     delay = HTTPSettings.BACKOFF_BASE * (HTTPSettings.BACKOFF_FACTOR**attempt)
     return min(delay, HTTPSettings.BACKOFF_MAX)

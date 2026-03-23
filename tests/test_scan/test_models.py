@@ -5,43 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from hypokrates.cross.models import HypothesisClassification
-from hypokrates.evidence.models import EvidenceBlock
 from hypokrates.models import MetaInfo
 from hypokrates.scan.models import ScanItem, ScanResult
-from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
-
-
-def _make_signal() -> SignalResult:
-    """Cria SignalResult mínimo para testes."""
-    table = ContingencyTable(a=100, b=900, c=50, d=9000)
-    measure = DisproportionalityResult(
-        measure="PRR", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-    )
-    return SignalResult(
-        drug="propofol",
-        event="HYPOTENSION",
-        table=table,
-        prr=measure,
-        ror=DisproportionalityResult(
-            measure="ROR", value=2.1, ci_lower=1.6, ci_upper=2.7, significant=True
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-        ),
-        signal_detected=True,
-        meta=MetaInfo(source="test", retrieved_at=datetime.now(UTC)),
-    )
-
-
-def _make_evidence() -> EvidenceBlock:
-    """Cria EvidenceBlock mínimo para testes."""
-    return EvidenceBlock(
-        source="test",
-        retrieved_at=datetime.now(UTC),
-    )
+from tests.helpers import make_evidence, make_signal
 
 
 class TestScanItem:
@@ -52,9 +18,9 @@ class TestScanItem:
             drug="propofol",
             event="HYPOTENSION",
             classification=HypothesisClassification.NOVEL_HYPOTHESIS,
-            signal=_make_signal(),
+            signal=make_signal(event="HYPOTENSION"),
             literature_count=0,
-            evidence=_make_evidence(),
+            evidence=make_evidence(),
             summary="Novel hypothesis: PROPOFOL + HYPOTENSION.",
             score=15.0,
             rank=1,
@@ -72,9 +38,9 @@ class TestScanItem:
             drug="propofol",
             event="HYPOTENSION",
             classification=HypothesisClassification.EMERGING_SIGNAL,
-            signal=_make_signal(),
+            signal=make_signal(event="HYPOTENSION"),
             literature_count=3,
-            evidence=_make_evidence(),
+            evidence=make_evidence(),
             summary="test",
             score=7.5,
             rank=2,

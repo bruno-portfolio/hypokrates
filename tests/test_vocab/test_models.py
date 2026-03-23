@@ -2,14 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
-from hypokrates.models import MetaInfo
 from hypokrates.vocab.models import DrugNormResult, MeSHResult
-
-
-def _make_meta() -> MetaInfo:
-    return MetaInfo(source="test", retrieved_at=datetime.now(UTC))
+from tests.helpers import make_meta
 
 
 class TestDrugNormResult:
@@ -21,7 +15,7 @@ class TestDrugNormResult:
             generic_name="ibuprofen",
             brand_names=["Advil", "Motrin"],
             rxcui="5640",
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         assert result.original == "advil"
         assert result.generic_name == "ibuprofen"
@@ -34,7 +28,7 @@ class TestDrugNormResult:
             generic_name="ibuprofen",
             brand_names=["Advil"],
             rxcui="5640",
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         data = result.model_dump()
         restored = DrugNormResult.model_validate(data)
@@ -44,7 +38,7 @@ class TestDrugNormResult:
     def test_generic_name_none(self) -> None:
         result = DrugNormResult(
             original="xyz123",
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         assert result.generic_name is None
         assert result.brand_names == []
@@ -60,7 +54,7 @@ class TestMeSHResult:
             mesh_id="D001241",
             mesh_term="Aspirin",
             tree_numbers=["D02.455.426.559.389.657.109"],
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         assert result.query == "aspirin"
         assert result.mesh_id == "D001241"
@@ -73,7 +67,7 @@ class TestMeSHResult:
             mesh_id="D001241",
             mesh_term="Aspirin",
             tree_numbers=["D02.455"],
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         data = result.model_dump()
         restored = MeSHResult.model_validate(data)
@@ -83,7 +77,7 @@ class TestMeSHResult:
     def test_mesh_term_none(self) -> None:
         result = MeSHResult(
             query="xyz123",
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         assert result.mesh_term is None
         assert result.mesh_id is None

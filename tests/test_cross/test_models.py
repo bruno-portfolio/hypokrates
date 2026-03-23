@@ -6,32 +6,8 @@ from datetime import UTC, datetime
 
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
 from hypokrates.evidence.models import EvidenceBlock
-from hypokrates.models import MetaInfo
 from hypokrates.pubmed.models import PubMedArticle
-from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
-
-
-def _make_signal_result(*, signal_detected: bool = True) -> SignalResult:
-    """Helper para criar SignalResult de teste."""
-    return SignalResult(
-        drug="propofol",
-        event="PRIS",
-        table=ContingencyTable(a=100, b=900, c=200, d=8800),
-        prr=DisproportionalityResult(
-            measure="PRR", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR", value=2.2, ci_lower=1.6, ci_upper=3.0, significant=True
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-        ),
-        signal_detected=signal_detected,
-        meta=MetaInfo(source="OpenFDA/FAERS", retrieved_at=datetime.now(UTC)),
-    )
+from tests.helpers import make_signal
 
 
 class TestHypothesisClassification:
@@ -55,7 +31,7 @@ class TestHypothesisResult:
             drug="propofol",
             event="PRIS",
             classification=HypothesisClassification.NOVEL_HYPOTHESIS,
-            signal=_make_signal_result(),
+            signal=make_signal(event="PRIS"),
             literature_count=0,
             evidence=EvidenceBlock(
                 source="FAERS+PubMed",
@@ -75,7 +51,7 @@ class TestHypothesisResult:
             drug="propofol",
             event="PRIS",
             classification=HypothesisClassification.EMERGING_SIGNAL,
-            signal=_make_signal_result(),
+            signal=make_signal(event="PRIS"),
             literature_count=3,
             articles=articles,
             evidence=EvidenceBlock(
@@ -92,7 +68,7 @@ class TestHypothesisResult:
             drug="propofol",
             event="PRIS",
             classification=HypothesisClassification.KNOWN_ASSOCIATION,
-            signal=_make_signal_result(),
+            signal=make_signal(event="PRIS"),
             literature_count=10,
             evidence=EvidenceBlock(
                 source="FAERS+PubMed",

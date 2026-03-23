@@ -15,17 +15,16 @@ import pytest
 
 from hypokrates.constants import __version__
 from hypokrates.cross.models import HypothesisClassification, HypothesisResult
-from hypokrates.evidence.models import EvidenceBlock
 from hypokrates.faers.models import (
     FAERSReaction,
     FAERSReport,
     FAERSResult,
 )
-from hypokrates.models import AdverseEvent, MetaInfo
+from hypokrates.models import AdverseEvent
 from hypokrates.pubmed.models import PubMedArticle, PubMedSearchResult
 from hypokrates.scan.models import ScanItem, ScanResult
-from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
 from hypokrates.vocab.models import DrugNormResult, MeSHResult
+from tests.helpers import make_evidence, make_meta, make_signal
 
 # ---------------------------------------------------------------------------
 # ToolCapture — mock do FastMCP para capturar funções registradas
@@ -49,51 +48,6 @@ class ToolCapture:
 # ---------------------------------------------------------------------------
 # Fixtures de dados de teste
 # ---------------------------------------------------------------------------
-
-
-def _make_meta(source: str = "test", total: int = 0) -> MetaInfo:
-    return MetaInfo(
-        source=source,
-        query={"test": True},
-        total_results=total,
-        retrieved_at=datetime.now(UTC),
-    )
-
-
-def _make_signal(
-    drug: str = "propofol",
-    event: str = "HYPOTENSION",
-    *,
-    detected: bool = True,
-    a: int = 100,
-) -> SignalResult:
-    return SignalResult(
-        drug=drug,
-        event=event,
-        table=ContingencyTable(a=a, b=900, c=50, d=9000),
-        prr=DisproportionalityResult(
-            measure="PRR", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR", value=2.2, ci_lower=1.6, ci_upper=2.8, significant=True
-        ),
-        ic=DisproportionalityResult(
-            measure="IC", value=1.0, ci_lower=0.5, ci_upper=1.5, significant=True
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM", value=2.0, ci_lower=1.5, ci_upper=2.5, significant=True
-        ),
-        signal_detected=detected,
-        meta=_make_meta("OpenFDA/FAERS"),
-    )
-
-
-def _make_evidence() -> EvidenceBlock:
-    return EvidenceBlock(
-        source="OpenFDA/FAERS",
-        retrieved_at=datetime.now(UTC),
-        data={"drug": "propofol"},
-    )
 
 
 def _make_article(
@@ -136,7 +90,7 @@ class TestFAERSTools:
                     reactions=[FAERSReaction(term="NAUSEA"), FAERSReaction(term="VOMITING")],
                 )
             ],
-            meta=_make_meta("OpenFDA/FAERS", total=100),
+            meta=make_meta(source="OpenFDA/FAERS", total=100),
         )
 
         with patch.object(faers, "faers_api") as mock_api:
@@ -161,7 +115,7 @@ class TestFAERSTools:
                 AdverseEvent(term="NAUSEA", count=500),
                 AdverseEvent(term="HEADACHE", count=300),
             ],
-            meta=_make_meta("OpenFDA/FAERS"),
+            meta=make_meta(source="OpenFDA/FAERS"),
         )
 
         with patch.object(faers, "faers_api") as mock_api:
@@ -182,11 +136,11 @@ class TestFAERSTools:
         mock_results = {
             "propofol": FAERSResult(
                 events=[AdverseEvent(term="NAUSEA", count=100)],
-                meta=_make_meta(),
+                meta=make_meta(),
             ),
             "ketamine": FAERSResult(
                 events=[AdverseEvent(term="HALLUCINATION", count=50)],
-                meta=_make_meta(),
+                meta=make_meta(),
             ),
         }
 
@@ -214,7 +168,7 @@ class TestStatsTools:
         capture = ToolCapture()
         stats.register(capture)  # type: ignore[arg-type]
 
-        mock_result = _make_signal()
+        mock_result = make_signal(event="HYPOTENSION")
 
         with patch.object(stats, "stats_api") as mock_api:
             mock_api.signal = AsyncMock(return_value=mock_result)
@@ -233,7 +187,7 @@ class TestStatsTools:
         capture = ToolCapture()
         stats.register(capture)  # type: ignore[arg-type]
 
-        mock_result = _make_signal(detected=False)
+        mock_result = make_signal(event="HYPOTENSION", detected=False)
 
         with patch.object(stats, "stats_api") as mock_api:
             mock_api.signal = AsyncMock(return_value=mock_result)
@@ -258,7 +212,7 @@ class TestPubMedTools:
 
         mock_result = PubMedSearchResult(
             total_count=42,
-            meta=_make_meta("PubMed"),
+            meta=make_meta(source="PubMed"),
         )
 
         with patch.object(pubmed, "pubmed_api") as mock_api:
@@ -284,7 +238,7 @@ class TestPubMedTools:
                     doi="10.1234/test",
                 )
             ],
-            meta=_make_meta("PubMed"),
+            meta=make_meta(source="PubMed"),
         )
 
         with patch.object(pubmed, "pubmed_api") as mock_api:
@@ -304,7 +258,7 @@ class TestPubMedTools:
         mock_result = PubMedSearchResult(
             total_count=1,
             articles=[PubMedArticle(pmid="111", title="No DOI article")],
-            meta=_make_meta("PubMed"),
+            meta=make_meta(source="PubMed"),
         )
 
         with patch.object(pubmed, "pubmed_api") as mock_api:
@@ -333,10 +287,10 @@ class TestCrossTools:
             drug="propofol",
             event="PRIS",
             classification=HypothesisClassification.EMERGING_SIGNAL,
-            signal=_make_signal("propofol", "PRIS"),
+            signal=make_signal(event="PRIS"),
             literature_count=3,
             articles=[_make_article("111", "PRIS case report")],
-            evidence=_make_evidence(),
+            evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
             summary="Emerging signal for propofol-PRIS.",
         )
 
@@ -360,10 +314,10 @@ class TestCrossTools:
             drug="propofol",
             event="RASH",
             classification=HypothesisClassification.NOVEL_HYPOTHESIS,
-            signal=_make_signal("propofol", "RASH"),
+            signal=make_signal(event="RASH"),
             literature_count=0,
             articles=[],
-            evidence=_make_evidence(),
+            evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
             summary="Novel hypothesis.",
         )
 
@@ -389,7 +343,7 @@ class TestScanTools:
         capture = ToolCapture()
         scan.register(capture)  # type: ignore[arg-type]
 
-        signal = _make_signal()
+        signal = make_signal(event="HYPOTENSION")
         mock_result = ScanResult(
             drug="propofol",
             items=[
@@ -400,7 +354,7 @@ class TestScanTools:
                     signal=signal,
                     literature_count=50,
                     articles=[_make_article("99999", "Propofol hypotension review")],
-                    evidence=_make_evidence(),
+                    evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
                     summary="Known.",
                     score=4.5,
                     rank=1,
@@ -411,7 +365,7 @@ class TestScanTools:
             emerging_count=0,
             known_count=1,
             no_signal_count=0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "scan_api") as mock_api:
@@ -438,7 +392,7 @@ class TestScanTools:
             total_scanned=3,
             failed_count=2,
             skipped_events=["EVENT_A", "EVENT_B"],
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "scan_api") as mock_api:
@@ -460,7 +414,7 @@ class TestScanTools:
             drug="propofol",
             items=[],
             total_scanned=0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "scan_api") as mock_api:
@@ -489,7 +443,7 @@ class TestVocabTools:
             generic_name="ibuprofen",
             brand_names=["Advil", "Motrin"],
             rxcui="5640",
-            meta=_make_meta("RxNorm"),
+            meta=make_meta(source="RxNorm"),
         )
 
         with patch.object(vocab, "vocab_api") as mock_api:
@@ -509,7 +463,7 @@ class TestVocabTools:
 
         mock_result = DrugNormResult(
             original="xyz123",
-            meta=_make_meta("RxNorm"),
+            meta=make_meta(source="RxNorm"),
         )
 
         with patch.object(vocab, "vocab_api") as mock_api:
@@ -529,7 +483,7 @@ class TestVocabTools:
             mesh_id="D001241",
             mesh_term="Aspirin",
             tree_numbers=["D02.455", "D09.698"],
-            meta=_make_meta("NCBI/MeSH"),
+            meta=make_meta(source="NCBI/MeSH"),
         )
 
         with patch.object(vocab, "vocab_api") as mock_api:
@@ -548,7 +502,7 @@ class TestVocabTools:
 
         mock_result = MeSHResult(
             query="xyz123",
-            meta=_make_meta("NCBI/MeSH"),
+            meta=make_meta(source="NCBI/MeSH"),
         )
 
         with patch.object(vocab, "vocab_api") as mock_api:
@@ -617,7 +571,7 @@ class TestDailyMedTools:
             drug="propofol",
             set_id="abc-123",
             events=["BRADYCARDIA", "HYPOTENSION", "APNEA"],
-            meta=_make_meta("DailyMed"),
+            meta=make_meta(source="DailyMed"),
         )
 
         with patch.object(dailymed, "dailymed_api") as mock_api:
@@ -640,7 +594,7 @@ class TestDailyMedTools:
             drug="unknowndrug",
             set_id="test-set-id",
             events=[],
-            meta=_make_meta("DailyMed"),
+            meta=make_meta(source="DailyMed"),
         )
 
         with patch.object(dailymed, "dailymed_api") as mock_api:
@@ -662,7 +616,7 @@ class TestDailyMedTools:
             in_label=True,
             matched_terms=["bradycardia"],
             set_id="abc-123",
-            meta=_make_meta("DailyMed"),
+            meta=make_meta(source="DailyMed"),
         )
 
         with patch.object(dailymed, "dailymed_api") as mock_api:
@@ -684,7 +638,7 @@ class TestDailyMedTools:
             drug="propofol",
             event="anhedonia",
             in_label=False,
-            meta=_make_meta("DailyMed"),
+            meta=make_meta(source="DailyMed"),
         )
 
         with patch.object(dailymed, "dailymed_api") as mock_api:
@@ -722,7 +676,7 @@ class TestTrialsTools:
                     phase="Phase 3",
                 ),
             ],
-            meta=_make_meta("ClinicalTrials.gov"),
+            meta=make_meta(source="ClinicalTrials.gov"),
         )
 
         with patch.object(trials, "trials_api") as mock_api:
@@ -747,7 +701,7 @@ class TestTrialsTools:
             total_count=0,
             active_count=0,
             trials=[],
-            meta=_make_meta("ClinicalTrials.gov"),
+            meta=make_meta(source="ClinicalTrials.gov"),
         )
 
         with patch.object(trials, "trials_api") as mock_api:
@@ -883,7 +837,7 @@ class TestOpenTargetsTools:
             ],
             total_count=2,
             critical_value=9.49,
-            meta=_make_meta("OpenTargets"),
+            meta=make_meta(source="OpenTargets"),
         )
 
         with patch.object(opentargets, "opentargets_api") as mock_api:
@@ -906,7 +860,7 @@ class TestOpenTargetsTools:
         mock_result = OTDrugSafety(
             drug_name="unknowndrug",
             chembl_id="",
-            meta=_make_meta("OpenTargets"),
+            meta=make_meta(source="OpenTargets"),
         )
 
         with patch.object(opentargets, "opentargets_api") as mock_api:
@@ -971,7 +925,7 @@ class TestChEMBLTools:
                     organism="Homo sapiens",
                 ),
             ],
-            meta=_make_meta("ChEMBL"),
+            meta=make_meta(source="ChEMBL"),
         )
 
         with patch.object(chembl, "chembl_api") as mock_api:
@@ -993,7 +947,7 @@ class TestChEMBLTools:
 
         mock_result = ChEMBLMechanism(
             chembl_id="",
-            meta=_make_meta("ChEMBL"),
+            meta=make_meta(source="ChEMBL"),
         )
 
         with patch.object(chembl, "chembl_api") as mock_api:
@@ -1020,7 +974,7 @@ class TestChEMBLTools:
                     conversion="Hydroxylation",
                 ),
             ],
-            meta=_make_meta("ChEMBL"),
+            meta=make_meta(source="ChEMBL"),
         )
 
         with patch.object(chembl, "chembl_api") as mock_api:
@@ -1041,7 +995,7 @@ class TestChEMBLTools:
 
         mock_result = ChEMBLMetabolism(
             chembl_id="",
-            meta=_make_meta("ChEMBL"),
+            meta=make_meta(source="ChEMBL"),
         )
 
         with patch.object(chembl, "chembl_api") as mock_api:
@@ -1061,7 +1015,7 @@ class TestChEMBLTools:
             chembl_id="CHEMBL526",
             drug_name="Propofol",
             pathways=[],
-            meta=_make_meta("ChEMBL"),
+            meta=make_meta(source="ChEMBL"),
         )
 
         with patch.object(chembl, "chembl_api") as mock_api:
@@ -1150,7 +1104,7 @@ class TestFAERSBulkTools:
         capture = ToolCapture()
         faers_bulk.register(capture)  # type: ignore[arg-type]
 
-        mock_signal = _make_signal("propofol", "BRADYCARDIA")
+        mock_signal = make_signal(event="BRADYCARDIA")
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.is_bulk_available = AsyncMock(return_value=True)
@@ -1261,7 +1215,7 @@ class TestFAERSBulkTools:
                 QuarterlyCount(year=2023, quarter=2, count=50, label="2023-Q2"),
             ],
             suspect_only=False,
-            meta=_make_meta("FAERS/bulk"),
+            meta=make_meta(source="FAERS/bulk"),
         )
 
         with (
@@ -1326,8 +1280,8 @@ class TestStatsToolsExtended:
         with patch.object(stats, "stats_api") as mock_api:
             mock_api.signal = AsyncMock(
                 side_effect=[
-                    _make_signal("propofol", "BRADYCARDIA"),
-                    _make_signal("ketamine", "HALLUCINATION"),
+                    make_signal(event="BRADYCARDIA"),
+                    make_signal(drug="ketamine", event="HALLUCINATION"),
                 ]
             )
             with patch.object(stats, "FAERSClient") as mock_cls:
@@ -1362,7 +1316,7 @@ class TestStatsToolsExtended:
         with patch.object(stats, "stats_api") as mock_api:
             mock_api.signal = AsyncMock(
                 side_effect=[
-                    _make_signal("propofol", "DEATH"),
+                    make_signal(event="DEATH"),
                     RuntimeError("API failed"),
                 ]
             )
@@ -1396,7 +1350,7 @@ class TestStatsToolsExtended:
                 QuarterlyCount(year=2022, quarter=3, count=30, label="2022-Q3"),
             ],
             suspect_only=False,
-            meta=_make_meta("OpenFDA/FAERS"),
+            meta=make_meta(source="OpenFDA/FAERS"),
         )
 
         with patch.object(stats, "stats_api") as mock_api:
@@ -1428,7 +1382,7 @@ class TestStatsToolsExtended:
             std_quarterly=0.0,
             spike_quarters=[],
             suspect_only=False,
-            meta=_make_meta("OpenFDA/FAERS"),
+            meta=make_meta(source="OpenFDA/FAERS"),
         )
 
         with patch.object(stats, "stats_api") as mock_api:
@@ -1456,10 +1410,10 @@ class TestCrossToolsExtended:
             drug="propofol",
             event="ANHEDONIA",
             classification=HypothesisClassification.NOVEL_HYPOTHESIS,
-            signal=_make_signal("propofol", "ANHEDONIA"),
+            signal=make_signal(event="ANHEDONIA"),
             literature_count=0,
             articles=[],
-            evidence=_make_evidence(),
+            evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
             summary="Novel hypothesis for anhedonia.",
             in_label=False,
             label_detail="Not found in adverse reactions section",
@@ -1511,7 +1465,7 @@ class TestCrossToolsExtended:
             control_unique_signals=0,
             both_detected=0,
             total_events=1,
-            meta=_make_meta("hypokrates/compare"),
+            meta=make_meta(source="hypokrates/compare"),
         )
 
         with patch.object(cross, "cross_api") as mock_api:
@@ -1549,9 +1503,9 @@ class TestScanToolsExtended:
                     drug="propofol",
                     event="BRADYCARDIA",
                     classification=HypothesisClassification.KNOWN_ASSOCIATION,
-                    signal=_make_signal("propofol", "BRADYCARDIA"),
+                    signal=make_signal(event="BRADYCARDIA"),
                     literature_count=10,
-                    evidence=_make_evidence(),
+                    evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
                     summary="Known.",
                     score=4.5,
                     rank=1,
@@ -1572,7 +1526,7 @@ class TestScanToolsExtended:
             mechanism="GABA-A potentiator",
             interactions_count=5,
             cyp_enzymes=["CYP2B6"],
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "scan_api") as mock_api:
@@ -1649,7 +1603,7 @@ class TestScanToolsExtended:
             total_events=2,
             class_threshold_used=0.75,
             outlier_factor_used=3.0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "class_compare_api") as mock_api:
@@ -1719,7 +1673,7 @@ class TestScanToolsExtended:
             total_events=1,
             class_threshold_used=0.75,
             outlier_factor_used=3.0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
 
         with patch.object(scan, "class_compare_api") as mock_api:

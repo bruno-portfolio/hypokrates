@@ -9,15 +9,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hypokrates.cross.models import CompareResult, CompareSignalItem
-from hypokrates.models import MetaInfo
 from hypokrates.scan.models import ScanItem, ScanResult
 from hypokrates.stats.models import (
-    ContingencyTable,
-    DisproportionalityResult,
     QuarterlyCount,
-    SignalResult,
     TimelineResult,
 )
+from tests.helpers import make_meta, make_signal
 
 try:
     from typer.testing import CliRunner
@@ -36,60 +33,11 @@ pytestmark = pytest.mark.skipif(not _HAS_TYPER, reason="typer not installed")
 runner: CliRunnerType = CliRunner() if _HAS_TYPER else None  # type: ignore[assignment]
 
 
-def _make_meta() -> MetaInfo:
-    return MetaInfo(source="test", retrieved_at=datetime.now(UTC))
-
-
-def _make_signal_result(
-    drug: str = "propofol",
-    event: str = "BRADYCARDIA",
-    *,
-    prr: float = 5.0,
-    detected: bool = True,
-    a: int = 100,
-) -> SignalResult:
-    return SignalResult(
-        drug=drug,
-        event=event,
-        table=ContingencyTable(a=a, b=900, c=50, d=9000),
-        prr=DisproportionalityResult(
-            measure="PRR",
-            value=prr,
-            ci_lower=prr * 0.8,
-            ci_upper=prr * 1.2,
-            significant=detected,
-        ),
-        ror=DisproportionalityResult(
-            measure="ROR",
-            value=prr * 1.05,
-            ci_lower=prr * 0.85,
-            ci_upper=prr * 1.25,
-            significant=detected,
-        ),
-        ic=DisproportionalityResult(
-            measure="IC",
-            value=1.0,
-            ci_lower=0.5,
-            ci_upper=1.5,
-            significant=detected,
-        ),
-        ebgm=DisproportionalityResult(
-            measure="EBGM",
-            value=2.0,
-            ci_lower=1.5,
-            ci_upper=2.5,
-            significant=detected,
-        ),
-        signal_detected=detected,
-        meta=_make_meta(),
-    )
-
-
 def _make_scan_result(drug: str = "propofol") -> ScanResult:
     from hypokrates.cross.models import HypothesisClassification
     from hypokrates.evidence.models import EvidenceBlock
 
-    sig = _make_signal_result(drug=drug)
+    sig = make_signal(drug=drug, event="BRADYCARDIA", prr=5.0)
     item = ScanItem(
         drug=drug,
         event="BRADYCARDIA",
@@ -107,7 +55,7 @@ def _make_scan_result(drug: str = "propofol") -> ScanResult:
         items=[item],
         total_scanned=1,
         known_count=1,
-        meta=_make_meta(),
+        meta=make_meta(),
     )
 
 
@@ -149,7 +97,7 @@ class TestScanCommand:
 class TestSignalCommand:
     @patch("hypokrates.sync.stats")
     def test_signal_basic(self, mock_stats: MagicMock) -> None:
-        mock_stats.signal.return_value = _make_signal_result()
+        mock_stats.signal.return_value = make_signal(event="BRADYCARDIA", prr=5.0)
         result = runner.invoke(app, ["signal", "propofol", "bradycardia"])
         assert result.exit_code == 0
         assert "PROPOFOL" in result.output
@@ -157,7 +105,7 @@ class TestSignalCommand:
 
     @patch("hypokrates.sync.stats")
     def test_signal_json(self, mock_stats: MagicMock) -> None:
-        mock_stats.signal.return_value = _make_signal_result()
+        mock_stats.signal.return_value = make_signal(event="BRADYCARDIA", prr=5.0)
         result = runner.invoke(app, ["signal", "propofol", "bradycardia", "-f", "json"])
         assert result.exit_code == 0
         assert '"drug"' in result.output
@@ -184,7 +132,7 @@ class TestCompareCommand:
             control_unique_signals=0,
             both_detected=1,
             total_events=1,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         result = runner.invoke(app, ["compare", "isotretinoin", "doxycycline"])
         assert result.exit_code == 0
@@ -197,7 +145,7 @@ class TestCompareCommand:
             drug="a",
             control="b",
             total_events=0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         result = runner.invoke(app, ["compare", "a", "b", "--events", "nausea,headache"])
         assert result.exit_code == 0
@@ -217,7 +165,7 @@ class TestTimelineCommand:
             peak_quarter=QuarterlyCount(year=2023, quarter=2, count=15, label="2023-Q2"),
             mean_quarterly=12.5,
             std_quarterly=3.5,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         result = runner.invoke(app, ["timeline", "etomidate", "anhedonia"])
         assert result.exit_code == 0
@@ -230,7 +178,7 @@ class TestTimelineCommand:
             drug="d",
             event="e",
             total_reports=0,
-            meta=_make_meta(),
+            meta=make_meta(),
         )
         result = runner.invoke(app, ["timeline", "d", "e", "-f", "json"])
         assert result.exit_code == 0
