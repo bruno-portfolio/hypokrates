@@ -100,3 +100,31 @@ class TestDownloadFile:
         assert result == dest
         # File content unchanged (no download happened)
         assert dest.read_text() == "already here"
+
+    async def test_verify_false_forwarded(self, tmp_path: Path) -> None:
+        """verify=False is forwarded to httpx.AsyncClient."""
+        import contextlib
+        from unittest.mock import patch
+
+        import httpx
+
+        from hypokrates.download.base import download_file
+
+        dest = tmp_path / "test.csv"
+        captured: dict[str, object] = {}
+
+        def spy_init(self_inner: object, **kwargs: object) -> None:
+            captured.update(kwargs)
+            raise ConnectionError("spy")
+
+        with (
+            patch.object(httpx.AsyncClient, "__init__", spy_init),
+            contextlib.suppress(ConnectionError),
+        ):
+            await download_file(
+                "https://example.com/f.csv",
+                dest,
+                verify=False,
+            )
+
+        assert captured.get("verify") is False

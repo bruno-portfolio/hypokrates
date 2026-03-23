@@ -7,11 +7,8 @@ Parse do CSV acontece 1x; chamadas subsequentes usam o DuckDB persistido.
 from __future__ import annotations
 
 import logging
-import threading
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, ClassVar
-
-import duckdb
+from typing import TYPE_CHECKING
 
 from hypokrates.anvisa.constants import ANVISA_DB_FILENAME, NOME_EN_PT, NOME_PT_EN
 from hypokrates.anvisa.models import AnvisaMedicamento, AnvisaNomeMapping, AnvisaSearchResult
@@ -21,13 +18,14 @@ from hypokrates.anvisa.parser import (
     split_apresentacoes,
     split_substancias,
 )
+from hypokrates.store.base import BaseDuckDBStore
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_CREATE_TABLES = """
+_CREATE_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS anvisa_medicamentos (
     registro VARCHAR PRIMARY KEY,
     nome_produto VARCHAR NOT NULL,
@@ -63,43 +61,18 @@ CREATE TABLE IF NOT EXISTS anvisa_meta (
 """
 
 
-class AnvisaStore:
+class AnvisaStore(BaseDuckDBStore):
     """Store DuckDB para dados da ANVISA.
 
     Singleton thread-safe. Persiste em ``~/.cache/hypokrates/anvisa.duckdb``.
     """
 
-    _instance: ClassVar[AnvisaStore | None] = None
-    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _DB_FILENAME = ANVISA_DB_FILENAME
+    _CREATE_TABLES = _CREATE_TABLES_SQL
 
     def __init__(self, db_path: Path | None = None) -> None:
-        if db_path is None:
-            from hypokrates.config import get_config
-
-            db_path = get_config().cache_dir / ANVISA_DB_FILENAME
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db_path = db_path
-        self._conn = duckdb.connect(str(db_path))
-        self._db_lock = threading.Lock()
-        self._conn.execute(_CREATE_TABLES)
+        super().__init__(db_path)
         self._loaded = self._check_loaded()
-
-    @classmethod
-    def get_instance(cls) -> AnvisaStore:
-        """Retorna (ou cria) singleton."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reseta singleton (usado em testes)."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._instance.close()
-                cls._instance = None
 
     @property
     def loaded(self) -> bool:
@@ -331,10 +304,3 @@ class AnvisaStore:
             )
             for row in rows
         ]
-
-    def close(self) -> None:
-        """Fecha a conexao DuckDB."""
-        with self._db_lock:
-            if self._conn is not None:
-                self._conn.close()
-                self._conn = None  # type: ignore[assignment]

@@ -9,19 +9,17 @@ Fonte: JADER (2004-presente, ~970K reports).
 from __future__ import annotations
 
 import logging
-import threading
-from typing import TYPE_CHECKING, ClassVar
-
-import duckdb
+from typing import TYPE_CHECKING
 
 from hypokrates.jader.constants import JADER_DB_FILENAME
+from hypokrates.store.base import BaseDuckDBStore
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_CREATE_TABLES = """
+_CREATE_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS jader_demo (
     case_id VARCHAR NOT NULL,
     report_version INTEGER DEFAULT 1,
@@ -113,43 +111,18 @@ LIMIT $3
 """
 
 
-class JADERStore:
+class JADERStore(BaseDuckDBStore):
     """Store DuckDB para dados do JADER.
 
     Singleton thread-safe. Persiste em ``~/.cache/hypokrates/jader.duckdb``.
     """
 
-    _instance: ClassVar[JADERStore | None] = None
-    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _DB_FILENAME = JADER_DB_FILENAME
+    _CREATE_TABLES = _CREATE_TABLES_SQL
 
     def __init__(self, db_path: Path | None = None) -> None:
-        if db_path is None:
-            from hypokrates.config import get_config
-
-            db_path = get_config().cache_dir / JADER_DB_FILENAME
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db_path = db_path
-        self._conn = duckdb.connect(str(db_path))
-        self._db_lock = threading.Lock()
-        self._conn.execute(_CREATE_TABLES)
+        super().__init__(db_path)
         self._loaded = self._check_loaded()
-
-    @classmethod
-    def get_instance(cls) -> JADERStore:
-        """Retorna (ou cria) singleton."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reseta singleton (usado em testes)."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._instance.close()
-                cls._instance = None
 
     @property
     def loaded(self) -> bool:
@@ -257,34 +230,3 @@ class JADERStore:
             if key in stats:
                 stats[key] = int(cnt)
         return stats
-
-    def execute_in_lock(self, sql: str, params: list[object] | None = None) -> None:
-        """Executa SQL dentro do lock."""
-        with self._db_lock:
-            if params:
-                self._conn.execute(sql, params)
-            else:
-                self._conn.execute(sql)
-
-    def query_in_lock(
-        self,
-        sql: str,
-        params: list[object] | None = None,
-    ) -> list[tuple[object, ...]]:
-        """Executa SQL dentro do lock e retorna resultado."""
-        with self._db_lock:
-            if params:
-                return self._conn.execute(sql, params).fetchall()
-            return self._conn.execute(sql).fetchall()
-
-    def executemany_in_lock(self, sql: str, rows: list[list[object]]) -> None:
-        """Executa SQL com múltiplas linhas dentro do lock."""
-        with self._db_lock:
-            self._conn.executemany(sql, rows)
-
-    def close(self) -> None:
-        """Fecha a conexão DuckDB."""
-        with self._db_lock:
-            if self._conn is not None:
-                self._conn.close()
-                self._conn = None  # type: ignore[assignment]

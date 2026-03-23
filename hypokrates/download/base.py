@@ -24,6 +24,7 @@ async def download_file(
     timeout: float = 600.0,
     on_progress: Callable[[int, int], None] | None = None,
     headers: dict[str, str] | None = None,
+    verify: bool = True,
 ) -> Path:
     """Download a file via httpx streaming with atomic write.
 
@@ -37,6 +38,7 @@ async def download_file(
         timeout: Request timeout in seconds.
         on_progress: Optional callback (bytes_downloaded, total_bytes).
         headers: Optional HTTP headers.
+        verify: SSL certificate verification (default True).
 
     Returns:
         Path to the downloaded file.
@@ -62,6 +64,7 @@ async def download_file(
             httpx.AsyncClient(
                 timeout=timeout,
                 follow_redirects=True,
+                verify=verify,
             ) as client,
             client.stream("GET", url, headers=req_headers) as response,
         ):

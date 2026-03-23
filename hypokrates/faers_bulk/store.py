@@ -7,11 +7,8 @@ Parse dos ZIPs acontece 1x por quarter; chamadas subsequentes usam DuckDB persis
 from __future__ import annotations
 
 import logging
-import threading
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, ClassVar
-
-import duckdb
+from typing import TYPE_CHECKING
 
 from hypokrates.faers_bulk.constants import (
     BATCH_SIZE,
@@ -28,13 +25,14 @@ from hypokrates.faers_bulk.models import (
     StrataFilter,
 )
 from hypokrates.faers_bulk.parser import parse_quarter_zip
+from hypokrates.store.base import BaseDuckDBStore
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_CREATE_TABLES = """
+_CREATE_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS faers_demo (
     primaryid VARCHAR NOT NULL,
     caseid VARCHAR NOT NULL,
@@ -156,7 +154,7 @@ AND (
 """
 
 
-class FAERSBulkStore:
+class FAERSBulkStore(BaseDuckDBStore):
     """Store DuckDB para FAERS quarterly ASCII files.
 
     Singleton thread-safe. Persiste em ``~/.cache/hypokrates/faers_bulk.duckdb``.
@@ -164,36 +162,8 @@ class FAERSBulkStore:
     ``asyncio.to_thread()`` (chamadas concorrentes de threads diferentes).
     """
 
-    _instance: ClassVar[FAERSBulkStore | None] = None
-    _lock: ClassVar[threading.Lock] = threading.Lock()
-
-    def __init__(self, db_path: Path | None = None) -> None:
-        if db_path is None:
-            from hypokrates.config import get_config
-
-            db_path = get_config().cache_dir / FAERS_BULK_DB_FILENAME
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db_path = db_path
-        self._conn = duckdb.connect(str(db_path))
-        self._db_lock = threading.Lock()
-        self._conn.execute(_CREATE_TABLES)
-
-    @classmethod
-    def get_instance(cls) -> FAERSBulkStore:
-        """Retorna (ou cria) singleton."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reseta singleton (usado em testes)."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._instance.close()
-                cls._instance = None
+    _DB_FILENAME = FAERS_BULK_DB_FILENAME
+    _CREATE_TABLES = _CREATE_TABLES_SQL
 
     def is_loaded(self) -> bool:
         """Se o store contém ao menos um quarter carregado."""
@@ -621,13 +591,6 @@ class FAERSBulkStore:
                 "INSERT INTO faers_reac VALUES (?, ?, ?)",
                 batch,
             )
-
-    def close(self) -> None:
-        """Fecha a conexão DuckDB."""
-        with self._db_lock:
-            if self._conn is not None:
-                self._conn.close()
-                self._conn = None  # type: ignore[assignment]
 
 
 def _build_strata_where(strata: StrataFilter) -> tuple[str, dict[str, object]]:

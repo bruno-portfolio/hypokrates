@@ -10,15 +10,13 @@ de US/EU/UK/JP. Download manual (313MB ZIP).
 from __future__ import annotations
 
 import logging
-import threading
-from typing import TYPE_CHECKING, ClassVar
-
-import duckdb
+from typing import TYPE_CHECKING
 
 from hypokrates.onsides.constants import (
     DEFAULT_MIN_CONFIDENCE,
     ONSIDES_DB_FILENAME,
 )
+from hypokrates.store.base import BaseDuckDBStore
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +25,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CREATE_TABLES = """
+_CREATE_TABLES_SQL = """
 CREATE TABLE IF NOT EXISTS product_label (
     label_id INTEGER PRIMARY KEY,
     source VARCHAR NOT NULL,
@@ -127,7 +125,7 @@ LIMIT 1
 """
 
 
-class OnSIDESStore:
+class OnSIDESStore(BaseDuckDBStore):
     """Store DuckDB para dados do OnSIDES.
 
     Singleton thread-safe. Persiste em ``~/.cache/hypokrates/onsides.duckdb``.
@@ -135,37 +133,12 @@ class OnSIDESStore:
     ``asyncio.to_thread()`` (chamadas concorrentes de threads diferentes).
     """
 
-    _instance: ClassVar[OnSIDESStore | None] = None
-    _lock: ClassVar[threading.Lock] = threading.Lock()
+    _DB_FILENAME = ONSIDES_DB_FILENAME
+    _CREATE_TABLES = _CREATE_TABLES_SQL
 
     def __init__(self, db_path: Path | None = None) -> None:
-        if db_path is None:
-            from hypokrates.config import get_config
-
-            db_path = get_config().cache_dir / ONSIDES_DB_FILENAME
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._db_path = db_path
-        self._conn = duckdb.connect(str(db_path))
-        self._db_lock = threading.Lock()
-        self._conn.execute(_CREATE_TABLES)
+        super().__init__(db_path)
         self._loaded = self._check_loaded()
-
-    @classmethod
-    def get_instance(cls) -> OnSIDESStore:
-        """Retorna (ou cria) singleton."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reseta singleton (usado em testes)."""
-        with cls._lock:
-            if cls._instance is not None:
-                cls._instance.close()
-                cls._instance = None
 
     @property
     def loaded(self) -> bool:
@@ -224,19 +197,6 @@ class OnSIDESStore:
             num_sources=len(row[4]),
         )
 
-    def execute_in_lock(self, sql: str, params: list[object] | None = None) -> None:
-        """Executa SQL dentro do lock (para uso pelo parser)."""
-        with self._db_lock:
-            if params:
-                self._conn.execute(sql, params)
-            else:
-                self._conn.execute(sql)
-
-    def executemany_in_lock(self, sql: str, rows: list[list[object]]) -> None:
-        """Executa SQL com múltiplas linhas dentro do lock."""
-        with self._db_lock:
-            self._conn.executemany(sql, rows)
-
     def read_csv_in_lock(self, table: str, csv_path: str) -> int:
         """Lê CSV diretamente no DuckDB via read_csv (mais eficiente que executemany)."""
         with self._db_lock:
@@ -246,10 +206,3 @@ class OnSIDESStore:
             )
             result = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
             return result[0] if result else 0
-
-    def close(self) -> None:
-        """Fecha a conexão DuckDB."""
-        with self._db_lock:
-            if self._conn is not None:
-                self._conn.close()
-                self._conn = None  # type: ignore[assignment]

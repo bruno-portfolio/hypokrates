@@ -6,8 +6,13 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from hypokrates.anvisa.downloader import download_medicamentos, needs_refresh
+from hypokrates.anvisa.constants import (
+    ANVISA_CSV_FILENAME,
+    ANVISA_MEDICAMENTOS_URL,
+    ANVISA_REFRESH_DAYS,
+)
 from hypokrates.anvisa.store import AnvisaStore
+from hypokrates.download.base import download_file, needs_refresh
 
 if TYPE_CHECKING:
     from hypokrates.anvisa.models import AnvisaNomeMapping, AnvisaSearchResult
@@ -26,7 +31,7 @@ async def _ensure_loaded(
     store = _store if _store is not None else AnvisaStore.get_instance()
     if store.loaded:
         loaded_at = await asyncio.to_thread(store.get_loaded_at)
-        if not needs_refresh(loaded_at):
+        if not needs_refresh(loaded_at, max_age_days=ANVISA_REFRESH_DAYS):
             return store
 
     # Verificar se ha CSV configurado manualmente
@@ -38,7 +43,14 @@ async def _ensure_loaded(
     if csv_path is None:
         # Auto-download
         logger.info("ANVISA store not loaded — downloading CSV")
-        csv_path = await download_medicamentos()
+        csv_path = config.cache_dir / "anvisa" / ANVISA_CSV_FILENAME
+        await download_file(
+            ANVISA_MEDICAMENTOS_URL,
+            csv_path,
+            label="ANVISA Medicamentos",
+            timeout=120.0,
+            verify=False,
+        )
 
     logger.info("Loading ANVISA CSV: %s", csv_path)
     await asyncio.to_thread(store.load_from_csv, csv_path)

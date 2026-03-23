@@ -12,6 +12,7 @@ ANVISA_MEDICAMENTOS_URL = (
 
 ANVISA_DB_FILENAME = "anvisa.duckdb"
 ANVISA_REFRESH_DAYS = 30  # re-download CSV se mais antigo que isso
+ANVISA_CSV_FILENAME = "TA_CONSULTA_MEDICAMENTOS.CSV"
 
 # --- CSV ---
 
