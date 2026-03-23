@@ -214,6 +214,12 @@ def register(mcp: FastMCP) -> None:
         if result.demographic_summary:
             lines.extend(["", "## Demographic Summary", result.demographic_summary])
 
+        # Caveats
+        if result.caveats:
+            lines.extend(["", "## Caveats"])
+            for caveat in result.caveats:
+                lines.append(f"- {caveat}")
+
         # Key literature
         lines.extend(
             format_references(

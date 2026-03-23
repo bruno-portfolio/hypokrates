@@ -9,7 +9,15 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from hypokrates.cross.api import hypothesis
-from hypokrates.cross.constants import STRATUM_AGE_NOTABLE_RATIO, STRATUM_SEX_NOTABLE_RATIO
+from hypokrates.cross.constants import (
+    CAVEAT_AGE_CONCENTRATION,
+    CAVEAT_LOW_COUNT,
+    CAVEAT_NON_REPLICATION_MIN,
+    CAVEAT_PRR_INFLATION,
+    CAVEAT_SEX_CONCENTRATION,
+    STRATUM_AGE_NOTABLE_RATIO,
+    STRATUM_SEX_NOTABLE_RATIO,
+)
 from hypokrates.cross.models import HypothesisResult, InvestigationResult, StratumSignal
 from hypokrates.models import MetaInfo
 
@@ -89,6 +97,9 @@ async def investigate(
     # Summary textual
     demographic_summary = _build_demographic_summary(sex_strata, age_strata, country_strata)
 
+    # Caveats automáticos
+    caveats = _build_caveats(hyp_result, sex_strata, age_strata, country_strata)
+
     elapsed = (datetime.now(UTC) - start).total_seconds()
 
     return InvestigationResult(
@@ -97,6 +108,7 @@ async def investigate(
         age_strata=age_strata,
         country_strata=country_strata,
         demographic_summary=demographic_summary,
+        caveats=caveats,
         meta=MetaInfo(
             source="hypokrates/investigate",
             query={"drug": drug, "event": event, "suspect_only": suspect_only},
@@ -340,3 +352,116 @@ def _build_demographic_summary(
         parts.append("Insufficient data for demographic stratification")
 
     return "\n".join(f"- {p}" for p in parts)
+
+
+def _check_concentration(
+    strata: list[StratumSignal],
+    threshold: float,
+    label: str,
+    detail: str,
+) -> str | None:
+    """Verifica se reports estão concentrados em um subgrupo FAERS."""
+    faers = [s for s in strata if s.source == "FAERS" and not s.insufficient_data]
+    if not faers:
+        return None
+    total = sum(x.drug_event_count for x in faers)
+    if total <= 0:
+        return None
+    top = max(faers, key=lambda x: x.drug_event_count)
+    ratio = top.drug_event_count / total
+    if ratio <= threshold:
+        return None
+    pct = int(ratio * 100)
+    return f"{label}: {pct}% of reports in {top.stratum_value} — {detail}"
+
+
+def _build_caveats(
+    hyp: HypothesisResult,
+    sex_strata: list[StratumSignal],
+    age_strata: list[StratumSignal],
+    country_strata: list[StratumSignal],
+) -> list[str]:
+    """Gera caveats automáticos baseados nos dados estratificados.
+
+    Pure function — sem side effects, sem API calls.
+    """
+    caveats: list[str] = []
+
+    # 1. LOW COUNT
+    if hyp.signal.table.a < CAVEAT_LOW_COUNT:
+        caveats.append(
+            f"LOW COUNT: Only {hyp.signal.table.a} reports — "
+            "insufficient for robust signal detection."
+        )
+
+    # 2. NON-REPLICATION (só quando tem >=2 fontes)
+    if len(country_strata) >= 2:
+        detecting = sum(1 for s in country_strata if s.signal_detected)
+        if detecting < CAVEAT_NON_REPLICATION_MIN:
+            confirmed = [s.stratum_value for s in country_strata if s.signal_detected]
+            not_confirmed = [s.stratum_value for s in country_strata if not s.signal_detected]
+            if confirmed:
+                caveats.append(
+                    f"NON-REPLICATION: Signal detected only in {', '.join(confirmed)}, "
+                    f"not replicated in {', '.join(not_confirmed)}."
+                )
+            else:
+                caveats.append(
+                    "NON-REPLICATION: Signal not detected in any database "
+                    f"({', '.join(s.stratum_value for s in country_strata)})."
+                )
+
+    # 3. SEX CONCENTRATION (FAERS, sem insufficient_data)
+    sex_caveat = _check_concentration(
+        sex_strata,
+        CAVEAT_SEX_CONCENTRATION,
+        "SEX CONCENTRATION",
+        "signal may reflect population bias, not drug effect.",
+    )
+    if sex_caveat:
+        caveats.append(sex_caveat)
+
+    # 4. AGE CONCENTRATION (FAERS, sem insufficient_data)
+    age_caveat = _check_concentration(
+        age_strata,
+        CAVEAT_AGE_CONCENTRATION,
+        "AGE CONCENTRATION",
+        "signal may reflect demographic usage pattern.",
+    )
+    if age_caveat:
+        caveats.append(age_caveat)
+
+    # 5. PRR INFLATION (qualquer stratum com PRR >> overall)
+    overall_prr = hyp.signal.prr.value
+    if overall_prr > 0:
+        all_strata = [*sex_strata, *age_strata]
+        for s in all_strata:
+            if not s.insufficient_data and s.prr > 0:
+                inflation = s.prr / overall_prr
+                if inflation > CAVEAT_PRR_INFLATION:
+                    caveats.append(
+                        f"PRR INFLATION: {s.source} {s.stratum_type}={s.stratum_value} "
+                        f"PRR={s.prr:.2f} is {inflation:.1f}x the overall "
+                        f"PRR={overall_prr:.2f} — signal may be driven by a specific subgroup."
+                    )
+                    break  # um caveat é suficiente
+
+    # 6. INDICATION CONFOUNDING
+    if hyp.indication_confounding:
+        caveats.append(
+            "INDICATION CONFOUNDING: This event matches a known therapeutic indication. "
+            "High PRR may reflect the patient population, not drug toxicity."
+        )
+
+    # 7. CO-ADMINISTRATION
+    if (
+        hyp.coadmin is not None
+        and hyp.coadmin.profile.co_admin_flag
+        and hyp.coadmin.verdict != "specific"
+    ):
+        caveats.append(
+            "CO-ADMINISTRATION: High co-suspect count in reports. PRR may be inflated "
+            "by procedural co-administration, not causality."
+        )
+
+    return caveats

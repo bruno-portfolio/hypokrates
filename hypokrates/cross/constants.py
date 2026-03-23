@@ -19,3 +19,10 @@ SPECIFICITY_RATIO_THRESHOLD: float = 2.0  # PRR ratio acima = drug-specific
 # investigate() — thresholds demográficos
 STRATUM_SEX_NOTABLE_RATIO: float = 1.5  # flag se PRR M/F difere > 1.5x
 STRATUM_AGE_NOTABLE_RATIO: float = 2.0  # flag se age_group PRR > 2x average
+
+# investigate() — caveat thresholds
+CAVEAT_NON_REPLICATION_MIN: int = 2
+CAVEAT_SEX_CONCENTRATION: float = 0.75
+CAVEAT_AGE_CONCENTRATION: float = 0.75
+CAVEAT_PRR_INFLATION: float = 3.0
+CAVEAT_LOW_COUNT: int = 5

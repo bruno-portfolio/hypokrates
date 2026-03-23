@@ -98,6 +98,7 @@ class InvestigationResult(BaseModel):
     age_strata: list[StratumSignal] = Field(default_factory=list)
     country_strata: list[StratumSignal] = Field(default_factory=list)
     demographic_summary: str = ""
+    caveats: list[str] = Field(default_factory=list)
     meta: MetaInfo
 
 
