@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Canada/JADER PRR propagation**: `hypothesis()` now extracts `prr` from `canada_signal()` and `jader_signal()` results (previously only `drug_event_count` and `signal_detected`). New fields `canada_prr`/`jader_prr` on `HypothesisResult`. Country strata in `investigate()` now show numeric PRR instead of "n/a"
+- **target_event in compare_signals**: new `target_event` parameter force-includes the investigated event in auto-detected top events. `full_report()` passes the event automatically, fixing `_compute_class_effect()` returning "NOT_IN_TOP_COMPARED" when the event isn't in the drug's top 10. CLI: `--target-event`/`-t`, MCP: `target_event` param
+
 ### Added
 - **Drug-specific indication detection**: `check_drug_indication()` in `scan/indications.py` checks both the generic frozenset (~80 terms) AND drug-specific indications from the DailyMed SPL "INDICATIONS AND USAGE" section (LOINC 34067-9). `LabelEventsResult.indications_text` field wired with 0 extra HTTP calls (same XML already fetched). `HypothesisResult.indication_source` tracks detection method (`"generic_term"` or `"dailymed_label"`). Caveat text now drug-specific: "INDICATION CONFOUNDING (via dailymed_label): DELIRIUM matches a known therapeutic indication for dexmedetomidine"
 - **Annotated class comparison**: `compare_signals(annotate=True)` pre-fetches DailyMed indications for both drugs in parallel, then enriches each event with `drug_indication`, `control_indication` flags and `top_co_suspects` (top 3 drugs from `drugs_by_event()` excluding drug+control). `full_report()` passes `annotate=True` automatically. MCP `full_report` renders Context column: `| Delirium | 15.81 | 3.40 | 4.7x | drug | indication for dex |`

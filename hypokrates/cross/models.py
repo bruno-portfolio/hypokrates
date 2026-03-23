@@ -73,8 +73,10 @@ class HypothesisResult(BaseModel):
     pharmacogenomics: list[str] = Field(default_factory=list)
     canada_reports: int | None = None
     canada_signal: bool | None = None
+    canada_prr: float | None = None
     jader_reports: int | None = None
     jader_signal: bool | None = None
+    jader_prr: float | None = None
 
 
 class StratumSignal(BaseModel):

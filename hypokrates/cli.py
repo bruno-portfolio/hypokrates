@@ -86,6 +86,9 @@ def compare(
     drug: str = typer.Argument(..., help="Primary drug"),
     control: str = typer.Argument(..., help="Control drug (same class)"),
     events: str | None = typer.Option(None, "--events", "-e", help="Comma-separated events"),
+    target_event: str | None = typer.Option(
+        None, "--target-event", "-t", help="Force-include event"
+    ),
     top_n: int = typer.Option(10, "--top-n", "-n"),
     suspect_only: bool = typer.Option(False, "--suspect-only"),
     output_format: str = typer.Option("table", "--format", "-f", help="Output: table|json"),
@@ -98,7 +101,12 @@ def compare(
         event_list = [e.strip() for e in events.split(",")]
 
     result = cross.compare_signals(
-        drug, control, events=event_list, top_n=top_n, suspect_only=suspect_only
+        drug,
+        control,
+        events=event_list,
+        target_event=target_event,
+        top_n=top_n,
+        suspect_only=suspect_only,
     )
 
     if output_format == "json":

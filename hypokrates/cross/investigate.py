@@ -250,6 +250,7 @@ def _build_country_strata(hyp: HypothesisResult) -> list[StratumSignal]:
                 stratum_type="country",
                 stratum_value="Canada",
                 drug_event_count=hyp.canada_reports,
+                prr=hyp.canada_prr or 0.0,
                 signal_detected=hyp.canada_signal or False,
             )
         )
@@ -262,6 +263,7 @@ def _build_country_strata(hyp: HypothesisResult) -> list[StratumSignal]:
                 stratum_type="country",
                 stratum_value="JADER",
                 drug_event_count=hyp.jader_reports,
+                prr=hyp.jader_prr or 0.0,
                 signal_detected=hyp.jader_signal or False,
             )
         )

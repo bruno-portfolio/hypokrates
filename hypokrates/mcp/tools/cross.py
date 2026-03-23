@@ -234,6 +234,7 @@ def register(mcp: FastMCP) -> None:
         drug: str,
         control: str,
         events: str = "",
+        target_event: str = "",
         top_n: int = 10,
         suspect_only: bool = False,
     ) -> str:
@@ -246,6 +247,7 @@ def register(mcp: FastMCP) -> None:
             drug: Primary drug name (e.g., "isotretinoin").
             control: Control drug from same class (e.g., "doxycycline").
             events: Comma-separated event names. If empty, auto-detects top events.
+            target_event: Force-include this event in auto-detect (ignored if events is set).
             top_n: Number of top events when auto-detecting.
             suspect_only: Only count reports where drug is suspect.
         """
@@ -257,6 +259,7 @@ def register(mcp: FastMCP) -> None:
             drug,
             control,
             events=event_list,
+            target_event=target_event or None,
             top_n=top_n,
             suspect_only=suspect_only,
         )

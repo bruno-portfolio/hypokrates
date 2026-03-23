@@ -24,8 +24,10 @@ def _make_hypothesis(
     prr: float = 3.0,
     canada_reports: int | None = None,
     canada_signal: bool | None = None,
+    canada_prr: float | None = None,
     jader_reports: int | None = None,
     jader_signal: bool | None = None,
+    jader_prr: float | None = None,
     indication_confounding: bool = False,
     coadmin: CoAdminAnalysis | None = None,
 ) -> HypothesisResult:
@@ -39,8 +41,10 @@ def _make_hypothesis(
         summary="Known association.",
         canada_reports=canada_reports,
         canada_signal=canada_signal,
+        canada_prr=canada_prr,
         jader_reports=jader_reports,
         jader_signal=jader_signal,
+        jader_prr=jader_prr,
         indication_confounding=indication_confounding,
         coadmin=coadmin,
     )
@@ -151,7 +155,12 @@ class TestCountryStrata:
         mock_canada: AsyncMock,
     ) -> None:
         mock_hyp.return_value = _make_hypothesis(
-            canada_reports=20, canada_signal=True, jader_reports=10, jader_signal=True
+            canada_reports=20,
+            canada_signal=True,
+            canada_prr=4.2,
+            jader_reports=10,
+            jader_signal=True,
+            jader_prr=3.1,
         )
         mock_faers.return_value = []
         mock_canada.return_value = []
@@ -162,6 +171,35 @@ class TestCountryStrata:
         assert len(result.country_strata) == 3
         sources = {s.stratum_value for s in result.country_strata}
         assert sources == {"FAERS", "Canada", "JADER"}
+
+    @patch("hypokrates.cross.investigate._run_canada_strata", new_callable=AsyncMock)
+    @patch("hypokrates.cross.investigate._run_faers_strata", new_callable=AsyncMock)
+    @patch("hypokrates.cross.investigate.hypothesis", new_callable=AsyncMock)
+    async def test_country_strata_prr_propagated(
+        self,
+        mock_hyp: AsyncMock,
+        mock_faers: AsyncMock,
+        mock_canada: AsyncMock,
+    ) -> None:
+        """PRR do Canada/JADER chega ao StratumSignal."""
+        mock_hyp.return_value = _make_hypothesis(
+            canada_reports=20,
+            canada_signal=True,
+            canada_prr=4.2,
+            jader_reports=10,
+            jader_signal=True,
+            jader_prr=3.1,
+        )
+        mock_faers.return_value = []
+        mock_canada.return_value = []
+
+        from hypokrates.cross.investigate import investigate
+
+        result = await investigate("atorvastatin", "myalgia")
+        by_source = {s.stratum_value: s for s in result.country_strata}
+        assert by_source["Canada"].prr == 4.2
+        assert by_source["JADER"].prr == 3.1
+        assert by_source["FAERS"].prr > 0
 
     @patch("hypokrates.cross.investigate._run_canada_strata", new_callable=AsyncMock)
     @patch("hypokrates.cross.investigate._run_faers_strata", new_callable=AsyncMock)

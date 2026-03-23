@@ -185,7 +185,9 @@ async def full_report_analysis(
         inv_raw, scan_raw, comp_raw = await asyncio.gather(
             inv_coro,
             scan_coro,
-            compare_signals(drug, control, suspect_only=suspect_only, annotate=True),
+            compare_signals(
+                drug, control, suspect_only=suspect_only, annotate=True, target_event=event
+            ),
             return_exceptions=True,
         )
         if isinstance(comp_raw, BaseException):

@@ -559,3 +559,74 @@ class TestHypothesisWithOpenTargets:
         )
 
         assert result.ot_llr == 18.72
+
+
+class TestCompareSignalsTargetEvent:
+    """compare_signals() com target_event."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_cache(self) -> None:
+        configure(cache_enabled=False)
+
+    def _make_faers_result(self, events: list[str]) -> Any:
+        from hypokrates.faers.models import FAERSResult
+        from hypokrates.models import AdverseEvent
+
+        return FAERSResult(
+            events=[AdverseEvent(term=e, count=100 - i) for i, e in enumerate(events)],
+            meta=MetaInfo(source="FAERS", retrieved_at=datetime.now(UTC)),
+        )
+
+    @patch("hypokrates.cross.api.faers_api.top_events", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.stats_api.signal", new_callable=AsyncMock)
+    async def test_target_event_included(
+        self, mock_signal: AsyncMock, mock_top: AsyncMock
+    ) -> None:
+        """target_event ausente do top -> aparece no resultado (canonicalizado)."""
+        mock_top.return_value = self._make_faers_result(["NAUSEA", "HEADACHE"])
+        mock_signal.return_value = make_signal(detected=True)
+
+        from hypokrates.cross.api import compare_signals
+        from hypokrates.vocab.meddra import canonical_term
+
+        target = "ANAPHYLACTIC REACTION"
+        result = await compare_signals(
+            "drugA", "drugB", target_event=target, top_n=2, use_cache=False
+        )
+        event_names = {item.event.upper() for item in result.items}
+        assert canonical_term(target) in event_names
+
+    @patch("hypokrates.cross.api.faers_api.top_events", new_callable=AsyncMock)
+    @patch("hypokrates.cross.api.stats_api.signal", new_callable=AsyncMock)
+    async def test_target_event_dedup(self, mock_signal: AsyncMock, mock_top: AsyncMock) -> None:
+        """target_event ja no top (ou sinonimo) -> sem duplicata."""
+        mock_top.return_value = self._make_faers_result(["NAUSEA", "HEADACHE"])
+        mock_signal.return_value = make_signal(detected=True)
+
+        from hypokrates.cross.api import compare_signals
+        from hypokrates.vocab.meddra import canonical_term
+
+        canon = canonical_term("NAUSEA")
+        result = await compare_signals(
+            "drugA", "drugB", target_event="NAUSEA", top_n=2, use_cache=False
+        )
+        canon_count = sum(1 for item in result.items if item.event.upper() == canon)
+        assert canon_count == 1
+
+    @patch("hypokrates.cross.api.stats_api.signal", new_callable=AsyncMock)
+    async def test_target_event_ignored_with_manual(self, mock_signal: AsyncMock) -> None:
+        """events=[...] + target_event -> target_event ignorado."""
+        mock_signal.return_value = make_signal(detected=True)
+
+        from hypokrates.cross.api import compare_signals
+
+        result = await compare_signals(
+            "drugA",
+            "drugB",
+            events=["NAUSEA"],
+            target_event="HEADACHE",
+            use_cache=False,
+        )
+        event_names = {item.event.upper() for item in result.items}
+        assert "HEADACHE" not in event_names
+        assert "NAUSEA" in event_names

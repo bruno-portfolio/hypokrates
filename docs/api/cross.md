@@ -136,8 +136,10 @@ result = await cross.hypothesis(
 | `pharmacogenomics` | `list[str]` | PharmGKB annotations (if `check_pharmgkb=True`) |
 | `canada_reports` | `int \| None` | Canada Vigilance report count (if `check_canada=True`) |
 | `canada_signal` | `bool \| None` | Canada Vigilance signal detected (if `check_canada=True`) |
+| `canada_prr` | `float \| None` | Canada Vigilance PRR (if `check_canada=True`) |
 | `jader_reports` | `int \| None` | JADER report count (if `check_jader=True`) |
 | `jader_signal` | `bool \| None` | JADER signal detected (if `check_jader=True`) |
+| `jader_prr` | `float \| None` | JADER PRR (if `check_jader=True`) |
 | `indication_confounding` | `bool` | Whether event matches a known therapeutic indication |
 | `indication_source` | `str` | Detection method: `"generic_term"`, `"dailymed_label"`, or `""` |
 
@@ -232,3 +234,34 @@ Signal for a single demographic stratum.
 | `country_strata` | `list[StratumSignal]` | Cross-country comparison (FAERS/Canada/JADER) |
 | `demographic_summary` | `str` | Human-readable summary of demographic differences |
 | `meta` | `MetaInfo` | Provenance metadata |
+
+---
+
+## `compare_signals()`
+
+Compare disproportionality signals between two drugs (intra-class comparison). Useful for separating genuine signal from confounding by indication.
+
+```python
+result = await cross.compare_signals(
+    "cephalexin", "amoxicillin",
+    target_event="ANAPHYLACTIC REACTION",
+    annotate=True,
+)
+for item in result.items:
+    print(f"{item.event}: drug={item.drug_prr:.2f} ctrl={item.control_prr:.2f} ratio={item.ratio:.1f}")
+```
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `drug` | `str` | *required* | Primary drug name |
+| `control` | `str` | *required* | Control drug (same class/indication) |
+| `events` | `list[str] \| None` | `None` | Events to compare. If `None`, auto-detects top N from drug |
+| `target_event` | `str \| None` | `None` | Force-include this event in auto-detect (ignored if `events` is set) |
+| `top_n` | `int` | `10` | Number of top events when auto-detecting |
+| `suspect_only` | `bool` | `False` | Only count reports where drug is suspect |
+| `use_cache` | `bool` | `True` | Use DuckDB cache |
+| `annotate` | `bool` | `False` | Enrich with indication check and co-suspects |
+
+**Returns:** `CompareResult`

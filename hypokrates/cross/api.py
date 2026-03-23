@@ -316,6 +316,7 @@ async def hypothesis(
 
     canada_reports: int | None = None
     canada_signal_detected: bool | None = None
+    canada_prr: float | None = None
 
     if check_canada:
         from hypokrates.canada import api as canada_api_mod
@@ -326,11 +327,13 @@ async def hypothesis(
             )
             canada_reports = canada_result.drug_event_count
             canada_signal_detected = canada_result.signal_detected
+            canada_prr = canada_result.prr
         except Exception:
             logger.warning("hypothesis %s + %s: Canada Vigilance unavailable", drug, event)
 
     jader_reports: int | None = None
     jader_signal_detected: bool | None = None
+    jader_prr: float | None = None
 
     if check_jader:
         from hypokrates.jader import api as jader_api_mod
@@ -339,6 +342,7 @@ async def hypothesis(
             jader_result = await jader_api_mod.jader_signal(drug, event, suspect_only=suspect_only)
             jader_reports = jader_result.drug_event_count
             jader_signal_detected = jader_result.signal_detected
+            jader_prr = jader_result.prr
         except Exception:
             logger.warning("hypothesis %s + %s: JADER unavailable", drug, event)
 
@@ -481,8 +485,10 @@ async def hypothesis(
         pharmacogenomics=pharmacogenomics,
         canada_reports=canada_reports,
         canada_signal=canada_signal_detected,
+        canada_prr=canada_prr,
         jader_reports=jader_reports,
         jader_signal=jader_signal_detected,
+        jader_prr=jader_prr,
     )
 
 
@@ -614,6 +620,7 @@ async def compare_signals(
     control: str,
     events: list[str] | None = None,
     *,
+    target_event: str | None = None,
     top_n: int = DEFAULT_COMPARE_TOP_N,
     suspect_only: bool = False,
     use_cache: bool = True,
@@ -629,6 +636,7 @@ async def compare_signals(
         drug: Nome da droga primária.
         control: Nome da droga controle (mesma classe/indicação).
         events: Lista de eventos para comparar. Se None, auto-detecta top N do drug.
+        target_event: Evento a incluir forçadamente no auto-detect (ignorado se events != None).
         top_n: Número de top eventos a comparar quando auto-detectando.
         suspect_only: Se True, conta apenas reports onde a droga é suspect.
         use_cache: Se deve usar cache.
@@ -658,6 +666,11 @@ async def compare_signals(
                 events.append(canon)
             if len(events) >= top_n:
                 break
+
+        if target_event is not None:
+            target_canon = canonical_term(target_event)
+            if target_canon not in seen:
+                events.append(target_canon)
 
     if not events:
         return CompareResult(
