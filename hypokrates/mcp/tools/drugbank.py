@@ -10,6 +10,10 @@ from hypokrates.exceptions import HypokratesError
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+_UNAVAILABLE_MSG = (
+    "DrugBank not available: {}. Configure with configure(drugbank_path='/path/to/drugbank.xml')."
+)
+
 
 def register(mcp: FastMCP) -> None:
     """Registra tools de DrugBank no MCP server."""
@@ -26,10 +30,7 @@ def register(mcp: FastMCP) -> None:
         try:
             info = await drugbank_api.drug_info(drug)
         except HypokratesError as exc:
-            return (
-                f"DrugBank not available: {exc}. "
-                "Configure with configure(drugbank_path='/path/to/drugbank.xml')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"DrugBank error: {exc}"
         if info is None:
@@ -80,10 +81,7 @@ def register(mcp: FastMCP) -> None:
         try:
             interactions = await drugbank_api.drug_interactions(drug)
         except HypokratesError as exc:
-            return (
-                f"DrugBank not available: {exc}. "
-                "Configure with configure(drugbank_path='/path/to/drugbank.xml')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"DrugBank error: {exc}"
         if not interactions:

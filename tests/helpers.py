@@ -13,6 +13,7 @@ import respx
 from hypokrates.evidence.models import EvidenceBlock
 from hypokrates.faers.models import FAERSReport, FAERSResult
 from hypokrates.models import AdverseEvent, MetaInfo
+from hypokrates.pubmed.models import PubMedArticle
 from hypokrates.stats.models import ContingencyTable, DisproportionalityResult, SignalResult
 
 GOLDEN_DATA = Path(__file__).parent / "golden_data"
@@ -257,4 +258,24 @@ def make_events(terms: list[str]) -> FAERSResult:
     return FAERSResult(
         events=[AdverseEvent(term=t, count=100 - i) for i, t in enumerate(terms)],
         meta=make_meta(),
+    )
+
+
+def make_article(
+    pmid: str = "12345",
+    title: str = "Test Article",
+    *,
+    authors: list[str] | None = None,
+    journal: str | None = "J Clin Pharmacol",
+    pub_date: str | None = "2024",
+    doi: str | None = None,
+) -> PubMedArticle:
+    """Factory para PubMedArticle de teste."""
+    return PubMedArticle(
+        pmid=pmid,
+        title=title,
+        authors=authors or ["Smith John"],
+        journal=journal,
+        pub_date=pub_date,
+        doi=doi,
     )

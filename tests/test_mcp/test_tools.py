@@ -1,6 +1,6 @@
 """Testes para hypokrates.mcp.tools — todas as tools MCP.
 
-Usa um ToolCapture mock para capturar as funções registradas sem
+Usa a fixture tool_capture para capturar as funções registradas sem
 depender do servidor MCP real.
 """
 
@@ -24,50 +24,7 @@ from hypokrates.models import AdverseEvent
 from hypokrates.pubmed.models import PubMedArticle, PubMedSearchResult
 from hypokrates.scan.models import ScanItem, ScanResult
 from hypokrates.vocab.models import DrugNormResult, MeSHResult
-from tests.helpers import make_evidence, make_meta, make_signal
-
-# ---------------------------------------------------------------------------
-# ToolCapture — mock do FastMCP para capturar funções registradas
-# ---------------------------------------------------------------------------
-
-
-class ToolCapture:
-    """Captura tools registradas via @mcp.tool()."""
-
-    def __init__(self) -> None:
-        self.tools: dict[str, Any] = {}
-
-    def tool(self) -> Any:
-        def decorator(fn: Any) -> Any:
-            self.tools[fn.__name__] = fn
-            return fn
-
-        return decorator
-
-
-# ---------------------------------------------------------------------------
-# Fixtures de dados de teste
-# ---------------------------------------------------------------------------
-
-
-def _make_article(
-    pmid: str = "12345",
-    title: str = "Test Article",
-    *,
-    authors: list[str] | None = None,
-    journal: str | None = "J Clin Pharmacol",
-    pub_date: str | None = "2024",
-    doi: str | None = None,
-) -> PubMedArticle:
-    return PubMedArticle(
-        pmid=pmid,
-        title=title,
-        authors=authors or ["Smith John"],
-        journal=journal,
-        pub_date=pub_date,
-        doi=doi,
-    )
-
+from tests.helpers import make_article, make_evidence, make_meta, make_signal
 
 # ---------------------------------------------------------------------------
 # Tests: FAERS tools
@@ -77,11 +34,10 @@ def _make_article(
 class TestFAERSTools:
     """MCP tools para FAERS."""
 
-    async def test_adverse_events(self) -> None:
+    async def test_adverse_events(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers
 
-        capture = ToolCapture()
-        faers.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers)
 
         mock_result = FAERSResult(
             reports=[
@@ -104,11 +60,10 @@ class TestFAERSTools:
         assert parsed["reports"][0]["id"] == "RPT001"
         assert "NAUSEA" in parsed["reports"][0]["reactions"]
 
-    async def test_top_events(self) -> None:
+    async def test_top_events(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers
 
-        capture = ToolCapture()
-        faers.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers)
 
         mock_result = FAERSResult(
             events=[
@@ -127,11 +82,10 @@ class TestFAERSTools:
         assert "500 reports" in result
         assert "HEADACHE" in result
 
-    async def test_compare_drugs(self) -> None:
+    async def test_compare_drugs(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers
 
-        capture = ToolCapture()
-        faers.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers)
 
         mock_results = {
             "propofol": FAERSResult(
@@ -162,11 +116,10 @@ class TestFAERSTools:
 class TestStatsTools:
     """MCP tools para signal detection."""
 
-    async def test_signal(self) -> None:
+    async def test_signal(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         mock_result = make_signal(event="HYPOTENSION")
 
@@ -181,11 +134,10 @@ class TestStatsTools:
         assert "ROR" in result
         assert "drug+event: 100" in result
 
-    async def test_signal_not_detected(self) -> None:
+    async def test_signal_not_detected(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         mock_result = make_signal(event="HYPOTENSION", detected=False)
 
@@ -204,11 +156,10 @@ class TestStatsTools:
 class TestPubMedTools:
     """MCP tools para PubMed."""
 
-    async def test_count_papers(self) -> None:
+    async def test_count_papers(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import pubmed
 
-        capture = ToolCapture()
-        pubmed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(pubmed)
 
         mock_result = PubMedSearchResult(
             total_count=42,
@@ -223,11 +174,10 @@ class TestPubMedTools:
         assert "hepatotoxicity" in result
         assert "42" in result
 
-    async def test_search_papers(self) -> None:
+    async def test_search_papers(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import pubmed
 
-        capture = ToolCapture()
-        pubmed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(pubmed)
 
         mock_result = PubMedSearchResult(
             total_count=1,
@@ -249,11 +199,10 @@ class TestPubMedTools:
         assert "Propofol hepatotoxicity review" in result
         assert "DOI:10.1234/test" in result
 
-    async def test_search_papers_no_doi(self) -> None:
+    async def test_search_papers_no_doi(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import pubmed
 
-        capture = ToolCapture()
-        pubmed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(pubmed)
 
         mock_result = PubMedSearchResult(
             total_count=1,
@@ -277,11 +226,10 @@ class TestPubMedTools:
 class TestCrossTools:
     """MCP tools para cross-reference."""
 
-    async def test_hypothesis_with_articles(self) -> None:
+    async def test_hypothesis_with_articles(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import cross
 
-        capture = ToolCapture()
-        cross.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(cross)
 
         mock_result = HypothesisResult(
             drug="propofol",
@@ -289,7 +237,7 @@ class TestCrossTools:
             classification=HypothesisClassification.EMERGING_SIGNAL,
             signal=make_signal(event="PRIS"),
             literature_count=3,
-            articles=[_make_article("111", "PRIS case report")],
+            articles=[make_article("111", "PRIS case report")],
             evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
             summary="Emerging signal for propofol-PRIS.",
         )
@@ -304,11 +252,10 @@ class TestCrossTools:
         assert "Literature count:** 3" in result
         assert "PRIS case report" in result
 
-    async def test_hypothesis_no_articles(self) -> None:
+    async def test_hypothesis_no_articles(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import cross
 
-        capture = ToolCapture()
-        cross.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(cross)
 
         mock_result = HypothesisResult(
             drug="propofol",
@@ -337,11 +284,10 @@ class TestCrossTools:
 class TestScanTools:
     """MCP tools para scan."""
 
-    async def test_scan_drug_with_results(self) -> None:
+    async def test_scan_drug_with_results(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         signal = make_signal(event="HYPOTENSION")
         mock_result = ScanResult(
@@ -353,7 +299,7 @@ class TestScanTools:
                     classification=HypothesisClassification.KNOWN_ASSOCIATION,
                     signal=signal,
                     literature_count=50,
-                    articles=[_make_article("99999", "Propofol hypotension review")],
+                    articles=[make_article("99999", "Propofol hypotension review")],
                     evidence=make_evidence(source="OpenFDA/FAERS", data={"drug": "propofol"}),
                     summary="Known.",
                     score=4.5,
@@ -380,11 +326,10 @@ class TestScanTools:
         assert "Ref:" in result
         assert "Propofol hypotension review" in result
 
-    async def test_scan_drug_with_failures(self) -> None:
+    async def test_scan_drug_with_failures(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         mock_result = ScanResult(
             drug="propofol",
@@ -403,12 +348,11 @@ class TestScanTools:
         assert "EVENT_A" in result
         assert "EVENT_B" in result
 
-    async def test_scan_drug_clamps_top_n(self) -> None:
+    async def test_scan_drug_clamps_top_n(self, tool_capture: Any) -> None:
         """top_n > 20 é clamped para 20."""
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         mock_result = ScanResult(
             drug="propofol",
@@ -432,11 +376,10 @@ class TestScanTools:
 class TestVocabTools:
     """MCP tools para normalização de vocabulário."""
 
-    async def test_normalize_drug_found(self) -> None:
+    async def test_normalize_drug_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import vocab
 
-        capture = ToolCapture()
-        vocab.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(vocab)
 
         mock_result = DrugNormResult(
             original="advil",
@@ -455,11 +398,10 @@ class TestVocabTools:
         assert "Advil" in result
         assert "Motrin" in result
 
-    async def test_normalize_drug_not_found(self) -> None:
+    async def test_normalize_drug_not_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import vocab
 
-        capture = ToolCapture()
-        vocab.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(vocab)
 
         mock_result = DrugNormResult(
             original="xyz123",
@@ -472,11 +414,10 @@ class TestVocabTools:
 
         assert "No match found" in result
 
-    async def test_map_to_mesh_found(self) -> None:
+    async def test_map_to_mesh_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import vocab
 
-        capture = ToolCapture()
-        vocab.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(vocab)
 
         mock_result = MeSHResult(
             query="aspirin",
@@ -494,11 +435,10 @@ class TestVocabTools:
         assert "D001241" in result
         assert "D02.455" in result
 
-    async def test_map_to_mesh_not_found(self) -> None:
+    async def test_map_to_mesh_not_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import vocab
 
-        capture = ToolCapture()
-        vocab.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(vocab)
 
         mock_result = MeSHResult(
             query="xyz123",
@@ -520,11 +460,10 @@ class TestVocabTools:
 class TestMetaTools:
     """MCP tools de metadados."""
 
-    async def test_list_tools(self) -> None:
+    async def test_list_tools(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import meta
 
-        capture = ToolCapture()
-        meta.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(meta)
 
         result = await capture.tools["list_tools"]()
 
@@ -539,11 +478,10 @@ class TestMetaTools:
         assert "drug_mechanism" in result
         assert "version" in result
 
-    async def test_version(self) -> None:
+    async def test_version(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import meta
 
-        capture = ToolCapture()
-        meta.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(meta)
 
         result = await capture.tools["version"]()
 
@@ -560,12 +498,11 @@ class TestMetaTools:
 class TestDailyMedTools:
     """MCP tools para DailyMed (bulas FDA)."""
 
-    async def test_label_events_found(self) -> None:
+    async def test_label_events_found(self, tool_capture: Any) -> None:
         from hypokrates.dailymed.models import LabelEventsResult
         from hypokrates.mcp.tools import dailymed
 
-        capture = ToolCapture()
-        dailymed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(dailymed)
 
         mock_result = LabelEventsResult(
             drug="propofol",
@@ -583,12 +520,11 @@ class TestDailyMedTools:
         assert "BRADYCARDIA" in result
         assert "3" in result  # events found count
 
-    async def test_label_events_empty(self) -> None:
+    async def test_label_events_empty(self, tool_capture: Any) -> None:
         from hypokrates.dailymed.models import LabelEventsResult
         from hypokrates.mcp.tools import dailymed
 
-        capture = ToolCapture()
-        dailymed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(dailymed)
 
         mock_result = LabelEventsResult(
             drug="unknowndrug",
@@ -603,12 +539,11 @@ class TestDailyMedTools:
 
         assert "No adverse reactions section found" in result
 
-    async def test_check_label_found(self) -> None:
+    async def test_check_label_found(self, tool_capture: Any) -> None:
         from hypokrates.dailymed.models import LabelCheckResult
         from hypokrates.mcp.tools import dailymed
 
-        capture = ToolCapture()
-        dailymed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(dailymed)
 
         mock_result = LabelCheckResult(
             drug="propofol",
@@ -627,12 +562,11 @@ class TestDailyMedTools:
         assert "bradycardia" in result
         assert "abc-123" in result
 
-    async def test_check_label_not_found(self) -> None:
+    async def test_check_label_not_found(self, tool_capture: Any) -> None:
         from hypokrates.dailymed.models import LabelCheckResult
         from hypokrates.mcp.tools import dailymed
 
-        capture = ToolCapture()
-        dailymed.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(dailymed)
 
         mock_result = LabelCheckResult(
             drug="propofol",
@@ -656,12 +590,11 @@ class TestDailyMedTools:
 class TestTrialsTools:
     """MCP tools para ClinicalTrials.gov."""
 
-    async def test_search_trials_found(self) -> None:
+    async def test_search_trials_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import trials
         from hypokrates.trials.models import ClinicalTrial, TrialsResult
 
-        capture = ToolCapture()
-        trials.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(trials)
 
         mock_result = TrialsResult(
             drug="propofol",
@@ -688,12 +621,11 @@ class TestTrialsTools:
         assert "RECRUITING" in result
         assert "Phase 3" in result
 
-    async def test_search_trials_empty(self) -> None:
+    async def test_search_trials_empty(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import trials
         from hypokrates.trials.models import TrialsResult
 
-        capture = ToolCapture()
-        trials.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(trials)
 
         mock_result = TrialsResult(
             drug="xyz",
@@ -719,7 +651,7 @@ class TestTrialsTools:
 class TestDrugBankTools:
     """MCP tools para DrugBank."""
 
-    async def test_drug_info_found(self) -> None:
+    async def test_drug_info_found(self, tool_capture: Any) -> None:
         from hypokrates.drugbank.models import (
             DrugBankInfo,
             DrugEnzyme,
@@ -728,8 +660,7 @@ class TestDrugBankTools:
         )
         from hypokrates.mcp.tools import drugbank
 
-        capture = ToolCapture()
-        drugbank.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(drugbank)
 
         mock_result = DrugBankInfo(
             drugbank_id="DB00818",
@@ -759,11 +690,10 @@ class TestDrugBankTools:
         assert "CYP2B6" in result
         assert "Fentanyl" in result
 
-    async def test_drug_info_not_found(self) -> None:
+    async def test_drug_info_not_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import drugbank
 
-        capture = ToolCapture()
-        drugbank.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(drugbank)
 
         with patch.object(drugbank, "drugbank_api") as mock_api:
             mock_api.drug_info = AsyncMock(return_value=None)
@@ -771,12 +701,11 @@ class TestDrugBankTools:
 
         assert "not found" in result
 
-    async def test_drug_interactions_found(self) -> None:
+    async def test_drug_interactions_found(self, tool_capture: Any) -> None:
         from hypokrates.drugbank.models import DrugInteraction
         from hypokrates.mcp.tools import drugbank
 
-        capture = ToolCapture()
-        drugbank.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(drugbank)
 
         mock_result = [
             DrugInteraction(
@@ -800,11 +729,10 @@ class TestDrugBankTools:
         assert "Midazolam" in result
         assert "2" in result  # total count
 
-    async def test_drug_interactions_empty(self) -> None:
+    async def test_drug_interactions_empty(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import drugbank
 
-        capture = ToolCapture()
-        drugbank.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(drugbank)
 
         with patch.object(drugbank, "drugbank_api") as mock_api:
             mock_api.drug_interactions = AsyncMock(return_value=[])
@@ -821,12 +749,11 @@ class TestDrugBankTools:
 class TestOpenTargetsTools:
     """MCP tools para OpenTargets."""
 
-    async def test_drug_adverse_events_found(self) -> None:
+    async def test_drug_adverse_events_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import opentargets
         from hypokrates.opentargets.models import OTAdverseEvent, OTDrugSafety
 
-        capture = ToolCapture()
-        opentargets.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(opentargets)
 
         mock_result = OTDrugSafety(
             drug_name="propofol",
@@ -850,12 +777,11 @@ class TestOpenTargetsTools:
         assert "10006093" in result
         assert "Hypotension" in result
 
-    async def test_drug_adverse_events_not_found(self) -> None:
+    async def test_drug_adverse_events_not_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import opentargets
         from hypokrates.opentargets.models import OTDrugSafety
 
-        capture = ToolCapture()
-        opentargets.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(opentargets)
 
         mock_result = OTDrugSafety(
             drug_name="unknowndrug",
@@ -869,11 +795,10 @@ class TestOpenTargetsTools:
 
         assert "not found" in result
 
-    async def test_drug_safety_score_found(self) -> None:
+    async def test_drug_safety_score_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import opentargets
 
-        capture = ToolCapture()
-        opentargets.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(opentargets)
 
         with patch.object(opentargets, "opentargets_api") as mock_api:
             mock_api.drug_safety_score = AsyncMock(return_value=5.2345)
@@ -883,11 +808,10 @@ class TestOpenTargetsTools:
         assert "BRADYCARDIA" in result
         assert "5.2345" in result
 
-    async def test_drug_safety_score_not_found(self) -> None:
+    async def test_drug_safety_score_not_found(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import opentargets
 
-        capture = ToolCapture()
-        opentargets.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(opentargets)
 
         with patch.object(opentargets, "opentargets_api") as mock_api:
             mock_api.drug_safety_score = AsyncMock(return_value=None)
@@ -904,12 +828,11 @@ class TestOpenTargetsTools:
 class TestChEMBLTools:
     """MCP tools para ChEMBL."""
 
-    async def test_drug_mechanism_found(self) -> None:
+    async def test_drug_mechanism_found(self, tool_capture: Any) -> None:
         from hypokrates.chembl.models import ChEMBLMechanism, ChEMBLTarget
         from hypokrates.mcp.tools import chembl
 
-        capture = ToolCapture()
-        chembl.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(chembl)
 
         mock_result = ChEMBLMechanism(
             chembl_id="CHEMBL526",
@@ -938,12 +861,11 @@ class TestChEMBLTools:
         assert "GABRA1" in result
         assert "Max phase:** 4" in result
 
-    async def test_drug_mechanism_not_found(self) -> None:
+    async def test_drug_mechanism_not_found(self, tool_capture: Any) -> None:
         from hypokrates.chembl.models import ChEMBLMechanism
         from hypokrates.mcp.tools import chembl
 
-        capture = ToolCapture()
-        chembl.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(chembl)
 
         mock_result = ChEMBLMechanism(
             chembl_id="",
@@ -956,12 +878,11 @@ class TestChEMBLTools:
 
         assert "not found in ChEMBL" in result
 
-    async def test_drug_metabolism_found(self) -> None:
+    async def test_drug_metabolism_found(self, tool_capture: Any) -> None:
         from hypokrates.chembl.models import ChEMBLMetabolism, MetabolismPathway
         from hypokrates.mcp.tools import chembl
 
-        capture = ToolCapture()
-        chembl.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(chembl)
 
         mock_result = ChEMBLMetabolism(
             chembl_id="CHEMBL526",
@@ -986,12 +907,11 @@ class TestChEMBLTools:
         assert "4-Hydroxypropofol" in result
         assert "Hydroxylation" in result
 
-    async def test_drug_metabolism_not_found(self) -> None:
+    async def test_drug_metabolism_not_found(self, tool_capture: Any) -> None:
         from hypokrates.chembl.models import ChEMBLMetabolism
         from hypokrates.mcp.tools import chembl
 
-        capture = ToolCapture()
-        chembl.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(chembl)
 
         mock_result = ChEMBLMetabolism(
             chembl_id="",
@@ -1004,12 +924,11 @@ class TestChEMBLTools:
 
         assert "not found in ChEMBL" in result
 
-    async def test_drug_metabolism_no_pathways(self) -> None:
+    async def test_drug_metabolism_no_pathways(self, tool_capture: Any) -> None:
         from hypokrates.chembl.models import ChEMBLMetabolism
         from hypokrates.mcp.tools import chembl
 
-        capture = ToolCapture()
-        chembl.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(chembl)
 
         mock_result = ChEMBLMetabolism(
             chembl_id="CHEMBL526",
@@ -1033,12 +952,11 @@ class TestChEMBLTools:
 class TestFAERSBulkTools:
     """MCP tools para FAERS Bulk."""
 
-    async def test_bulk_status_loaded(self) -> None:
+    async def test_bulk_status_loaded(self, tool_capture: Any) -> None:
         from hypokrates.faers_bulk.models import BulkStoreStatus, QuarterInfo
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         mock_status = BulkStoreStatus(
             total_reports=50000,
@@ -1066,12 +984,11 @@ class TestFAERSBulkTools:
         assert "45,000" in result
         assert "2024Q3" in result
 
-    async def test_bulk_status_empty(self) -> None:
+    async def test_bulk_status_empty(self, tool_capture: Any) -> None:
         from hypokrates.faers_bulk.models import BulkStoreStatus
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         mock_status = BulkStoreStatus(
             total_reports=0,
@@ -1086,11 +1003,10 @@ class TestFAERSBulkTools:
         assert "Empty" in result
         assert "faers_bulk_load" in result
 
-    async def test_bulk_status_error(self) -> None:
+    async def test_bulk_status_error(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.bulk_store_status = AsyncMock(side_effect=RuntimeError("No store"))
@@ -1098,11 +1014,10 @@ class TestFAERSBulkTools:
 
         assert "not available" in result
 
-    async def test_bulk_signal_detected(self) -> None:
+    async def test_bulk_signal_detected(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         mock_signal = make_signal(event="BRADYCARDIA")
 
@@ -1115,11 +1030,10 @@ class TestFAERSBulkTools:
         assert "BRADYCARDIA" in result
         assert "Signal detected:** YES" in result
 
-    async def test_bulk_signal_store_empty(self) -> None:
+    async def test_bulk_signal_store_empty(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.is_bulk_available = AsyncMock(return_value=False)
@@ -1127,11 +1041,10 @@ class TestFAERSBulkTools:
 
         assert "empty" in result.lower()
 
-    async def test_bulk_signal_invalid_role(self) -> None:
+    async def test_bulk_signal_invalid_role(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.is_bulk_available = AsyncMock(return_value=True)
@@ -1139,12 +1052,11 @@ class TestFAERSBulkTools:
 
         assert "Invalid role_filter" in result
 
-    async def test_bulk_load_success(self) -> None:
+    async def test_bulk_load_success(self, tool_capture: Any) -> None:
         from hypokrates.faers_bulk.models import BulkStoreStatus
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         mock_status = BulkStoreStatus(
             total_reports=50000,
@@ -1164,11 +1076,10 @@ class TestFAERSBulkTools:
 
         assert "25,000" in result
 
-    async def test_bulk_load_nothing_new(self) -> None:
+    async def test_bulk_load_nothing_new(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch(
             "hypokrates.faers_bulk.loader.load_incremental", new_callable=AsyncMock
@@ -1178,11 +1089,10 @@ class TestFAERSBulkTools:
 
         assert "No new quarters" in result
 
-    async def test_bulk_load_error(self) -> None:
+    async def test_bulk_load_error(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch(
             "hypokrates.faers_bulk.loader.load_incremental", new_callable=AsyncMock
@@ -1192,12 +1102,11 @@ class TestFAERSBulkTools:
 
         assert "Error loading" in result
 
-    async def test_bulk_timeline(self) -> None:
+    async def test_bulk_timeline(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
         from hypokrates.stats.models import QuarterlyCount, TimelineResult
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         mock_result = TimelineResult(
             drug="propofol",
@@ -1233,11 +1142,10 @@ class TestFAERSBulkTools:
         assert "2023-Q2" in result
         assert "SPIKE" in result
 
-    async def test_bulk_timeline_store_empty(self) -> None:
+    async def test_bulk_timeline_store_empty(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.is_bulk_available = AsyncMock(return_value=False)
@@ -1245,11 +1153,10 @@ class TestFAERSBulkTools:
 
         assert "empty" in result.lower()
 
-    async def test_bulk_timeline_invalid_role(self) -> None:
+    async def test_bulk_timeline_invalid_role(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import faers_bulk
 
-        capture = ToolCapture()
-        faers_bulk.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(faers_bulk)
 
         with patch.object(faers_bulk, "bulk_api") as mock_api:
             mock_api.is_bulk_available = AsyncMock(return_value=True)
@@ -1266,11 +1173,10 @@ class TestFAERSBulkTools:
 class TestStatsToolsExtended:
     """MCP tools de stats — batch e timeline."""
 
-    async def test_batch_signal(self) -> None:
+    async def test_batch_signal(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         pairs = [
             {"drug": "propofol", "event": "BRADYCARDIA"},
@@ -1293,20 +1199,18 @@ class TestStatsToolsExtended:
         assert "KETAMINE" in result
         assert "2 pairs" in result
 
-    async def test_batch_signal_empty(self) -> None:
+    async def test_batch_signal_empty(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         result = await capture.tools["batch_signal"]([])
         assert "No pairs provided" in result
 
-    async def test_batch_signal_with_error(self) -> None:
+    async def test_batch_signal_with_error(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         pairs = [
             {"drug": "propofol", "event": "DEATH"},
@@ -1327,12 +1231,11 @@ class TestStatsToolsExtended:
         assert "PROPOFOL" in result
         assert "Error" in result
 
-    async def test_signal_timeline(self) -> None:
+    async def test_signal_timeline(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
         from hypokrates.stats.models import QuarterlyCount, TimelineResult
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         mock_result = TimelineResult(
             drug="propofol",
@@ -1363,12 +1266,11 @@ class TestStatsToolsExtended:
         assert "SPIKE" in result
         assert "38" in result
 
-    async def test_signal_timeline_no_spikes(self) -> None:
+    async def test_signal_timeline_no_spikes(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import stats
         from hypokrates.stats.models import QuarterlyCount, TimelineResult
 
-        capture = ToolCapture()
-        stats.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(stats)
 
         mock_result = TimelineResult(
             drug="propofol",
@@ -1400,11 +1302,10 @@ class TestStatsToolsExtended:
 class TestCrossToolsExtended:
     """MCP tools de cross — enriquecimento e compare_signals."""
 
-    async def test_hypothesis_with_label_and_trials(self) -> None:
+    async def test_hypothesis_with_label_and_trials(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import cross
 
-        capture = ToolCapture()
-        cross.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(cross)
 
         mock_result = HypothesisResult(
             drug="propofol",
@@ -1440,12 +1341,11 @@ class TestCrossToolsExtended:
         assert "CYP2B6" in result
         assert "3.14" in result
 
-    async def test_compare_signals(self) -> None:
+    async def test_compare_signals(self, tool_capture: Any) -> None:
         from hypokrates.cross.models import CompareResult, CompareSignalItem
         from hypokrates.mcp.tools import cross
 
-        capture = ToolCapture()
-        cross.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(cross)
 
         mock_result = CompareResult(
             drug="isotretinoin",
@@ -1489,12 +1389,11 @@ class TestCrossToolsExtended:
 class TestScanToolsExtended:
     """MCP tools de scan — enriquecimento e compare_class."""
 
-    async def test_scan_drug_with_enrichment(self) -> None:
+    async def test_scan_drug_with_enrichment(self, tool_capture: Any) -> None:
         """scan_drug com mechanism, cyp_enzymes, interactions_count."""
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         mock_result = ScanResult(
             drug="propofol",
@@ -1546,12 +1445,11 @@ class TestScanToolsExtended:
         assert "2 operational filtered" in result
         assert "MedDRA grouped" in result
 
-    async def test_scan_drug_error(self) -> None:
+    async def test_scan_drug_error(self, tool_capture: Any) -> None:
         """scan_drug retorna erro quando API falha."""
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         with patch.object(scan, "scan_api") as mock_api:
             mock_api.scan_drug = AsyncMock(side_effect=RuntimeError("FAERS down"))
@@ -1560,7 +1458,7 @@ class TestScanToolsExtended:
         assert "ERROR" in result
         assert "FAERS down" in result
 
-    async def test_compare_class_success(self) -> None:
+    async def test_compare_class_success(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
         from hypokrates.scan.models import (
             ClassCompareResult,
@@ -1568,8 +1466,7 @@ class TestScanToolsExtended:
             EventClassification,
         )
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         mock_result = ClassCompareResult(
             drugs=["drug_a", "drug_b"],
@@ -1617,21 +1514,19 @@ class TestScanToolsExtended:
         assert "Drug-Specific" in result
         assert "RASH" in result
 
-    async def test_compare_class_too_few_drugs(self) -> None:
+    async def test_compare_class_too_few_drugs(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         result = await capture.tools["compare_class"]("only_one")
         assert "ERROR" in result
         assert "2 drugs" in result
 
-    async def test_compare_class_error(self) -> None:
+    async def test_compare_class_error(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         with patch.object(scan, "class_compare_api") as mock_api:
             mock_api.compare_class = AsyncMock(side_effect=RuntimeError("FAERS down"))
@@ -1639,7 +1534,7 @@ class TestScanToolsExtended:
 
         assert "ERROR" in result
 
-    async def test_compare_class_differential_with_outlier(self) -> None:
+    async def test_compare_class_differential_with_outlier(self, tool_capture: Any) -> None:
         from hypokrates.mcp.tools import scan
         from hypokrates.scan.models import (
             ClassCompareResult,
@@ -1647,8 +1542,7 @@ class TestScanToolsExtended:
             EventClassification,
         )
 
-        capture = ToolCapture()
-        scan.register(capture)  # type: ignore[arg-type]
+        capture = tool_capture(scan)
 
         mock_result = ClassCompareResult(
             drugs=["drug_a", "drug_b", "drug_c"],
@@ -1689,104 +1583,6 @@ class TestScanToolsExtended:
 # ---------------------------------------------------------------------------
 # Tests: MCP server — create_server
 # ---------------------------------------------------------------------------
-
-
-class TestSharedFormatters:
-    """Testes para _shared.py — citation formatters."""
-
-    def test_format_citation_full(self) -> None:
-        from hypokrates.mcp.tools._shared import format_citation
-
-        art = PubMedArticle(
-            pmid="12345678",
-            title="Drug safety review",
-            authors=["Smith John", "Jones Mary"],
-            journal="Clinical Pharmacology",
-            pub_date="2024 Jan",
-            doi="10.1234/test",
-        )
-        result = format_citation(art)
-        assert "Smith J, Jones M" in result
-        assert "(2024)" in result
-        assert "Drug safety review" in result
-        assert "*Clinical Pharmacology*" in result
-        assert "PMID:12345678" in result
-        assert "DOI:10.1234/test" in result
-
-    def test_format_citation_minimal(self) -> None:
-        from hypokrates.mcp.tools._shared import format_citation
-
-        art = PubMedArticle(pmid="111", title="Minimal article")
-        result = format_citation(art)
-        assert "Minimal article" in result
-        assert "PMID:111" in result
-        assert "DOI:" not in result
-        assert "*" not in result
-
-    def test_format_citation_three_authors_et_al(self) -> None:
-        from hypokrates.mcp.tools._shared import format_citation
-
-        art = PubMedArticle(
-            pmid="222",
-            title="Multi-author study",
-            authors=["Smith John", "Jones Mary", "Brown Alice"],
-            pub_date="2023",
-        )
-        result = format_citation(art)
-        assert "Smith J, et al." in result
-        assert "Jones" not in result
-        assert "(2023)" in result
-
-    def test_format_references_empty(self) -> None:
-        from hypokrates.mcp.tools._shared import format_references
-
-        assert format_references([]) == []
-
-    def test_format_references_max_items(self) -> None:
-        from hypokrates.mcp.tools._shared import format_references
-
-        articles = [PubMedArticle(pmid=str(i), title=f"Article {i}") for i in range(5)]
-        result = format_references(articles, max_items=2)
-        # heading + 2 items
-        content = "\n".join(result)
-        assert "Article 0" in content
-        assert "Article 1" in content
-        assert "Article 2" not in content
-
-    def test_format_references_with_abstract(self) -> None:
-        from hypokrates.mcp.tools._shared import format_references
-
-        art = PubMedArticle(
-            pmid="333",
-            title="Abstract test",
-            abstract="This is a test abstract with enough content to verify.",
-        )
-        result = format_references([art], include_abstract=True)
-        content = "\n".join(result)
-        assert "Abstract test" in content
-        assert "> This is a test abstract" in content
-
-    def test_extract_year_formats(self) -> None:
-        from hypokrates.mcp.tools._shared import _extract_year
-
-        assert _extract_year("2024 Jan") == "2024"
-        assert _extract_year("2024") == "2024"
-        assert _extract_year("Jan-Feb 2023") == "2023"
-        assert _extract_year(None) is None
-        assert _extract_year("") is None
-        assert _extract_year("no year here") is None
-
-    def test_format_authors_single(self) -> None:
-        from hypokrates.mcp.tools._shared import _format_authors
-
-        assert _format_authors(["Smith John"]) == "Smith J"
-        assert _format_authors([]) == ""
-
-    def test_format_authors_two(self) -> None:
-        from hypokrates.mcp.tools._shared import _format_authors
-
-        result = _format_authors(["Smith John", "Jones Mary"])
-        assert result == "Smith J, Jones M"
 
 
 class TestMCPServer:

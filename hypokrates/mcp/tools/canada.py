@@ -13,6 +13,11 @@ from hypokrates.stats.measures import compute_ebgm, compute_ic, compute_prr, com
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+_UNAVAILABLE_MSG = (
+    "Canada Vigilance not available: {}. "
+    "Configure with configure(canada_bulk_path='/path/to/extracted/')."
+)
+
 
 def register(mcp: FastMCP) -> None:
     """Registra tools de Canada Vigilance no MCP server."""
@@ -51,10 +56,7 @@ def register(mcp: FastMCP) -> None:
                 drug, event, suspect_only=suspect_only, strata=strata
             )
         except HypokratesError as exc:
-            return (
-                f"Canada Vigilance not available: {exc}. "
-                "Configure with configure(canada_bulk_path='/path/to/extracted/')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"Canada Vigilance error: {exc}"
 
@@ -102,10 +104,7 @@ def register(mcp: FastMCP) -> None:
                 drug, limit=limit, suspect_only=suspect_only
             )
         except HypokratesError as exc:
-            return (
-                f"Canada Vigilance not available: {exc}. "
-                "Configure with configure(canada_bulk_path='/path/to/extracted/')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"Canada Vigilance error: {exc}"
 
@@ -131,10 +130,7 @@ def register(mcp: FastMCP) -> None:
         try:
             status = await canada_api.canada_bulk_status()
         except HypokratesError as exc:
-            return (
-                f"Canada Vigilance not available: {exc}. "
-                "Configure with configure(canada_bulk_path='/path/to/extracted/')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"Canada Vigilance error: {exc}"
 

@@ -16,6 +16,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_BULK_EMPTY_MSG = (
+    "FAERS Bulk store is empty. Run `hypokrates download faers` "
+    "in your terminal to enable stratification, or use "
+    "`faers_bulk_load` to load ZIPs you already have."
+)
+_INVALID_ROLE_MSG = "Invalid role_filter: {}. Use: suspect, ps_only, all."
+
 
 def register(mcp: FastMCP) -> None:
     """Registra tools de FAERS Bulk no MCP server."""
@@ -81,16 +88,12 @@ def register(mcp: FastMCP) -> None:
         """
         available = await bulk_api.is_bulk_available()
         if not available:
-            return (
-                "FAERS Bulk store is empty. Run `hypokrates download faers` "
-                "in your terminal to enable stratification, or use "
-                "`faers_bulk_load` to load ZIPs you already have."
-            )
+            return _BULK_EMPTY_MSG
 
         try:
             rf = RoleCodFilter(role_filter)
         except ValueError:
-            return f"Invalid role_filter: {role_filter}. Use: suspect, ps_only, all."
+            return _INVALID_ROLE_MSG.format(role_filter)
 
         strata = None
         if sex is not None or age_group is not None:
@@ -166,12 +169,12 @@ def register(mcp: FastMCP) -> None:
         """
         available = await bulk_api.is_bulk_available()
         if not available:
-            return "FAERS Bulk store is empty. Load data first with `faers_bulk_load`."
+            return _BULK_EMPTY_MSG
 
         try:
             rf = RoleCodFilter(role_filter)
         except ValueError:
-            return f"Invalid role_filter: {role_filter}. Use: suspect, ps_only, all."
+            return _INVALID_ROLE_MSG.format(role_filter)
 
         result = await bulk_signal_timeline(drug, event, role_filter=rf)
 

@@ -17,6 +17,7 @@
 - **meta.py Sprint 11**: JADER tools added to `_TOOLS` list, Sprint 11 label applied
 
 ### Refactored
+- **MCP tools: within-file message dedup + test infrastructure**: extracted repeated error/unavailability messages into module-level constants in 5 tool files (drugbank, onsides, canada, dailymed, faers_bulk). `ToolCapture` → `conftest.py` fixture factory (63 tests), `_make_article` → `helpers.py::make_article()`, `TestSharedFormatters` → `test_shared.py`. Net -204 LOC in tests
 - **`BaseDuckDBStore` base class**: extracted singleton, `__init__`, `get_instance`, `reset`, `close`, and lock helpers from 6 identical store implementations (OnSIDES, JADER, Canada, DrugBank, ANVISA, FAERS Bulk) into `hypokrates/store/base.py`. ~189 LOC eliminated
 - **ANVISA downloader eliminated**: `anvisa/downloader.py` (89 LOC) removed — `_ensure_loaded` now uses `download/base.py::download_file(verify=False)` directly. Added `verify` parameter to `download_file()`
 - **5 largest files simplified**: extracted `_build_strata_where` helper, eliminated redundant variables/docstrings/queries across `faers_bulk/store.py`, `canada/store.py`, `cross/api.py`, `scan/api.py`, `faers_bulk/api.py`

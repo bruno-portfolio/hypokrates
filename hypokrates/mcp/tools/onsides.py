@@ -10,6 +10,10 @@ from hypokrates.onsides import api as onsides_api
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+_UNAVAILABLE_MSG = (
+    "OnSIDES not available: {}. Configure with configure(onsides_path='/path/to/onsides/csvs/')."
+)
+
 
 def register(mcp: FastMCP) -> None:
     """Registra tools de OnSIDES no MCP server."""
@@ -33,10 +37,7 @@ def register(mcp: FastMCP) -> None:
         try:
             result = await onsides_api.onsides_events(drug, min_confidence=min_confidence)
         except HypokratesError as exc:
-            return (
-                f"OnSIDES not available: {exc}. "
-                "Configure with configure(onsides_path='/path/to/onsides/csvs/')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"OnSIDES error: {exc}"
 
@@ -85,10 +86,7 @@ def register(mcp: FastMCP) -> None:
         try:
             result = await onsides_api.onsides_check_event(drug, event)
         except HypokratesError as exc:
-            return (
-                f"OnSIDES not available: {exc}. "
-                "Configure with configure(onsides_path='/path/to/onsides/csvs/')."
-            )
+            return _UNAVAILABLE_MSG.format(exc)
         except Exception as exc:
             return f"OnSIDES error: {exc}"
 

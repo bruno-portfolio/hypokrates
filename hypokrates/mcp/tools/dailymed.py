@@ -9,6 +9,11 @@ from hypokrates.dailymed import api as dailymed_api
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+_NO_SPL_MSG = (
+    "**⚠ No SPL found in DailyMed.** Drug may be withdrawn, "
+    "not marketed in the US, or listed under a different name."
+)
+
 
 def register(mcp: FastMCP) -> None:
     """Registra tools de DailyMed no MCP server."""
@@ -38,10 +43,7 @@ def register(mcp: FastMCP) -> None:
         elif result.set_id:
             lines.append("No adverse reactions section found in label.")
         else:
-            lines.append(
-                "**⚠ No SPL found in DailyMed.** Drug may be withdrawn, "
-                "not marketed in the US, or listed under a different name."
-            )
+            lines.append(_NO_SPL_MSG)
 
         return "\n".join(lines)
 
@@ -67,9 +69,6 @@ def register(mcp: FastMCP) -> None:
         if result.set_id:
             lines.append(f"**SET ID:** {result.set_id}")
         else:
-            lines.append(
-                "**⚠ No SPL found in DailyMed.** Drug may be withdrawn, "
-                "not marketed in the US, or listed under a different name."
-            )
+            lines.append(_NO_SPL_MSG)
 
         return "\n".join(lines)

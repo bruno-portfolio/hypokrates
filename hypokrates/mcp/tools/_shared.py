@@ -52,7 +52,6 @@ def format_strata_table(
 
 
 def _format_authors(authors: list[str]) -> str:
-    """Formata lista de autores: 1=nome, 2=ambos, 3+=primeiro + et al."""
     if not authors:
         return ""
 
@@ -72,7 +71,6 @@ def _format_authors(authors: list[str]) -> str:
 
 
 def _extract_year(pub_date: str | None) -> str | None:
-    """Extrai ano (4 dígitos) de pub_date PubMed."""
     if not pub_date:
         return None
     match = _YEAR_RE.search(pub_date)
