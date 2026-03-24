@@ -96,6 +96,13 @@ def register(mcp: FastMCP) -> None:
             strata = StrataFilter(sex=sex, age_group=age_group)
 
         result = await bulk_api.bulk_signal(drug, event, role_filter=rf, strata=strata)
+        if result.no_data:
+            return (
+                f"# Bulk Signal: {drug.upper()} + {event.upper()}\n"
+                f"**Signal detected:** NO DATA\n"
+                f"**Source:** {result.meta.source}\n"
+                f"**⚠ No FAERS reports found for this drug-event term.**"
+            )
         detected = "YES" if result.signal_detected else "NO"
         lines = [
             f"# Bulk Signal: {drug.upper()} + {event.upper()}",

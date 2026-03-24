@@ -145,6 +145,8 @@ MEDDRA_GROUPS: dict[str, list[str]] = {
     ],
     "STEVENS-JOHNSON SYNDROME": [
         "TOXIC EPIDERMAL NECROLYSIS",
+        "LYELL SYNDROME",
+        "LYELL'S SYNDROME",
     ],
     "ANGIOEDEMA": [
         "ANGIONEUROTIC OEDEMA",

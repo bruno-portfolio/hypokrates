@@ -11,6 +11,8 @@
 - **`co_suspect_profile` MedDRA expansion**: event term now expanded via `expand_event_terms()` (reusing `_build_event_search()`), matching the behavior of `drugs_by_event()` and `signal()`. Previously missed grouped MedDRA terms (e.g., "malignant hyperthermia" vs "hyperthermia malignant")
 - **`hypothesis()` gather isolation**: when both `check_label` and `check_trials` are enabled, a failure in one no longer discards the result of the other. Uses `asyncio.create_task()` with separate try/except blocks instead of a single `asyncio.gather()` wrapped in one try/except
 - **MCP `signal` tool source display**: output now shows `**Source:**` line (e.g., "OpenFDA/FAERS" or "FAERS/bulk (deduplicated)"), matching the pattern already used in `faers_bulk` MCP tools
+- **Lyell syndrome MedDRA synonym**: added LYELL SYNDROME / LYELL'S SYNDROME → STEVENS-JOHNSON SYNDROME group in `MEDDRA_GROUPS`. JADER `jader_signal("carbamazepine", "lyell syndrome")` now correctly returns 647 reports instead of 0 (unmapped)
+- **`batch_signal`/`faers_bulk_signal` no_data display**: both MCP tools now check `result.no_data` and show "NO DATA" with warning instead of misleading "Signal: NO" with all-zero measures for nonexistent drug-event terms
 
 ### Added
 - **vocab/drug_synonyms.py**: Static INN↔USAN synonym dict (15 drug groups) with `expand_drug_names()`. Bidirectional lookup — "adrenaline" and "epinephrine" both expand to the full group. API path generates OR queries; bulk path uses `ANY($drugs)`

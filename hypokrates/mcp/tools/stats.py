@@ -101,6 +101,13 @@ def register(mcp: FastMCP) -> None:
             if isinstance(result, BaseException):
                 sections.append(f"## {drug} + {event}\n**Error:** {result}")
                 continue
+            if result.no_data:
+                sections.append(
+                    f"## {drug} + {event}\n"
+                    f"**Signal:** NO DATA | n=0\n"
+                    f"**⚠ No FAERS reports found for this drug-event term.**"
+                )
+                continue
             detected = "YES" if result.signal_detected else "NO"
             sections.append(
                 f"## {drug} + {event}\n"
