@@ -74,9 +74,14 @@ async def canada_signal(
     Returns:
         CanadaSignalResult com PRR e flag de sinal.
     """
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+    from hypokrates.vocab.meddra import expand_event_terms
+
     store = await _ensure_loaded(_store)
+    drug_names = expand_drug_names(drug)
+    event_terms = expand_event_terms(event)
     a, b, c, n = await asyncio.to_thread(
-        store.four_counts, drug, event, suspect_only=suspect_only, strata=strata
+        store.four_counts, drug_names, event_terms, suspect_only=suspect_only, strata=strata
     )
 
     # Tabela de contingência 2x2
@@ -143,9 +148,12 @@ async def canada_top_events(
     Returns:
         Lista de (event_term, count) ordenada por count DESC.
     """
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
     store = await _ensure_loaded(_store)
+    drug_names = expand_drug_names(drug)
     return await asyncio.to_thread(
-        store.top_events, drug, suspect_only=suspect_only, limit=limit, strata=strata
+        store.top_events, drug_names, suspect_only=suspect_only, limit=limit, strata=strata
     )
 
 

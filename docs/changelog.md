@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+#### Bug Fixes (consistency audit, 2026-03-23)
+
+- **Canada/JADER synonym expansion**: `canada_signal()`, `jader_signal()`, and `*_top_events()` now expand INN/USAN drug synonyms and MedDRA event groups before querying DuckDB. Previously, "paracetamol" found 0 reports in Canada (DB uses "ACETAMINOPHEN"). Cross-country comparisons are now consistent with FAERS.
+- **FAERS Bulk `no_data` flag**: `bulk_signal()` sets `no_data=True` when drug+event count is zero. MCP `signal` tool correctly shows "NO DATA".
+- **`_resolve_role_filter` bug**: `scan_drug(suspect_only=False)` in bulk mode now returns `RoleCodFilter.ALL` instead of always defaulting to `SUSPECT`.
+- **`co_suspect_profile` MedDRA expansion**: event terms now expanded via `expand_event_terms()`, matching other FAERS query paths.
+- **`hypothesis()` gather isolation**: label and trials failures are now independent — one failing no longer discards the other's result.
+- **MCP `signal` source display**: output now includes `**Source:**` line (e.g., "FAERS/bulk (deduplicated)").
+
 #### Bug Fixes (5 bugs from stress test #3, 2026-03-23)
 
 - **INN/USAN drug synonym expansion**: `resolve_drug_field()` now expands INN↔USAN synonyms (epinephrine↔adrenaline, acetaminophen↔paracetamol, etc.). Prevents signal splitting in FAERS — noradrenaline was returning 0 reports. Static dict in `vocab/drug_synonyms.py` (15 drug groups). Both API and bulk paths expanded.

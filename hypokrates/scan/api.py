@@ -484,7 +484,9 @@ def _resolve_role_filter(primary_suspect_only: bool, suspect_only: bool) -> Role
 
     if primary_suspect_only:
         return RoleCodFilter.PS_ONLY
-    return RoleCodFilter.SUSPECT
+    if suspect_only:
+        return RoleCodFilter.SUSPECT
+    return RoleCodFilter.ALL
 
 
 async def _check_bulk_available() -> bool:

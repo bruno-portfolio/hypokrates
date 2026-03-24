@@ -280,8 +280,8 @@ async def co_suspect_profile(
         drug_search = _drug_search or await resolve_drug_field(
             drug, client=client, use_cache=use_cache
         )
-        reaction_field = f'{SEARCH_FIELDS["reaction"]}:"{event.upper()}"'
-        search = f"{drug_search} AND {reaction_field}"
+        reaction_query = _build_event_search(event, suspect_only=False)
+        search = f"{drug_search} AND {reaction_query}"
         if suspect_only:
             search += f" AND {DRUG_CHARACTERIZATION_FIELD}:{DRUG_CHARACTERIZATION_SUSPECT}"
 

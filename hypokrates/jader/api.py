@@ -99,8 +99,15 @@ async def jader_signal(
     Returns:
         JADERSignalResult com PRR e flag de sinal.
     """
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+    from hypokrates.vocab.meddra import expand_event_terms
+
     store = await _ensure_loaded(_store)
-    a, b, c, n = await asyncio.to_thread(store.four_counts, drug, event, suspect_only=suspect_only)
+    drug_names = expand_drug_names(drug)
+    event_terms = expand_event_terms(event)
+    a, b, c, n = await asyncio.to_thread(
+        store.four_counts, drug_names, event_terms, suspect_only=suspect_only
+    )
 
     d = n - a - b - c
     table = ContingencyTable(a=a, b=b, c=c, d=d)
@@ -167,8 +174,13 @@ async def jader_top_events(
     Returns:
         Lista de (event_term, count) ordenada por count DESC.
     """
+    from hypokrates.vocab.drug_synonyms import expand_drug_names
+
     store = await _ensure_loaded(_store)
-    return await asyncio.to_thread(store.top_events, drug, suspect_only=suspect_only, limit=limit)
+    drug_names = expand_drug_names(drug)
+    return await asyncio.to_thread(
+        store.top_events, drug_names, suspect_only=suspect_only, limit=limit
+    )
 
 
 async def jader_bulk_status(

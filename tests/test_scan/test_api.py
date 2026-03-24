@@ -889,7 +889,7 @@ async def test_scan_bulk_mode_uses_bulk_top_events(
         result = await scan_drug("propofol", top_n=2, use_bulk=True, group_events=False)
 
     assert result.bulk_mode is True
-    assert result.role_filter_used == "suspect"
+    assert result.role_filter_used == "all"
     mock_bulk_top.assert_called_once()
 
 

@@ -152,6 +152,7 @@ async def bulk_signal(
         ic=ic,
         ebgm=ebgm,
         signal_detected=signal_detected,
+        no_data=counts.drug_event == 0,
         meta=MetaInfo(
             source="FAERS/bulk (deduplicated)",
             query={

@@ -40,6 +40,7 @@ def register(mcp: FastMCP) -> None:
         lines = [
             f"# Signal Detection: {drug.upper()} + {event.upper()}",
             f"**Signal detected:** {detected}",
+            f"**Source:** {result.meta.source}",
         ]
         if result.no_data:
             lines.append("**⚠ No FAERS reports found for this drug-event term.**")

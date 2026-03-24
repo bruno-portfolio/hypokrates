@@ -75,6 +75,15 @@ print(f"Date range: {status.date_range}")
 | `prr` | `float` | Proportional Reporting Ratio |
 | `signal_detected` | `bool` | PRR >= 2 and count >= 3 |
 
+## Synonym Expansion
+
+Drug names and event terms are automatically expanded before querying the DuckDB store:
+
+- **Drug synonyms (INN/USAN):** "paracetamol" also matches "ACETAMINOPHEN", "adrenaline" also matches "EPINEPHRINE", etc.
+- **MedDRA groups:** "malignant hyperthermia" also matches "HYPERTHERMIA MALIGNANT", etc.
+
+This ensures cross-country comparisons with FAERS are consistent — the same drug/event pair returns results regardless of naming convention used in each database.
+
 ## Integration with hypothesis()
 
 ```python

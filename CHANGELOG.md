@@ -5,6 +5,12 @@
 ### Fixed
 - **Canada/JADER PRR propagation**: `hypothesis()` now extracts `prr` from `canada_signal()` and `jader_signal()` results (previously only `drug_event_count` and `signal_detected`). New fields `canada_prr`/`jader_prr` on `HypothesisResult`. Country strata in `investigate()` now show numeric PRR instead of "n/a"
 - **target_event in compare_signals**: new `target_event` parameter force-includes the investigated event in auto-detected top events. `full_report()` passes the event automatically, fixing `_compute_class_effect()` returning "NOT_IN_TOP_COMPARED" when the event isn't in the drug's top 10. CLI: `--target-event`/`-t`, MCP: `target_event` param
+- **Canada/JADER synonym expansion**: `canada_signal()`, `canada_top_events()`, `jader_signal()`, and `jader_top_events()` now expand INN/USAN drug synonyms and MedDRA event groups before querying the DuckDB store. Previously only FAERS API/Bulk paths expanded synonyms, causing cross-country comparisons to undercount (e.g., "paracetamol" found 0 reports in Canada where the DB uses "ACETAMINOPHEN")
+- **FAERS Bulk `no_data` flag**: `bulk_signal()` now sets `no_data=True` when `drug_event == 0`, matching the API path behavior. MCP `signal` tool correctly displays "NO DATA" for zero-result bulk queries
+- **`_resolve_role_filter` ignoring `suspect_only`**: `scan_drug()` with `suspect_only=False` in bulk mode now correctly uses `RoleCodFilter.ALL` instead of always defaulting to `SUSPECT`
+- **`co_suspect_profile` MedDRA expansion**: event term now expanded via `expand_event_terms()` (reusing `_build_event_search()`), matching the behavior of `drugs_by_event()` and `signal()`. Previously missed grouped MedDRA terms (e.g., "malignant hyperthermia" vs "hyperthermia malignant")
+- **`hypothesis()` gather isolation**: when both `check_label` and `check_trials` are enabled, a failure in one no longer discards the result of the other. Uses `asyncio.create_task()` with separate try/except blocks instead of a single `asyncio.gather()` wrapped in one try/except
+- **MCP `signal` tool source display**: output now shows `**Source:**` line (e.g., "OpenFDA/FAERS" or "FAERS/bulk (deduplicated)"), matching the pattern already used in `faers_bulk` MCP tools
 
 ### Added
 - **vocab/drug_synonyms.py**: Static INN↔USAN synonym dict (15 drug groups) with `expand_drug_names()`. Bidirectional lookup — "adrenaline" and "epinephrine" both expand to the full group. API path generates OR queries; bulk path uses `ANY($drugs)`

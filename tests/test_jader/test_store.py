@@ -46,30 +46,32 @@ class TestJADERStore:
         assert loaded_store.count_reactions() == 10
 
     def test_four_counts_propofol_bradycardia(self, loaded_store: JADERStore) -> None:
-        a, _b, _c, n = loaded_store.four_counts("PROPOFOL", "BRADYCARDIA")
+        a, _b, _c, n = loaded_store.four_counts(["PROPOFOL"], ["BRADYCARDIA"])
         # J-001 and J-002 have propofol(suspect)+bradycardia
         # J-009 has propofol(concomitant)+bradycardia
         assert a >= 2
         assert n == 10
 
     def test_four_counts_suspect_only(self, loaded_store: JADERStore) -> None:
-        a_all, _, _, _ = loaded_store.four_counts("PROPOFOL", "BRADYCARDIA")
-        a_suspect, _, _, _ = loaded_store.four_counts("PROPOFOL", "BRADYCARDIA", suspect_only=True)
+        a_all, _, _, _ = loaded_store.four_counts(["PROPOFOL"], ["BRADYCARDIA"])
+        a_suspect, _, _, _ = loaded_store.four_counts(
+            ["PROPOFOL"], ["BRADYCARDIA"], suspect_only=True
+        )
         assert a_suspect <= a_all
 
     def test_four_counts_not_found(self, loaded_store: JADERStore) -> None:
-        a, _b, _c, n = loaded_store.four_counts("NONEXISTENT", "BRADYCARDIA")
+        a, _b, _c, n = loaded_store.four_counts(["NONEXISTENT"], ["BRADYCARDIA"])
         assert a == 0
         assert n == 10
 
     def test_top_events(self, loaded_store: JADERStore) -> None:
-        events = loaded_store.top_events("PROPOFOL", limit=5)
+        events = loaded_store.top_events(["PROPOFOL"], limit=5)
         assert len(events) > 0
         names = [e[0] for e in events]
         assert "BRADYCARDIA" in names
 
     def test_top_events_not_found(self, loaded_store: JADERStore) -> None:
-        events = loaded_store.top_events("NONEXISTENT")
+        events = loaded_store.top_events(["NONEXISTENT"])
         assert events == []
 
     def test_date_range(self, loaded_store: JADERStore) -> None:

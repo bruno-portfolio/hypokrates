@@ -65,15 +65,15 @@ WITH drug_reports AS (
     FROM jader_drug d
     INNER JOIN jader_dedup dd ON d.case_id = dd.case_id
         AND d.report_version = dd.report_version
-    WHERE UPPER(d.drug_name_en) = UPPER($1)
-    AND ($3 = 'all' OR d.drug_role = '被疑薬')
+    WHERE list_contains($drugs, UPPER(d.drug_name_en))
+    AND ($role = 'all' OR d.drug_role = '被疑薬')
 ),
 event_reports AS (
     SELECT DISTINCT r.case_id
     FROM jader_reac r
     INNER JOIN jader_dedup dd ON r.case_id = dd.case_id
         AND r.report_version = dd.report_version
-    WHERE UPPER(r.pt_en) = UPPER($2)
+    WHERE list_contains($events, UPPER(r.pt_en))
 ),
 a AS (
     SELECT COUNT(*) AS cnt FROM drug_reports dr
@@ -102,12 +102,12 @@ INNER JOIN jader_dedup dd ON r.case_id = dd.case_id
     AND r.report_version = dd.report_version
 INNER JOIN jader_drug d ON r.case_id = d.case_id
     AND r.report_version = d.report_version
-WHERE UPPER(d.drug_name_en) = UPPER($1)
-AND ($2 = 'all' OR d.drug_role = '被疑薬')
+WHERE list_contains($drugs, UPPER(d.drug_name_en))
+AND ($role = 'all' OR d.drug_role = '被疑薬')
 AND r.pt_en != ''
 GROUP BY r.pt_en
 ORDER BY cnt DESC
-LIMIT $3
+LIMIT $limit
 """
 
 
@@ -149,12 +149,15 @@ class JADERStore(BaseDuckDBStore):
         return count
 
     def four_counts(
-        self, drug: str, event: str, *, suspect_only: bool = False
+        self, drug_names: list[str], event_terms: list[str], *, suspect_only: bool = False
     ) -> tuple[int, int, int, int]:
         """Retorna (a, b, c, n) para cálculo de PRR."""
         role = "suspect" if suspect_only else "all"
         with self._db_lock:
-            row = self._conn.execute(_FOUR_COUNTS_SQL, [drug, event, role]).fetchone()
+            row = self._conn.execute(
+                _FOUR_COUNTS_SQL,
+                {"drugs": drug_names, "events": event_terms, "role": role},
+            ).fetchone()
 
         if row is None:
             return 0, 0, 0, 0
@@ -163,7 +166,7 @@ class JADERStore(BaseDuckDBStore):
 
     def top_events(
         self,
-        drug: str,
+        drug_names: list[str],
         *,
         suspect_only: bool = False,
         limit: int = 10,
@@ -171,7 +174,9 @@ class JADERStore(BaseDuckDBStore):
         """Retorna top eventos adversos para uma droga."""
         role = "suspect" if suspect_only else "all"
         with self._db_lock:
-            rows = self._conn.execute(_TOP_EVENTS_SQL, [drug, role, limit]).fetchall()
+            rows = self._conn.execute(
+                _TOP_EVENTS_SQL, {"drugs": drug_names, "role": role, "limit": limit}
+            ).fetchall()
 
         return [(row[0], int(row[1])) for row in rows]
 

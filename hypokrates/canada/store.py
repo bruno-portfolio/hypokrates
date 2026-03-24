@@ -74,13 +74,13 @@ WITH drug_reports AS (
     SELECT DISTINCT d.report_id
     FROM canada_drugs d
     JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
-    WHERE UPPER(i.ingredient_name) = UPPER($1)
-    AND ($3 = 'all' OR d.drug_role = 'Suspect')
+    WHERE list_contains($drugs, UPPER(i.ingredient_name))
+    AND ($role = 'all' OR d.drug_role = 'Suspect')
 ),
 event_reports AS (
     SELECT DISTINCT report_id
     FROM canada_reactions
-    WHERE UPPER(pt_name) = UPPER($2)
+    WHERE list_contains($events, UPPER(pt_name))
 ),
 a AS (
     SELECT COUNT(*) AS cnt FROM drug_reports dr
@@ -107,12 +107,12 @@ SELECT r.pt_name, COUNT(DISTINCT r.report_id) AS cnt
 FROM canada_reactions r
 JOIN canada_drugs d ON r.report_id = d.report_id
 JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
-WHERE UPPER(i.ingredient_name) = UPPER($1)
-AND ($2 = 'all' OR d.drug_role = 'Suspect')
+WHERE list_contains($drugs, UPPER(i.ingredient_name))
+AND ($role = 'all' OR d.drug_role = 'Suspect')
 AND r.pt_name != ''
 GROUP BY r.pt_name
 ORDER BY cnt DESC
-LIMIT $3
+LIMIT $limit
 """
 
 
@@ -151,19 +151,22 @@ class CanadaVigilanceStore(BaseDuckDBStore):
 
     def four_counts(
         self,
-        drug: str,
-        event: str,
+        drug_names: list[str],
+        event_terms: list[str],
         *,
         suspect_only: bool = False,
         strata: StrataFilter | None = None,
     ) -> tuple[int, int, int, int]:
         """Retorna (a, b, c, n) para calculo de PRR."""
         if strata is not None and not strata.is_empty:
-            return self._four_counts_stratified(drug, event, suspect_only, strata)
+            return self._four_counts_stratified(drug_names, event_terms, suspect_only, strata)
 
         role = "suspect" if suspect_only else "all"
         with self._db_lock:
-            row = self._conn.execute(_FOUR_COUNTS_SQL, [drug, event, role]).fetchone()
+            row = self._conn.execute(
+                _FOUR_COUNTS_SQL,
+                {"drugs": drug_names, "events": event_terms, "role": role},
+            ).fetchone()
 
         if row is None:
             return 0, 0, 0, 0
@@ -172,27 +175,32 @@ class CanadaVigilanceStore(BaseDuckDBStore):
 
     def _four_counts_stratified(
         self,
-        drug: str,
-        event: str,
+        drug_names: list[str],
+        event_terms: list[str],
         suspect_only: bool,
         strata: StrataFilter,
     ) -> tuple[int, int, int, int]:
         where_clauses: list[str] = []
-        params: list[object] = [drug, event, "suspect" if suspect_only else "all"]
+        params: dict[str, object] = {
+            "drugs": drug_names,
+            "events": event_terms,
+            "role": "suspect" if suspect_only else "all",
+        }
 
         if strata.sex is not None:
             # Canada uses "1"=Male, "2"=Female
             sex_code = {"M": "1", "F": "2"}.get(strata.sex.upper(), strata.sex)
-            where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
-            params.append(sex_code)
+            where_clauses.append("rpt.gender_code = $sex_code")
+            params["sex_code"] = sex_code
 
         if strata.age_group is not None and strata.age_group in AGE_GROUPS:
             lo, hi = AGE_GROUPS[strata.age_group]
             where_clauses.append(
-                f"TRY_CAST(rpt.age AS INTEGER) >= ${len(params) + 1} "
-                f"AND TRY_CAST(rpt.age AS INTEGER) < ${len(params) + 2}"
+                "TRY_CAST(rpt.age AS INTEGER) >= $age_lo "
+                "AND TRY_CAST(rpt.age AS INTEGER) < $age_hi"
             )
-            params.extend([lo, hi])
+            params["age_lo"] = lo
+            params["age_hi"] = hi
 
         strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -205,14 +213,14 @@ class CanadaVigilanceStore(BaseDuckDBStore):
             FROM canada_drugs d
             JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
             JOIN strata_reports sr ON d.report_id = sr.report_id
-            WHERE UPPER(i.ingredient_name) = UPPER($1)
-            AND ($3 = 'all' OR d.drug_role = 'Suspect')
+            WHERE list_contains($drugs, UPPER(i.ingredient_name))
+            AND ($role = 'all' OR d.drug_role = 'Suspect')
         ),
         event_reports AS (
             SELECT DISTINCT r.report_id
             FROM canada_reactions r
             JOIN strata_reports sr ON r.report_id = sr.report_id
-            WHERE UPPER(r.pt_name) = UPPER($2)
+            WHERE list_contains($events, UPPER(r.pt_name))
         ),
         a AS (
             SELECT COUNT(*) AS cnt FROM drug_reports dr
@@ -244,7 +252,7 @@ class CanadaVigilanceStore(BaseDuckDBStore):
 
     def top_events(
         self,
-        drug: str,
+        drug_names: list[str],
         *,
         suspect_only: bool = False,
         limit: int = 10,
@@ -254,36 +262,43 @@ class CanadaVigilanceStore(BaseDuckDBStore):
         role = "suspect" if suspect_only else "all"
 
         if strata is not None and not strata.is_empty:
-            return self._top_events_stratified(drug, suspect_only, limit, strata)
+            return self._top_events_stratified(drug_names, suspect_only, limit, strata)
 
         with self._db_lock:
-            rows = self._conn.execute(_TOP_EVENTS_SQL, [drug, role, limit]).fetchall()
+            rows = self._conn.execute(
+                _TOP_EVENTS_SQL, {"drugs": drug_names, "role": role, "limit": limit}
+            ).fetchall()
 
         return [(row[0], int(row[1])) for row in rows]
 
     def _top_events_stratified(
         self,
-        drug: str,
+        drug_names: list[str],
         suspect_only: bool,
         limit: int,
         strata: StrataFilter,
     ) -> list[tuple[str, int]]:
         where_clauses: list[str] = []
-        params: list[object] = [drug, "suspect" if suspect_only else "all", limit]
+        params: dict[str, object] = {
+            "drugs": drug_names,
+            "role": "suspect" if suspect_only else "all",
+            "limit": limit,
+        }
 
         if strata.sex is not None:
             # Canada uses "1"=Male, "2"=Female
             sex_code = {"M": "1", "F": "2"}.get(strata.sex.upper(), strata.sex)
-            where_clauses.append(f"rpt.gender_code = ${len(params) + 1}")
-            params.append(sex_code)
+            where_clauses.append("rpt.gender_code = $sex_code")
+            params["sex_code"] = sex_code
 
         if strata.age_group is not None and strata.age_group in AGE_GROUPS:
             lo, hi = AGE_GROUPS[strata.age_group]
             where_clauses.append(
-                f"TRY_CAST(rpt.age AS INTEGER) >= ${len(params) + 1} "
-                f"AND TRY_CAST(rpt.age AS INTEGER) < ${len(params) + 2}"
+                "TRY_CAST(rpt.age AS INTEGER) >= $age_lo "
+                "AND TRY_CAST(rpt.age AS INTEGER) < $age_hi"
             )
-            params.extend([lo, hi])
+            params["age_lo"] = lo
+            params["age_hi"] = hi
 
         strata_where = " AND ".join(where_clauses) if where_clauses else "1=1"
 
@@ -296,12 +311,12 @@ class CanadaVigilanceStore(BaseDuckDBStore):
         JOIN canada_drugs d ON r.report_id = d.report_id
         JOIN canada_ingredients i ON d.drug_product_id = i.drug_product_id
         JOIN strata_reports sr ON r.report_id = sr.report_id
-        WHERE UPPER(i.ingredient_name) = UPPER($1)
-        AND ($2 = 'all' OR d.drug_role = 'Suspect')
+        WHERE list_contains($drugs, UPPER(i.ingredient_name))
+        AND ($role = 'all' OR d.drug_role = 'Suspect')
         AND r.pt_name != ''
         GROUP BY r.pt_name
         ORDER BY cnt DESC
-        LIMIT $3
+        LIMIT $limit
         """
 
         with self._db_lock:

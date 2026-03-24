@@ -209,19 +209,28 @@ async def hypothesis(
         from hypokrates.dailymed import api as dailymed_api
         from hypokrates.trials import api as trials_api
 
-        try:
-            if label_cache is None:
-                label_raw, trials_result = await asyncio.gather(
-                    dailymed_api.label_events(drug, use_cache=use_cache),
-                    trials_api.search_trials(drug, event, use_cache=use_cache),
-                )
-                label_cache = label_raw
-            else:
+        if label_cache is None:
+            _label_task = asyncio.create_task(dailymed_api.label_events(drug, use_cache=use_cache))
+            _trials_task = asyncio.create_task(
+                trials_api.search_trials(drug, event, use_cache=use_cache)
+            )
+            try:
+                label_cache = await _label_task
+            except Exception:
+                logger.warning("hypothesis %s + %s: label unavailable", drug, event)
+            try:
+                trials_result = await _trials_task
+                active_trials = trials_result.active_count
+                trials_detail = _format_trials_detail(trials_result)
+            except Exception:
+                logger.warning("hypothesis %s + %s: trials unavailable", drug, event)
+        else:
+            try:
                 trials_result = await trials_api.search_trials(drug, event, use_cache=use_cache)
-            active_trials = trials_result.active_count
-            trials_detail = _format_trials_detail(trials_result)
-        except Exception:
-            logger.warning("hypothesis %s + %s: label/trials unavailable", drug, event)
+                active_trials = trials_result.active_count
+                trials_detail = _format_trials_detail(trials_result)
+            except Exception:
+                logger.warning("hypothesis %s + %s: trials unavailable", drug, event)
     elif check_label:
         if label_cache is None:
             from hypokrates.dailymed import api as dailymed_api
